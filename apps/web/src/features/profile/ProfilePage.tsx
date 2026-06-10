@@ -1,5 +1,8 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore.js'
+import { useProgramStore } from '../../store/useProgramStore.js'
+import { useAuthStore } from '../../store/useAuthStore.js'
 import { IconBolt } from '../../components/icons/index.js'
 
 const LIFTS: { key: 'squat' | 'bench' | 'deadlift'; label: string; short: string }[] = [
@@ -9,7 +12,17 @@ const LIFTS: { key: 'squat' | 'bench' | 'deadlift'; label: string; short: string
 ]
 
 export function ProfilePage() {
-  const { history, theme, setTheme, personalOneRMs, setPersonalOneRMs } = useAppStore()
+  const navigate = useNavigate()
+  const { history, theme, setTheme, personalOneRMs, setPersonalOneRMs, clearHistory } = useAppStore()
+  const { clearCustomPrograms } = useProgramStore()
+  const { user, signOut } = useAuthStore()
+
+  const handleSignOut = async () => {
+    await signOut()
+    clearHistory()
+    clearCustomPrograms()
+    navigate('/login')
+  }
   const totalVol = history.reduce((s, h) => s + h.volume, 0)
   const totalSessions = history.length
   const totalMin = history.reduce((s, h) => s + h.duration, 0)
@@ -40,15 +53,18 @@ export function ProfilePage() {
       {/* Avatar card */}
       <div style={{ padding: '0 20px 20px' }}>
         <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div className="avatar">AT</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 20, letterSpacing: '-0.02em' }}>
-              Athlete
+          <div className="avatar">{user?.email?.[0]?.toUpperCase() ?? 'A'}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18, letterSpacing: '-0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {user?.email ?? 'Athlete'}
             </div>
             <div className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-              MEMBER SINCE JAN 2025
+              POWERLIFTER
             </div>
           </div>
+          <button className="btn btn-secondary" style={{ height: 34, fontSize: 11, padding: '0 12px', flexShrink: 0 }} onClick={handleSignOut}>
+            Sign Out
+          </button>
         </div>
       </div>
 

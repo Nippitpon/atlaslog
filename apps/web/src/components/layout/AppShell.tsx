@@ -1,5 +1,7 @@
-import { useLocation, Outlet, useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { useLocation, Outlet, useNavigate, Navigate } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore.js'
+import { useAuthStore } from '../../store/useAuthStore.js'
 import { BottomNav } from './BottomNav.js'
 import { FinishSummary } from '../../features/logger/FinishSummary.js'
 import { PROGRAMS } from '../../lib/data.js'
@@ -9,8 +11,21 @@ export function AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
   const { theme, showPicker, setShowPicker, startWorkout, finishedSession, setFinishedSession } = useAppStore()
+  const { user, initialized, init } = useAuthStore()
+
+  useEffect(() => { init() }, [init])
   const isDark = theme === 'dark'
   const isLogger = location.pathname === '/workout'
+
+  if (!initialized) {
+    return (
+      <div className={`atlas-app theme-${theme}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100dvh' }}>
+        <div className="t-mono" style={{ fontSize: 12, color: 'var(--muted)' }}>Loading…</div>
+      </div>
+    )
+  }
+
+  if (!user) return <Navigate to="/login" replace />
 
   const handlePickProgram = (p: typeof PROGRAMS[number]) => {
     startWorkout(p)

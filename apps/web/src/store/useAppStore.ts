@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { Session, Workout, Program } from '@atlaslog/shared'
 import { makeSeedHistory } from '../lib/data.js'
 import { useProgramStore } from './useProgramStore.js'
+import { supabase } from '../lib/supabase.js'
 
 interface OneRMs { squat: number; bench: number; deadlift: number }
 
@@ -19,6 +20,8 @@ interface AppStore {
   setShowPicker: (v: boolean) => void
   setFinishedSession: (s: Session | null) => void
   setPersonalOneRMs: (v: OneRMs) => void
+  setHistory: (sessions: Session[]) => void
+  clearHistory: () => void
   startWorkout: (program: Program) => void
   updateWorkout: (w: Workout) => void
   finishWorkout: () => Session | null
@@ -40,6 +43,8 @@ export const useAppStore = create<AppStore>()(
       setShowPicker: (showPicker) => set({ showPicker }),
       setFinishedSession: (finishedSession) => set({ finishedSession }),
       setPersonalOneRMs: (personalOneRMs) => set({ personalOneRMs }),
+      setHistory: (history) => set({ history }),
+      clearHistory: () => set({ history: [] }),
 
       startWorkout: (program) => {
         const w: Workout = {
@@ -76,6 +81,12 @@ export const useAppStore = create<AppStore>()(
           exercises: workout.exercises,
         }
         set({ history: [session, ...history], workout: null, finishedSession: session })
+
+        // Sync to cloud (fire and forget)
+        supabase.auth.getUser().then(({ data }) => {
+          if (!data.user) return
+          supabase.from('sessions').upsert({ ...session, user_id: data.user.id }).then(() => {})
+        })
 
         // Mark current day as done on finish
         const parts = workout.programId.split('/')

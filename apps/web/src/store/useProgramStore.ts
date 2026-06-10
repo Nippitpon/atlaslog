@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { DayStatus, ProgramProgressState, ProgramConfig, StructuredExercise, StructuredProgram } from '@atlaslog/shared'
+import { supabase } from '../lib/supabase.js'
 
 type CustomAccessories = {
   [programId: string]: {
@@ -29,6 +30,8 @@ interface ProgramStore {
 
   addCustomProgram: (program: StructuredProgram) => void
   removeCustomProgram: (programId: string) => void
+  setCustomPrograms: (programs: StructuredProgram[]) => void
+  clearCustomPrograms: () => void
 }
 
 export const useProgramStore = create<ProgramStore>()(
@@ -113,6 +116,10 @@ export const useProgramStore = create<ProgramStore>()(
         set(state => ({
           customPrograms: [...state.customPrograms.filter(p => p.id !== program.id), program],
         }))
+        supabase.auth.getUser().then(({ data }) => {
+          if (!data.user) return
+          supabase.from('custom_programs').upsert({ id: program.id, user_id: data.user.id, program }).then(() => {})
+        })
       },
 
       removeCustomProgram: (programId) => {
@@ -130,7 +137,14 @@ export const useProgramStore = create<ProgramStore>()(
             customAccessories: nextCustom,
           }
         })
+        supabase.auth.getUser().then(({ data }) => {
+          if (!data.user) return
+          supabase.from('custom_programs').delete().eq('id', programId).then(() => {})
+        })
       },
+
+      setCustomPrograms: (programs) => set({ customPrograms: programs }),
+      clearCustomPrograms: () => set({ customPrograms: [] }),
     }),
     {
       name: 'atlas:v1:program-progress',
