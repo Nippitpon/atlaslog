@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { DayStatus, ProgramProgressState, ProgramConfig, StructuredExercise, StructuredProgram } from '@atlaslog/shared'
 import { supabase } from '../lib/supabase.js'
+import type { User } from '@supabase/supabase-js'
 
 type CustomAccessories = {
   [programId: string]: {
@@ -116,7 +117,7 @@ export const useProgramStore = create<ProgramStore>()(
         set(state => ({
           customPrograms: [...state.customPrograms.filter(p => p.id !== program.id), program],
         }))
-        supabase.auth.getUser().then(({ data }) => {
+        supabase.auth.getUser().then(({ data }: { data: { user: User | null } }) => {
           if (!data.user) return
           supabase.from('custom_programs').upsert({ id: program.id, user_id: data.user.id, program }).then(() => {})
         })
@@ -137,7 +138,7 @@ export const useProgramStore = create<ProgramStore>()(
             customAccessories: nextCustom,
           }
         })
-        supabase.auth.getUser().then(({ data }) => {
+        supabase.auth.getUser().then(({ data }: { data: { user: User | null } }) => {
           if (!data.user) return
           supabase.from('custom_programs').delete().eq('id', programId).then(() => {})
         })

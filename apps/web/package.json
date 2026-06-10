@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@atlaslog/shared": "workspace:*",
+    "@supabase/supabase-js": "^2.108.0",
     "@tanstack/react-query": "^5.80.6",
     "lucide-react": "^0.513.0",
     "react": "^19.2.6",

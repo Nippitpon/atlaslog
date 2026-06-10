@@ -4,6 +4,7 @@ import type { Session, Workout, Program } from '@atlaslog/shared'
 import { makeSeedHistory } from '../lib/data.js'
 import { useProgramStore } from './useProgramStore.js'
 import { supabase } from '../lib/supabase.js'
+import type { User } from '@supabase/supabase-js'
 
 interface OneRMs { squat: number; bench: number; deadlift: number }
 
@@ -83,7 +84,7 @@ export const useAppStore = create<AppStore>()(
         set({ history: [session, ...history], workout: null, finishedSession: session })
 
         // Sync to cloud (fire and forget)
-        supabase.auth.getUser().then(({ data }) => {
+        supabase.auth.getUser().then(({ data }: { data: { user: User | null } }) => {
           if (!data.user) return
           supabase.from('sessions').upsert({ ...session, user_id: data.user.id }).then(() => {})
         })
