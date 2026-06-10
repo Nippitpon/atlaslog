@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import type { StructuredProgram, ProgramConfig } from '@atlaslog/shared'
 import { parseExcelFile } from '../../lib/excelImport.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
+import { useAppStore } from '../../store/useAppStore.js'
 import { IconX, IconUpload, IconCheck } from '../../components/icons/index.js'
 
 type Step = 'upload' | 'preview' | 'setup'
@@ -43,6 +44,7 @@ function NumInput({ label, value, onChange, placeholder }: {
 export function ImportProgramSheet({ onClose }: Props) {
   const navigate = useNavigate()
   const { addCustomProgram, setConfig } = useProgramStore()
+  const { personalOneRMs } = useAppStore()
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [step, setStep] = useState<Step>('upload')
@@ -53,9 +55,9 @@ export function ImportProgramSheet({ onClose }: Props) {
   // Setup step state
   const todayISO = new Date().toISOString().split('T')[0]
   const [startDate, setStartDate] = useState(todayISO)
-  const [squatRM, setSquatRM] = useState('')
-  const [benchRM, setBenchRM] = useState('')
-  const [deadliftRM, setDeadliftRM] = useState('')
+  const [squatRM, setSquatRM] = useState(personalOneRMs.squat > 0 ? String(personalOneRMs.squat) : '')
+  const [benchRM, setBenchRM] = useState(personalOneRMs.bench > 0 ? String(personalOneRMs.bench) : '')
+  const [deadliftRM, setDeadliftRM] = useState(personalOneRMs.deadlift > 0 ? String(personalOneRMs.deadlift) : '')
 
   const endDate = useMemo(() => {
     if (!program) return todayISO

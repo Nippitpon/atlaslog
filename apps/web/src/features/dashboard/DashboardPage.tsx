@@ -194,6 +194,25 @@ export function DashboardPage() {
         </div>
       </div>
 
+      {/* No active program CTA */}
+      {!activeProgramInfo && (
+        <div style={{ padding: '0 20px', marginBottom: 16 }}>
+          <div className="card" style={{ textAlign: 'center', padding: '28px 20px' }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>🏋️</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18, marginBottom: 6 }}>
+              No active program
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 20, lineHeight: 1.5 }}>
+              เลือกโปรแกรมเพื่อเริ่มติดตามการซ้อม
+            </div>
+            <button className="btn btn-primary" onClick={() => navigate('/programs')} style={{ width: '100%' }}>
+              <IconDumbbell size={18} />
+              Browse Programs
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Active program current-week card */}
       {activeProgramInfo && (() => {
         const { program, currentWeek, currentWeekNum, doneWeeks } = activeProgramInfo

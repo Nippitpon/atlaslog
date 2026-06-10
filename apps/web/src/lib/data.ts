@@ -79,31 +79,5 @@ export const PROGRAMS: Program[] = [
 ]
 
 export function makeSeedHistory(): Session[] {
-  const today = new Date()
-  today.setHours(12, 0, 0, 0)
-  const daysAgo = (n: number) => {
-    const d = new Date(today)
-    d.setDate(d.getDate() - n)
-    return d.toISOString()
-  }
-  return [
-    {
-      id: 'h1', programId: 'push', name: 'Push Day', date: daysAgo(1),
-      duration: 64, volume: 6420, setCount: 18,
-      exercises: [
-        { exerciseId: 'bench', sets: [{w:60,r:10,done:true},{w:70,r:8,done:true},{w:75,r:6,done:true},{w:75,r:5,done:true}] },
-        { exerciseId: 'incline-db', sets: [{w:22,r:10,done:true},{w:24,r:10,done:true},{w:26,r:8,done:true}] },
-        { exerciseId: 'ohp', sets: [{w:40,r:8,done:true},{w:45,r:6,done:true},{w:45,r:6,done:true}] },
-        { exerciseId: 'lat-raise', sets: [{w:10,r:12,done:true},{w:10,r:12,done:true},{w:10,r:12,done:true}] },
-        { exerciseId: 'tricep-pd', sets: [{w:30,r:10,done:true},{w:30,r:10,done:true},{w:30,r:10,done:true}] },
-      ],
-    },
-    { id: 'h2', programId: 'legs', name: 'Leg Day', date: daysAgo(3), duration: 72, volume: 9840, setCount: 19 },
-    { id: 'h3', programId: 'pull', name: 'Pull Day', date: daysAgo(5), duration: 56, volume: 7150, setCount: 17 },
-    { id: 'h4', programId: 'push', name: 'Push Day', date: daysAgo(8), duration: 61, volume: 6180, setCount: 18 },
-    { id: 'h5', programId: 'full', name: 'Full Body', date: daysAgo(10), duration: 48, volume: 4820, setCount: 14 },
-    { id: 'h6', programId: 'legs', name: 'Leg Day', date: daysAgo(12), duration: 68, volume: 9220, setCount: 18 },
-    { id: 'h7', programId: 'pull', name: 'Pull Day', date: daysAgo(15), duration: 54, volume: 6890, setCount: 17 },
-    { id: 'h8', programId: 'upper', name: 'Upper Body', date: daysAgo(17), duration: 52, volume: 5640, setCount: 15 },
-  ]
+  return []
 }

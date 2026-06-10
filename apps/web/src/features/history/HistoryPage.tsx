@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore.js'
 import { getExercise } from '../../lib/utils.js'
 import type { Session } from '@atlaslog/shared'
@@ -91,6 +92,7 @@ function SessionCard({ h }: { h: Session }) {
 }
 
 export function HistoryPage() {
+  const navigate = useNavigate()
   const { history } = useAppStore()
 
   const groups = useMemo(() => {
@@ -114,8 +116,17 @@ export function HistoryPage() {
       </div>
 
       {history.length === 0 ? (
-        <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--muted)' }}>
-          <p>No workouts logged yet.</p>
+        <div style={{ padding: '60px 20px', textAlign: 'center' }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>📋</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 20, marginBottom: 8 }}>
+            No workouts yet
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 28, lineHeight: 1.5 }}>
+            เริ่มบันทึกการซ้อมได้เลย<br />ทุก session จะถูกเก็บไว้ที่นี่
+          </div>
+          <button className="btn btn-primary" onClick={() => navigate('/')} style={{ minWidth: 160 }}>
+            Start a Workout
+          </button>
         </div>
       ) : groups.map(([month, items]) => (
         <div key={month} style={{ marginBottom: 28 }}>

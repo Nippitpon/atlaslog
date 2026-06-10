@@ -91,7 +91,7 @@ export const useAppStore = create<AppStore>()(
       cancelWorkout: () => set({ workout: null }),
     }),
     {
-      name: 'atlas:v1',
+      name: 'atlas:v2',
       partialize: (state) => ({
         theme: state.theme,
         history: state.history,
