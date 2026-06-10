@@ -1,0 +1,315 @@
+import { useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAppStore } from '../../store/useAppStore.js'
+import { useProgramStore } from '../../store/useProgramStore.js'
+import { STRUCTURED_PROGRAMS, dayToProgram } from '../../lib/twelveWeekProgram.js'
+import { calcWeight } from '../../lib/rpeTable.js'
+import { weeklyVolume, getDayOfWeek } from '../../lib/utils.js'
+import { IconUser, IconDumbbell, IconSearch, IconPlus, IconCheck } from '../../components/icons/index.js'
+
+
+const PHASE_COLOR: Record<string, string> = {
+  Accumulation:    '#60a5fa',
+  Intensification: '#f97316',
+  Peaking:         '#a78bfa',
+  Taper:           '#4ade80',
+}
+
+export function DashboardPage() {
+  const navigate = useNavigate()
+  const { history, setShowPicker, startWorkout } = useAppStore()
+  const { configs, getWeekStatus, getDayStatus, getConfig, getCustomAccessories, customPrograms } = useProgramStore()
+
+  const week = weeklyVolume(history)
+  const maxVol = Math.max(1, ...week.map(d => d.volume))
+
+  // SBD Total: best Squat + Bench + Deadlift from main sets this week
+  const sbdTotal = useMemo(() => {
+    const weekStart = new Date()
+    weekStart.setDate(weekStart.getDate() - 6)
+    weekStart.setHours(0, 0, 0, 0)
+
+    const sessionsThisWeek = history.filter(h => new Date(h.date) >= weekStart)
+    let bestSquat = 0, bestBench = 0, bestDeadlift = 0
+
+    sessionsThisWeek.forEach(s => {
+      s.exercises?.forEach(ex => {
+        if (!ex.isMain) return
+        const maxW = Math.max(0, ...ex.sets.filter(st => st.done).map(st => st.w))
+        if (ex.exerciseId === 'squat') bestSquat = Math.max(bestSquat, maxW)
+        if (ex.exerciseId === 'bench') bestBench = Math.max(bestBench, maxW)
+        if (ex.exerciseId === 'deadlift') bestDeadlift = Math.max(bestDeadlift, maxW)
+      })
+    })
+
+    return { bestSquat, bestBench, bestDeadlift, total: bestSquat + bestBench + bestDeadlift }
+  }, [history])
+
+  // Active program: first program with a config that isn't fully done
+  // If calendar-based week is already done, advance to first not-done week
+  const activeProgramInfo = useMemo(() => {
+    const allPrograms = [...STRUCTURED_PROGRAMS, ...customPrograms]
+    for (const programId of Object.keys(configs)) {
+      const program = allPrograms.find(p => p.id === programId)
+      const config = configs[programId]
+      if (!program || !config) continue
+
+      const doneWeeks = program.weeks.filter(w =>
+        getWeekStatus(programId, w.id, w.days.length) === 'done'
+      ).length
+
+      if (doneWeeks === program.totalWeeks) continue // all weeks done
+
+      const today = new Date()
+      const start = new Date(config.startDate)
+      const diffDays = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+      const calendarWeekNum = Math.min(Math.max(Math.floor(diffDays / 7) + 1, 1), program.totalWeeks)
+
+      // Advance past done weeks starting from calendar week
+      let displayWeekNum = calendarWeekNum
+      for (let w = calendarWeekNum; w <= program.totalWeeks; w++) {
+        const wk = program.weeks[w - 1]
+        if (!wk) break
+        if (getWeekStatus(programId, wk.id, wk.days.length) !== 'done') {
+          displayWeekNum = w
+          break
+        }
+      }
+
+      const currentWeek = program.weeks[displayWeekNum - 1]
+      if (!currentWeek) continue
+
+      const weekStatus = getWeekStatus(programId, currentWeek.id, currentWeek.days.length)
+      return { program, config, currentWeek, currentWeekNum: displayWeekNum, doneWeeks, weekStatus }
+    }
+    return null
+  }, [configs, getWeekStatus, customPrograms])
+
+  const quickStart = () => {
+    if (!activeProgramInfo) { setShowPicker(true); return }
+    const { program, currentWeek } = activeProgramInfo
+    const config = getConfig(program.id)
+
+    const targetDay =
+      currentWeek.days.find(d => getDayStatus(program.id, currentWeek.id, d.id) === 'in_progress') ||
+      currentWeek.days.find(d => getDayStatus(program.id, currentWeek.id, d.id) === 'not_started')
+
+    if (!targetDay) { navigate(`/programs/${program.id}/week/${currentWeek.id}`); return }
+
+    const SBD: Record<string, 'squat' | 'bench' | 'deadlift'> = { squat: 'squat', bench: 'bench', deadlift: 'deadlift' }
+    const weightOverrides: Record<string, number> = {}
+    if (config) {
+      const oneRMs = config.oneRMs
+      targetDay.exercises.forEach(ex => {
+        const liftKey = SBD[ex.exerciseId]
+        if (!liftKey || !oneRMs[liftKey] || ex.rpe === undefined) return
+        const rm = oneRMs[liftKey]
+        const weight = ex.pct !== undefined
+          ? Math.round(rm * ex.pct / 2.5) * 2.5
+          : typeof ex.reps === 'number' ? calcWeight(rm, ex.reps, ex.rpe) : 0
+        if (weight > 0) weightOverrides[`${ex.exerciseId}:${ex.rpe}`] = weight
+      })
+    }
+
+    const customAcc = getCustomAccessories(program.id, currentWeek.id, targetDay.id)
+    const effectiveDay = customAcc
+      ? { ...targetDay, exercises: [...targetDay.exercises.filter(e => e.type === 'main'), ...customAcc] }
+      : targetDay
+
+    startWorkout(dayToProgram(program.id, currentWeek.id, effectiveDay, weightOverrides))
+    navigate('/workout')
+  }
+
+  return (
+    <div className="atlas-screen screen-enter">
+      <div className="scr-header">
+        <div>
+          <div className="sub">{getDayOfWeek()}</div>
+          <h1>Let's lift.</h1>
+        </div>
+        <button className="btn-icon" onClick={() => navigate('/profile')} aria-label="Profile">
+          <IconUser size={20} />
+        </button>
+      </div>
+
+      {/* Stats card */}
+      <div style={{ padding: '0 20px', marginBottom: 16 }}>
+        <div className="card">
+          {/* SBD Total row */}
+          {sbdTotal.total > 0 && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              background: 'var(--surface-2)', borderRadius: 10, padding: '8px 12px', marginBottom: 16,
+            }}>
+              <div>
+                <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>SBD TOTAL (WEEK)</div>
+                <div className="t-mono tnum" style={{ fontSize: 20, fontWeight: 700, color: 'var(--accent)' }}>
+                  {sbdTotal.total}<span style={{ fontSize: 11, color: 'var(--muted)', marginLeft: 2 }}>kg</span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 12 }}>
+                {[
+                  { label: 'S', val: sbdTotal.bestSquat },
+                  { label: 'B', val: sbdTotal.bestBench },
+                  { label: 'D', val: sbdTotal.bestDeadlift },
+                ].map(({ label, val }) => (
+                  <div key={label} style={{ textAlign: 'center' }}>
+                    <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>{label}</div>
+                    <div className="t-mono tnum" style={{ fontSize: 13, fontWeight: 600 }}>{val}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 }}>
+              <div className="t-eyebrow">WEEKLY VOLUME</div>
+              <div className="t-mono" style={{ fontSize: 11, color: 'var(--muted)' }}>
+                PEAK {Math.round(maxVol).toLocaleString()} kg
+              </div>
+            </div>
+            <div className="bar-chart">
+              {week.map((d, i) => {
+                const h = d.volume > 0 ? Math.max(4, (d.volume / maxVol) * 100) : 4
+                return (
+                  <div key={i} className="bar-col">
+                    <div style={{ height: 100, width: '100%', display: 'flex', alignItems: 'flex-end' }}>
+                      <div
+                        className={`bar-fill ${d.isToday ? 'today' : d.volume > 0 ? 'active' : ''}`}
+                        style={{ height: `${h}%` }}
+                      />
+                    </div>
+                    <div className="bar-label" style={{
+                      color: d.isToday ? 'var(--accent)' : 'var(--muted)',
+                      fontWeight: d.isToday ? 700 : 400,
+                    }}>
+                      {d.label}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Active program current-week card */}
+      {activeProgramInfo && (() => {
+        const { program, currentWeek, currentWeekNum, doneWeeks } = activeProgramInfo
+        const phaseColor = PHASE_COLOR[currentWeek.phase] ?? 'var(--accent)'
+        const pct = Math.round((doneWeeks / program.totalWeeks) * 100)
+        return (
+          <div style={{ padding: '0 20px', marginBottom: 16 }}>
+            <button
+              style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box' }}
+              onClick={() => navigate(`/programs/${program.id}/week/${currentWeek.id}`)}
+            >
+              <div className="card card-tight" style={{ borderLeft: `3px solid ${phaseColor}`, paddingLeft: 14 }}>
+                {/* Program header */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <div>
+                    <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 3 }}>ACTIVE PROGRAM</div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, lineHeight: 1.1 }}>
+                      {program.name}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 20, letterSpacing: '-0.02em' }}>
+                      W{currentWeekNum}
+                    </div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: phaseColor, textTransform: 'uppercase' }}>
+                      {currentWeek.phase}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Day status row */}
+                <div style={{ display: 'flex', gap: 5, marginBottom: 12 }}>
+                  {currentWeek.days.map(day => {
+                    const status = getDayStatus(program.id, currentWeek.id, day.id)
+                    const isActive = status === 'in_progress'
+                    const isDone = status === 'done'
+                    const focusShort = day.focus.split(' ')[0]
+                    return (
+                      <div key={day.id} style={{
+                        flex: 1, textAlign: 'center', padding: '6px 4px',
+                        background: isActive
+                          ? 'rgba(212,255,58,0.12)'
+                          : isDone ? 'rgba(74,222,128,0.08)' : 'var(--surface-2)',
+                        border: `1px solid ${isActive
+                          ? 'rgba(212,255,58,0.4)'
+                          : isDone ? 'rgba(74,222,128,0.25)' : 'var(--border)'}`,
+                        borderRadius: 8,
+                        transition: 'background .2s',
+                      }}>
+                        <div style={{
+                          fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: isActive ? 700 : 400,
+                          color: isActive ? 'var(--accent)' : isDone ? '#4ade80' : 'var(--muted)',
+                          marginBottom: 3,
+                        }}>
+                          {day.dayOfWeek}
+                        </div>
+                        <div style={{ height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {isDone
+                            ? <IconCheck size={11} stroke={3} style={{ color: '#4ade80' }} />
+                            : isActive
+                            ? <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)' }} />
+                            : <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--border-strong)' }} />
+                          }
+                        </div>
+                        <div style={{
+                          fontFamily: 'var(--font-mono)', fontSize: 8, marginTop: 3,
+                          color: isActive ? 'var(--accent)' : isDone ? '#4ade80' : 'var(--muted)',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>
+                          {focusShort}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Progress bar */}
+                <div style={{ height: 4, background: 'var(--surface-2)', borderRadius: 2, overflow: 'hidden', marginBottom: 4 }}>
+                  <div style={{ height: '100%', width: `${pct}%`, background: phaseColor, borderRadius: 2, transition: 'width .4s ease' }} />
+                </div>
+                <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase' }}>
+                  {doneWeeks}/{program.totalWeeks} weeks · {pct}%
+                </div>
+              </div>
+            </button>
+          </div>
+        )
+      })()}
+
+      {/* Shortcuts */}
+      <div style={{ padding: '0 20px', marginBottom: 28, display: 'flex', gap: 10 }}>
+        <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => navigate('/programs')}>
+          <IconDumbbell size={18} />
+          Programs
+        </button>
+        <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => navigate('/library')}>
+          <IconSearch size={18} />
+          Exercises
+        </button>
+      </div>
+
+      {/* Quick Start FAB */}
+      <button
+        onClick={quickStart}
+        aria-label="Quick start workout"
+        style={{
+          position: 'fixed', bottom: 80, right: 20, zIndex: 20,
+          width: 56, height: 56, borderRadius: '50%',
+          background: 'var(--accent)', border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 4px 16px rgba(212,255,58,0.35)',
+          color: 'var(--accent-ink)',
+        }}
+      >
+        <IconPlus size={26} stroke={2.5} />
+      </button>
+    </div>
+  )
+}
