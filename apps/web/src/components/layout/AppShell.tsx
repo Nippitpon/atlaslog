@@ -6,6 +6,7 @@ import { BottomNav } from './BottomNav.js'
 import { FinishSummary } from '../../features/logger/FinishSummary.js'
 import { PROGRAMS } from '../../lib/data.js'
 import { IconX, IconChevronRight } from '../icons/index.js'
+import { isSupabaseConfigured } from '../../lib/supabase.js'
 
 export function AppShell() {
   const navigate = useNavigate()
@@ -13,9 +14,31 @@ export function AppShell() {
   const { theme, showPicker, setShowPicker, startWorkout, finishedSession, setFinishedSession } = useAppStore()
   const { user, initialized, init } = useAuthStore()
 
-  useEffect(() => { init() }, [init])
+  useEffect(() => { if (isSupabaseConfigured) init() }, [init])
   const isDark = theme === 'dark'
   const isLogger = location.pathname === '/workout'
+
+  if (!isSupabaseConfigured) {
+    return (
+      <div className={`atlas-app theme-${theme}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100dvh', padding: 24 }}>
+        <div style={{ maxWidth: 360, width: '100%', textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>⚙️</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 22, marginBottom: 8 }}>
+            ยังไม่ได้ตั้งค่า Supabase
+          </div>
+          <div style={{ color: 'var(--text-2)', fontSize: 14, lineHeight: 1.6, marginBottom: 16 }}>
+            แอปต้องการ environment variables เพื่อเชื่อมต่อ cloud
+          </div>
+          <div style={{ textAlign: 'left', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-2)', lineHeight: 1.8 }}>
+            สร้างไฟล์ <span style={{ color: 'var(--accent)' }}>apps/web/.env.local</span> แล้วใส่:<br />
+            <span style={{ color: 'var(--text)' }}>VITE_SUPABASE_URL=...</span><br />
+            <span style={{ color: 'var(--text)' }}>VITE_SUPABASE_ANON_KEY=...</span><br />
+            แล้ว restart dev server
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (!initialized) {
     return (
