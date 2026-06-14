@@ -86,7 +86,17 @@ export const useAppStore = create<AppStore>()(
         // Sync to cloud (fire and forget)
         supabase.auth.getUser().then(({ data }: { data: { user: User | null } }) => {
           if (!data.user) return
-          supabase.from('sessions').upsert({ ...session, user_id: data.user.id }).then(() => {})
+          supabase.from('sessions').upsert({
+            id: session.id,
+            user_id: data.user.id,
+            program_id: session.programId,
+            name: session.name,
+            date: session.date,
+            duration: session.duration,
+            volume: session.volume,
+            set_count: session.setCount,
+            exercises: session.exercises,
+          }).then(() => {})
         })
 
         // Mark current day as done on finish

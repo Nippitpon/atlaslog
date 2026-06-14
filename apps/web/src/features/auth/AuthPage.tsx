@@ -1,18 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/useAuthStore.js'
-import { useAppStore } from '../../store/useAppStore.js'
-import { useProgramStore } from '../../store/useProgramStore.js'
-import { supabase } from '../../lib/supabase.js'
-import type { Session, StructuredProgram } from '@atlaslog/shared'
 
 type Mode = 'signin' | 'signup'
 
 export function AuthPage() {
   const navigate = useNavigate()
   const { signIn, signUp } = useAuthStore()
-  const { setHistory } = useAppStore()
-  const { setCustomPrograms } = useProgramStore()
 
   const [mode, setMode] = useState<Mode>('signin')
   const [email, setEmail] = useState('')
@@ -20,15 +14,6 @@ export function AuthPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [signupDone, setSignupDone] = useState(false)
-
-  const loadCloudData = async () => {
-    const [{ data: sessions }, { data: programs }] = await Promise.all([
-      supabase.from('sessions').select('*').order('date', { ascending: false }),
-      supabase.from('custom_programs').select('*'),
-    ])
-    if (sessions) setHistory(sessions as Session[])
-    if (programs) setCustomPrograms(programs.map((r: { program: StructuredProgram }) => r.program))
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -46,7 +31,7 @@ export function AuthPage() {
     const err = await signIn(email, password)
     if (err) { setError(err); setLoading(false); return }
 
-    await loadCloudData()
+    // Data pull is handled by useAuthStore on SIGNED_IN event
     navigate('/')
   }
 
