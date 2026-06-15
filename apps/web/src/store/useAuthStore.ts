@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase.js'
+import { flushQueue } from '../lib/syncQueue.js'
 import { useAppStore } from './useAppStore.js'
 import { useProgramStore } from './useProgramStore.js'
 
@@ -11,6 +12,7 @@ interface AuthStore {
   signIn: (email: string, password: string) => Promise<string | null>
   signUp: (email: string, password: string) => Promise<string | null>
   signOut: () => Promise<void>
+  resendConfirmation: (email: string) => Promise<string | null>
 }
 
 async function loadUserData(userId: string) {
@@ -46,13 +48,16 @@ export const useAuthStore = create<AuthStore>()((set) => ({
   init: () => {
     supabase.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
       set({ user: data.session?.user ?? null, initialized: true })
+      if (data.session?.user) void flushQueue()
     })
     supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
       set({ user: session?.user ?? null })
       if (event === 'SIGNED_IN' && session?.user) {
         loadUserData(session.user.id)
+        void flushQueue()
       }
     })
+    window.addEventListener('online', () => { void flushQueue() })
   },
 
   signIn: async (email, password) => {
@@ -68,5 +73,10 @@ export const useAuthStore = create<AuthStore>()((set) => ({
   signOut: async () => {
     await supabase.auth.signOut()
     set({ user: null })
+  },
+
+  resendConfirmation: async (email) => {
+    const { error } = await supabase.auth.resend({ type: 'signup', email })
+    return error?.message ?? null
   },
 }))

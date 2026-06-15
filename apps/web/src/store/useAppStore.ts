@@ -3,8 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { Session, Workout, Program } from '@atlaslog/shared'
 import { makeSeedHistory } from '../lib/data.js'
 import { useProgramStore } from './useProgramStore.js'
-import { supabase } from '../lib/supabase.js'
-import type { User } from '@supabase/supabase-js'
+import { syncSession } from '../lib/syncQueue.js'
 
 interface OneRMs { squat: number; bench: number; deadlift: number }
 
@@ -83,21 +82,8 @@ export const useAppStore = create<AppStore>()(
         }
         set({ history: [session, ...history], workout: null, finishedSession: session })
 
-        // Sync to cloud (fire and forget)
-        supabase.auth.getUser().then(({ data }: { data: { user: User | null } }) => {
-          if (!data.user) return
-          supabase.from('sessions').upsert({
-            id: session.id,
-            user_id: data.user.id,
-            program_id: session.programId,
-            name: session.name,
-            date: session.date,
-            duration: session.duration,
-            volume: session.volume,
-            set_count: session.setCount,
-            exercises: session.exercises,
-          }).then(() => {})
-        })
+        // Sync to cloud; queues for retry if offline / not signed in
+        void syncSession(session)
 
         // Mark current day as done on finish
         const parts = workout.programId.split('/')
