@@ -1,6 +1,6 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-15
+> อัปเดตล่าสุด: 2026-06-19
 
 ---
 
@@ -145,20 +145,134 @@ Commits: `9de2433` → `0f19806` → `9ad5a31` → pull-on-login commit
 | ~~**Pull-on-login ยังไม่ทำ**~~ | ✅ แก้แล้ว | — |
 | ~~**ไม่มี offline fallback**~~ | ✅ แก้แล้ว — `syncQueue.ts` enqueue เมื่อ fail + flush ตอน online/login | — |
 | ~~**Email confirmation UX**~~ | ✅ เพิ่มปุ่ม resend confirmation แล้ว | — |
-| **signUp UI bug (ใหม่)** | เมื่อ Confirm email ปิด signUp ได้ session ทันที แต่ UI ยังโชว์ "Check your email" (ควรเช็ค session แล้ว navigate ไป `/` แทน) | ต่ำ |
+| ~~**signUp UI bug**~~ | ✅ หายเอง — เปิด Confirm email แล้ว signUp ไม่ได้ session ทันที, UI โชว์ "รอแอดมินอนุมัติ" ถูกต้อง (verify 2026-06-19) | — |
+| **admin guard race (ใหม่)** | navigate ตรงไป `/admin` ทันทีหลัง login ถูก redirect กลับ `/` เพราะ `loadRole()` async ยังไม่เสร็จ — กดปุ่มจาก Profile ใช้ได้ปกติ | ต่ำ |
 | **pull เฉพาะตอน SIGNED_IN** | reload หน้าใช้ local persist (INITIAL_SESSION ไม่ trigger pull) — ปกติพอ แต่ถ้าแก้ข้อมูลจากอีกเครื่องจะไม่ refresh จนกว่าจะ re-login | ต่ำ |
-| **ยังไม่ได้ทดสอบ production** | env vars ยังไม่ใส่ใน Vercel จริง | กลาง |
+| ~~**ยังไม่ได้ทดสอบ production**~~ | ✅ ใส่ env vars ใน Vercel + login บน production ได้แล้ว | — |
+| ~~**Confirm email ปิดอยู่**~~ | ✅ เปิดกลับแล้ว 2026-06-19 (ตอนทำ admin-confirm flow) | — |
 
 ---
 
-## Phase 4 — แผนงานถัดไป (ยังไม่เริ่ม)
+## Phase 4 — Admin-Confirms-Users (✅ Done — setup + ทดสอบ + commit ครบ 2026-06-19)
 
-> รอ Phase 3 stable ก่อน
+> **เป้าหมาย:** เปลี่ยน signup flow จาก "user กดลิงก์ยืนยันใน email เอง" → **"admin อนุมัติ/ยืนยัน user"**
+>
+> **สถานะ (session 2026-06-19):** ✅ setup Supabase ครบ (profiles+trigger, bootstrap admin
+> `earthharuethai@gmail.com`, deploy Edge Function `admin-users`, เปิด Confirm email กลับ) →
+> ทดสอบ Playwright 390px ครบ 8/8 เคส ผ่านหมด → build + service_role ไม่หลุด bundle → commit แล้ว
 
-- Coach-athlete linking (invite code หรือ email)
-- Coach dashboard: ดู progress ของนักกีฬาหลายคน
+### ข้อจำกัดทางเทคนิคที่ต้องรู้ (สำคัญ)
+
+- confirm user (set `auth.users.email_confirmed_at`) **ต้องใช้ service_role ผ่าน Edge Function เท่านั้น**
+  — SQL editor แก้ `auth.users` ตรง ๆ ไม่ได้ (`permission denied`), security-definer ก็ไม่รอด
+- **service_role key ห้ามวางฝั่ง frontend** — อยู่เฉพาะใน Edge Function env (Supabase inject
+  `SUPABASE_SERVICE_ROLE_KEY` ให้อัตโนมัติ); ทุก `VITE_*` ถูก bundle ไป client ห้ามใส่
+- "ใครเป็น admin" เก็บใน `public.profiles.role` (SQL editor แก้ได้) → bootstrap admin คนแรกด้วย SQL
+
+### กลไกหลัก (เลือกแล้ว)
+
+คง **"Confirm email" เปิด** ใน Supabase → user ใหม่ login ไม่ได้จนกว่า admin จะ confirm
+(`email_confirm: true` ผ่าน Edge Function) → ใช้ `email_confirmed_at` เดิมเป็น "ประตูอนุมัติ"
+ไม่ต้องมี approved-flag แยก
+
+### ขอบเขต admin panel
+List + Confirm (พื้นฐาน) · Reject/Delete user · ดู user ทั้งหมด + สถานะ
+
+---
+
+### Checklist — Backend (Supabase)
+
+- [x] **1. ตาราง `public.profiles`** (role) ✅ รันแล้ว 2026-06-19
+  ```sql
+  create table public.profiles (
+    id uuid primary key references auth.users(id) on delete cascade,
+    role text not null default 'user' check (role in ('user','admin')),
+    created_at timestamptz default now()
+  );
+  alter table public.profiles enable row level security;
+  create policy "read own profile" on public.profiles for select using (auth.uid() = id);
+  ```
+
+- [x] **2. Trigger auto-create profile ตอน signup** ✅ รันแล้ว + backfill
+  ```sql
+  create function public.handle_new_user() returns trigger
+  language plpgsql security definer set search_path = '' as $$
+  begin
+    insert into public.profiles (id) values (new.id) on conflict do nothing;
+    return new;
+  end; $$;
+  create trigger on_auth_user_created
+    after insert on auth.users for each row execute function public.handle_new_user();
+  ```
+  backfill user เดิม: `insert into public.profiles (id) select id from auth.users on conflict do nothing;`
+
+- [x] **3. Bootstrap admin คนแรก** ✅ `earthharuethai@gmail.com` = admin (SQL editor — public table แก้ได้)
+  ```sql
+  update public.profiles set role = 'admin' where id = '<OWNER_USER_UUID>';
+  ```
+  หา UUID จาก Authentication → Users
+
+- [x] **4. Edge Function `admin-users`** ✅ เขียนแล้วที่ `supabase/functions/admin-users/index.ts`
+  (verify admin server-side, actions list/confirm/delete, CORS) — **ยังต้อง deploy**
+  - **deploy:** Dashboard in-browser editor (Edge Functions → New function → วางโค้ดจากไฟล์) **หรือ** Supabase CLI
+    (`supabase login` → `supabase link` → `supabase functions deploy admin-users`)
+  - ไม่ต้องตั้ง secret เพิ่ม — Supabase inject `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` ให้ edge runtime อัตโนมัติ
+
+- [x] **5. เปิด "Confirm email" กลับ** ✅ เปิดแล้ว ใน Authentication settings (Phase 3 ปิดไว้)
+
+### Checklist — Frontend (React) — ✅ เขียนเสร็จทั้งหมด
+
+- [x] **6.** `packages/shared/src/types.ts` — `AdminUser` ✅
+- [x] **7.** `apps/web/src/lib/adminApi.ts` — `listUsers/confirmUser/deleteUser` ✅
+- [x] **8.** `useAuthStore` — `isAdmin` (query `profiles.role`), reset ตอน signOut/SIGNED_OUT ✅
+- [x] **9.** `apps/web/src/features/admin/AdminPage.tsx` — Pending/Confirmed + Confirm/Reject/Delete ✅
+- [x] **10.** `router.tsx` — route `/admin` ✅
+- [x] **11.** Route guard — `!isAdmin` → `<Navigate to="/" />` (ใน AdminPage) ✅
+- [x] **12.** `ProfilePage.tsx` — ปุ่ม "Admin Panel" เฉพาะ isAdmin ✅
+- [x] **13.** `AuthPage.tsx` — signupDone → "รอแอดมินอนุมัติ" (ตัดปุ่ม resend) ✅
+
+### คำแนะนำเพิ่ม (ควรมี)
+
+- **Defense in depth:** `isAdmin` ฝั่ง client ใช้แค่ซ่อน/โชว์ UI — Edge Function **ต้อง** verify role server-side เสมอ
+- **Confirm-before-delete** + กัน admin ลบ account ตัวเอง
+- **Pagination:** `listUsers()` default 50/page — เผื่อ user เยอะในอนาคต
+- **(future)** audit: `confirmed_by uuid` / log ว่าใคร confirm ใคร
+- หลัง implement: ตรวจ service_role ไม่หลุด client bundle (`grep -r SERVICE_ROLE apps/web/dist` ต้องไม่เจอ)
+
+### ✅ เสร็จแล้ว 2026-06-19 (เดิม: resume here)
+
+**โค้ด + setup + ทดสอบ + commit ครบทุกอย่าง:**
+
+1. **4 ขั้นใน Supabase** — ทำครบแล้ว (profiles+trigger+backfill, bootstrap admin
+   `earthharuethai@gmail.com`, deploy Edge Function `admin-users`, เปิด Confirm email)
+2. **ทดสอบ Playwright 390px ครบ 8/8 เคส ผ่านหมด** (ดูผลด้านล่าง)
+3. **commit แล้ว** — `pnpm build` ผ่าน, `service_role` ไม่หลุดเข้า client bundle (grep dist = 0)
+
+> **หมายเหตุ bug เล็ก (ต่ำ):** navigate ตรงไป `/admin` ทันทีหลัง login จะถูก redirect กลับ `/`
+> เพราะ `loadRole()` (query `profiles.role`) เป็น async ยังไม่เสร็จตอน guard เช็ค — กดปุ่ม Admin
+> Panel จากหน้า Profile (หลัง role โหลดเสร็จ) ใช้ได้ปกติ. ไม่กระทบความปลอดภัย (Edge Function
+> verify role server-side อยู่แล้ว) — ไว้ปรับ guard ให้รอ role โหลดเสร็จในอนาคต
+
+### Verification — 8 เคส (Playwright 390px) — ✅ ผ่านครบ 2026-06-19
+
+1. ✅ สมัคร user ใหม่ → เห็น "รอแอดมินอนุมัติ" (ไม่มีปุ่ม resend — signUp UI bug หายเองเพราะเปิด Confirm email)
+2. ✅ login ด้วย user ใหม่ → ติด "Email not confirmed"
+3. ✅ login เป็น admin → Profile เห็นปุ่ม **Admin Panel**
+4. ✅ เข้า `/admin` → เห็น user ใหม่ในกลุ่ม **Pending** (edge function `list` ทำงาน + Delete ตัวเอง disabled)
+5. ✅ กด **Confirm** → user ย้ายไป Confirmed (edge function `confirm`)
+6. ✅ login ด้วย user ที่เพิ่ง confirm → เข้าได้
+7. ✅ กด **Delete** → confirm dialog → หายจาก list + auth.users (edge function `delete`)
+8. ✅ login เป็น user ธรรมดา → เข้า `/admin` ตรง ๆ → redirect กลับ `/` (guard) + ไม่มีปุ่ม Admin Panel
++ ✅ `pnpm build` ผ่าน · `grep -ri service_role dist` = 0 (key ไม่หลุด client)
++ ⚠️ `pnpm lint`: 1 error เดิมใน `DashboardPage.tsx` (react-hooks/preserve-manual-memoization)
+  — ไม่เกี่ยว Phase 4, มีอยู่ก่อนแล้วบน main, ไฟล์ admin ทั้งหมด lint สะอาด
+
+### Phase 4+ (idea ต่อยอด — ยังไม่ plan)
+
+- Coach-athlete linking (invite code / email)
+- Coach dashboard: ดู progress นักกีฬาหลายคน
 - Push notifications: เตือนวันซ้อม
-- Program sharing: share ลิงก์ custom program ให้คนอื่น import
+- Program sharing: share ลิงก์ custom program
 
 ---
 

@@ -5,6 +5,14 @@ export interface Exercise {
   equipment: string
 }
 
+export interface AdminUser {
+  id: string
+  email: string
+  createdAt: string
+  emailConfirmedAt: string | null
+  role: string
+}
+
 export interface ProgramSet {
   w: number
   r: number

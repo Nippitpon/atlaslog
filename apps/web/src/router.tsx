@@ -8,6 +8,7 @@ import { LoggerPage } from './features/logger/LoggerPage.js'
 import { HistoryPage } from './features/history/HistoryPage.js'
 import { LibraryPage } from './features/library/LibraryPage.js'
 import { ProfilePage } from './features/profile/ProfilePage.js'
+import { AdminPage } from './features/admin/AdminPage.js'
 import { AuthPage } from './features/auth/AuthPage.js'
 
 export const router = createBrowserRouter([
@@ -24,6 +25,7 @@ export const router = createBrowserRouter([
       { path: 'history',                                     element: <HistoryPage /> },
       { path: 'library',                                     element: <LibraryPage /> },
       { path: 'profile',                                     element: <ProfilePage /> },
+      { path: 'admin',                                       element: <AdminPage /> },
     ],
   },
 ])

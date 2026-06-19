@@ -6,7 +6,7 @@ type Mode = 'signin' | 'signup'
 
 export function AuthPage() {
   const navigate = useNavigate()
-  const { signIn, signUp, resendConfirmation } = useAuthStore()
+  const { signIn, signUp } = useAuthStore()
 
   const [mode, setMode] = useState<Mode>('signin')
   const [email, setEmail] = useState('')
@@ -14,21 +14,6 @@ export function AuthPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [signupDone, setSignupDone] = useState(false)
-  const [resending, setResending] = useState(false)
-  const [resent, setResent] = useState(false)
-  const [cooldown, setCooldown] = useState(false)
-  const [resendError, setResendError] = useState<string | null>(null)
-
-  const handleResend = async () => {
-    setResending(true)
-    setResendError(null)
-    const err = await resendConfirmation(email)
-    setResending(false)
-    if (err) { setResendError(err); return }
-    setResent(true)
-    setCooldown(true)
-    setTimeout(() => { setCooldown(false); setResent(false) }, 30000)
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -54,31 +39,15 @@ export function AuthPage() {
     return (
       <div className="atlas-app theme-dark" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100dvh', padding: 24 }}>
         <div style={{ maxWidth: 360, width: '100%', textAlign: 'center' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>📬</div>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 24, marginBottom: 8 }}>
-            Check your email
+            รอแอดมินอนุมัติ
           </div>
           <div style={{ color: 'var(--text-2)', fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
-            เราส่ง confirmation link ไปที่<br />
-            <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 13 }}>{email}</span>
+            สมัครบัญชี<br />
+            <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 13 }}>{email}</span><br />
+            เรียบร้อย — แอดมินจะอนุมัติให้เข้าใช้งานเร็ว ๆ นี้
           </div>
-          {resendError && (
-            <div style={{
-              background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
-              borderRadius: 10, padding: '10px 14px', marginBottom: 12,
-              color: '#ef4444', fontFamily: 'var(--font-mono)', fontSize: 12,
-            }}>
-              {resendError}
-            </div>
-          )}
-          <button
-            className="btn btn-primary"
-            style={{ width: '100%', marginBottom: 10 }}
-            onClick={handleResend}
-            disabled={resending || cooldown}
-          >
-            {resending ? '...' : resent ? 'ส่งอีกครั้งแล้ว ✓' : 'Resend confirmation email'}
-          </button>
           <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => setSignupDone(false)}>
             Back to Sign In
           </button>

@@ -15,7 +15,7 @@ export function ProfilePage() {
   const navigate = useNavigate()
   const { history, theme, setTheme, personalOneRMs, setPersonalOneRMs, clearHistory } = useAppStore()
   const { clearCustomPrograms } = useProgramStore()
-  const { user, signOut } = useAuthStore()
+  const { user, isAdmin, signOut } = useAuthStore()
 
   const handleSignOut = async () => {
     await signOut()
@@ -67,6 +67,28 @@ export function ProfilePage() {
           </button>
         </div>
       </div>
+
+      {/* Admin panel entry */}
+      {isAdmin && (
+        <div style={{ padding: '0 20px 20px' }}>
+          <button
+            className="card card-tight"
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}
+            onClick={() => navigate('/admin')}
+          >
+            <div style={{
+              width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+              background: 'var(--surface-2)', border: '1px solid var(--border)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 11, color: 'var(--accent)',
+            }}>★</div>
+            <div style={{ flex: 1, fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 15 }}>
+              Admin Panel
+            </div>
+            <span className="t-mono" style={{ fontSize: 11, color: 'var(--muted)' }}>MANAGE USERS →</span>
+          </button>
+        </div>
+      )}
 
       {/* Lifetime stats */}
       <div style={{ padding: '0 20px 20px' }}>

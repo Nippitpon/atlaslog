@@ -7,12 +7,18 @@ import { useProgramStore } from './useProgramStore.js'
 
 interface AuthStore {
   user: User | null
+  isAdmin: boolean
   initialized: boolean
   init: () => void
   signIn: (email: string, password: string) => Promise<string | null>
   signUp: (email: string, password: string) => Promise<string | null>
   signOut: () => Promise<void>
   resendConfirmation: (email: string) => Promise<string | null>
+}
+
+async function loadRole(userId: string): Promise<boolean> {
+  const { data } = await supabase.from('profiles').select('role').eq('id', userId).single()
+  return data?.role === 'admin'
 }
 
 async function loadUserData(userId: string) {
@@ -43,19 +49,25 @@ async function loadUserData(userId: string) {
 
 export const useAuthStore = create<AuthStore>()((set) => ({
   user: null,
+  isAdmin: false,
   initialized: false,
 
   init: () => {
     supabase.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
       set({ user: data.session?.user ?? null, initialized: true })
-      if (data.session?.user) void flushQueue()
+      if (data.session?.user) {
+        void flushQueue()
+        loadRole(data.session.user.id).then(isAdmin => set({ isAdmin }))
+      }
     })
     supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
       set({ user: session?.user ?? null })
       if (event === 'SIGNED_IN' && session?.user) {
         loadUserData(session.user.id)
         void flushQueue()
+        loadRole(session.user.id).then(isAdmin => set({ isAdmin }))
       }
+      if (event === 'SIGNED_OUT') set({ isAdmin: false })
     })
     window.addEventListener('online', () => { void flushQueue() })
   },
@@ -72,7 +84,7 @@ export const useAuthStore = create<AuthStore>()((set) => ({
 
   signOut: async () => {
     await supabase.auth.signOut()
-    set({ user: null })
+    set({ user: null, isAdmin: false })
   },
 
   resendConfirmation: async (email) => {
