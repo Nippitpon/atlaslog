@@ -93,9 +93,23 @@ Commits: `9de2433` → `0f19806` → `9ad5a31` → pull-on-login commit
   dispatch `online` → flush → sign out/in → session ขึ้นจาก Supabase จริง (round-trip ผ่าน)
 - ✅ `pnpm build` ผ่าน, ไฟล์ที่แก้ทั้งหมด lint สะอาด
 
+### Production fix — session 2026-06-19 (commit `12d9bc6`)
+
+- **เจอบั๊ก deep-link 404 บน prod:** เข้า `/login` `/admin` ตรง ๆ / refresh → Vercel ตอบ 404
+  (ไม่มี SPA fallback rewrite ใน `apps/web/vercel.json`)
+- **แก้:** เพิ่ม `"rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]`
+- **หมายเหตุสำคัญ:** commit Phase 4 (`edf1f70`) เพิ่งถูก push ขึ้น remote พร้อม fix นี้ —
+  **ก่อนหน้านี้ prod รันโค้ดเก่า (ยังไม่มี Phase 4)**. หลัง push → Vercel auto-deploy
+- **ทดสอบ prod หลัง deploy (Playwright 390px):** `/login` hard-load ไม่ 404 แล้ว ✅ ·
+  login admin → ปุ่ม Admin Panel ขึ้น · `/admin` โหลด user list ผ่าน edge function จริง
+  (CORS ผ่านโดเมน prod) ✅
+
 ### ยังค้างอยู่
 
-- [ ] **ขั้นที่ 4** — ใส่ env vars ใน Vercel (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) +
+- [x] **P0-2: ช่องโหว่ self-confirm — ปิดแล้ว** ✅ ตัด `{{ .ConfirmationURL }}` ออกจาก
+  email template "Confirm signup" ใน Supabase แล้ว → user ไม่มีลิงก์ self-confirm,
+  เหลือทางเดียวคือ admin กด Confirm ผ่าน edge function (สอดคล้องผลทดสอบเคส 5→6)
+- [x] ~~**ขั้นที่ 4** — ใส่ env vars ใน Vercel~~ (เสร็จตั้งแต่ Phase 3) (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) +
   redeploy + ทดสอบ production (ผู้ใช้ทำใน Vercel dashboard)
 - [ ] **เปิด Confirm email กลับ** ใน Supabase ก่อนใช้งานจริง (ตอนทดสอบปิดไว้) — กัน spam signup
 
