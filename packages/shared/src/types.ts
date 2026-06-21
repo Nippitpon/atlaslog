@@ -124,3 +124,35 @@ export interface ProgramProgressState {
     }
   }
 }
+
+// ─── Phase 4 — Social (Coach-Athlete / Sharing / Notifications) ────────────────
+
+export interface CoachLink {
+  id: string
+  coachId: string
+  athleteId: string
+  status: 'active' | 'archived'
+  createdAt: string
+}
+
+export interface AthleteSummary {
+  id: string
+  email: string
+  linkedAt: string
+}
+
+export interface SharedProgram {
+  code: string
+  ownerId: string
+  name: string
+  program: StructuredProgram
+  createdAt: string
+}
+
+export interface AppNotification {
+  id: string
+  type: string
+  data: Record<string, unknown> | null
+  readAt: string | null
+  createdAt: string
+}

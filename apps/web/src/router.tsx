@@ -9,6 +9,8 @@ import { HistoryPage } from './features/history/HistoryPage.js'
 import { LibraryPage } from './features/library/LibraryPage.js'
 import { ProfilePage } from './features/profile/ProfilePage.js'
 import { AdminPage } from './features/admin/AdminPage.js'
+import { CoachPage } from './features/coach/CoachPage.js'
+import { AthleteDetailPage } from './features/coach/AthleteDetailPage.js'
 import { AuthPage } from './features/auth/AuthPage.js'
 
 export const router = createBrowserRouter([
@@ -26,6 +28,8 @@ export const router = createBrowserRouter([
       { path: 'library',                                     element: <LibraryPage /> },
       { path: 'profile',                                     element: <ProfilePage /> },
       { path: 'admin',                                       element: <AdminPage /> },
+      { path: 'coach',                                       element: <CoachPage /> },
+      { path: 'coach/:athleteId',                            element: <AthleteDetailPage /> },
     ],
   },
 ])

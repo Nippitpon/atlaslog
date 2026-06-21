@@ -1,0 +1,60 @@
+import type { AthleteSummary, Session, StructuredProgram } from '@atlaslog/shared'
+import { supabase } from './supabase.js'
+
+async function call<T>(body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke('coach', { body })
+  if (error) throw new Error(error.message)
+  if (data?.error) throw new Error(data.error)
+  return data as T
+}
+
+export function linkCoach(code: string): Promise<string> {
+  return call<{ ok: true; coachEmail: string }>({ action: 'resolve-link', code })
+    .then(r => r.coachEmail)
+}
+
+export function listAthletes(): Promise<AthleteSummary[]> {
+  return call<{ athletes: AthleteSummary[] }>({ action: 'list-athletes' }).then(r => r.athletes)
+}
+
+export async function unlinkAthlete(athleteId: string): Promise<void> {
+  const { data } = await supabase.auth.getUser()
+  if (!data.user) throw new Error('Not signed in')
+  const { error } = await supabase
+    .from('coach_athlete')
+    .delete()
+    .eq('coach_id', data.user.id)
+    .eq('athlete_id', athleteId)
+  if (error) throw new Error(error.message)
+}
+
+// Read athlete data via RLS (coach reads policy). No edge function needed.
+export async function getAthleteSessions(athleteId: string): Promise<Session[]> {
+  const { data, error } = await supabase
+    .from('sessions')
+    .select('*')
+    .eq('user_id', athleteId)
+    .order('date', { ascending: false })
+  if (error) throw new Error(error.message)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data as any[]).map(r => ({
+    id: r.id,
+    programId: r.program_id,
+    name: r.name,
+    date: r.date,
+    duration: r.duration,
+    volume: r.volume,
+    setCount: r.set_count,
+    exercises: r.exercises,
+  }))
+}
+
+export async function getAthletePrograms(athleteId: string): Promise<StructuredProgram[]> {
+  const { data, error } = await supabase
+    .from('custom_programs')
+    .select('*')
+    .eq('user_id', athleteId)
+  if (error) throw new Error(error.message)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data as any[]).map(r => r.program)
+}
