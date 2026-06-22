@@ -147,6 +147,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 18px;
   padding: 20px;
+  color: var(--text);
 }
 .card-tight { padding: 16px; border-radius: 14px; }
 

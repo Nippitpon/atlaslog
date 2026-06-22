@@ -21,12 +21,15 @@ interface AuthStore {
   refreshNotifications: () => Promise<void>
 }
 
-async function loadRole(userId: string): Promise<boolean> {
+async function loadRole(userId: string): Promise<string> {
   const { data } = await supabase.from('profiles').select('role').eq('id', userId).single()
-  return data?.role === 'admin'
+  return data?.role ?? 'user'
 }
 
-async function loadIsCoach(userId: string): Promise<boolean> {
+// A user counts as a coach if an admin assigned the 'coach' role OR they already
+// have active athlete links (preserves coaches linked before roles existed).
+async function loadIsCoach(userId: string, role: string): Promise<boolean> {
+  if (role === 'coach') return true
   const { count } = await supabase
     .from('coach_athlete')
     .select('id', { count: 'exact', head: true })
@@ -74,8 +77,10 @@ export const useAuthStore = create<AuthStore>()((set) => ({
       const u = data.session?.user
       if (u) {
         void flushQueue()
-        loadRole(u.id).then(isAdmin => set({ isAdmin }))
-        loadIsCoach(u.id).then(isCoach => set({ isCoach }))
+        loadRole(u.id).then(role => {
+          set({ isAdmin: role === 'admin' })
+          loadIsCoach(u.id, role).then(isCoach => set({ isCoach }))
+        })
         fetchNotifications(u.id).then(notifications => set({ notifications })).catch(() => {})
       }
     })
@@ -85,8 +90,10 @@ export const useAuthStore = create<AuthStore>()((set) => ({
         const u = session.user
         loadUserData(u.id)
         void flushQueue()
-        loadRole(u.id).then(isAdmin => set({ isAdmin }))
-        loadIsCoach(u.id).then(isCoach => set({ isCoach }))
+        loadRole(u.id).then(role => {
+          set({ isAdmin: role === 'admin' })
+          loadIsCoach(u.id, role).then(isCoach => set({ isCoach }))
+        })
         fetchNotifications(u.id).then(notifications => set({ notifications })).catch(() => {})
       }
       if (event === 'SIGNED_OUT') set({ isAdmin: false, isCoach: false, notifications: [] })

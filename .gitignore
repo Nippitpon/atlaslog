@@ -10,3 +10,5 @@ dist/
 .claude/
 Atlaslog.html
 TEST_ACCOUNTS.md
+test-run.mjs
+test-screenshots/

@@ -166,6 +166,18 @@ export function ImportProgramSheet({ onClose }: Props) {
               <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 8 }}>
                 optional: pct (0-1), rpe (6-10), note
               </div>
+              <a
+                href="/atlaslog-program-template.xlsx"
+                download
+                className="t-mono"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 12,
+                  fontSize: 11, color: 'var(--accent)', textDecoration: 'none', fontWeight: 600,
+                }}
+              >
+                <IconUpload size={13} style={{ transform: 'rotate(180deg)' }} />
+                ดาวน์โหลดไฟล์ตัวอย่าง (template)
+              </a>
             </div>
 
             <input

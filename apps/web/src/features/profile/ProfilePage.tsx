@@ -252,7 +252,7 @@ export function ProfilePage() {
                     placeholder="0"
                     onChange={e => setDraft(d => ({ ...d, [key]: Number(e.target.value) || 0 }))}
                     onFocus={e => e.target.select()}
-                    style={{ width: 72, textAlign: 'right' }}
+                    style={{ width: 116, textAlign: 'right', paddingRight: 12 }}
                   />
                   <span className="t-mono" style={{ fontSize: 11, color: 'var(--muted)' }}>kg</span>
                 </div>

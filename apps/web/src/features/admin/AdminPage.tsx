@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { Navigate } from 'react-router-dom'
 import type { AdminUser } from '@atlaslog/shared'
 import { useAuthStore } from '../../store/useAuthStore.js'
-import { listUsers, confirmUser, deleteUser } from '../../lib/adminApi.js'
+import { listUsers, confirmUser, deleteUser, setUserRole } from '../../lib/adminApi.js'
 
 export function AdminPage() {
   const { user, isAdmin } = useAuthStore()
@@ -43,6 +43,8 @@ export function AdminPage() {
   }
 
   const handleConfirm = (u: AdminUser) => runAction(u.id, () => confirmUser(u.id))
+  const handleSetRole = (u: AdminUser, role: 'user' | 'coach') =>
+    runAction(u.id, () => setUserRole(u.id, role))
   const handleDelete = (u: AdminUser) => {
     if (!window.confirm(`Delete ${u.email}? This cannot be undone.`)) return
     return runAction(u.id, () => deleteUser(u.id))
@@ -60,7 +62,7 @@ export function AdminPage() {
             {u.email}
           </div>
           <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
-            {u.role === 'admin' ? 'ADMIN · ' : ''}{isPending ? 'PENDING' : 'CONFIRMED'}
+            {u.role === 'admin' ? 'ADMIN · ' : u.role === 'coach' ? 'COACH · ' : ''}{isPending ? 'PENDING' : 'CONFIRMED'}
           </div>
         </div>
         {isPending ? (
@@ -83,14 +85,42 @@ export function AdminPage() {
             </button>
           </>
         ) : (
-          <button
-            className="btn btn-secondary"
-            style={{ height: 32, fontSize: 11, padding: '0 12px', flexShrink: 0, opacity: isSelf ? 0.4 : 1 }}
-            disabled={busyId === u.id || isSelf}
-            onClick={() => handleDelete(u)}
-          >
-            Delete
-          </button>
+          <>
+            {u.role !== 'admin' && !isSelf && (
+              <div style={{
+                display: 'flex', flexShrink: 0, borderRadius: 8, overflow: 'hidden',
+                border: '1px solid var(--border)',
+              }}>
+                {(['user', 'coach'] as const).map(r => {
+                  const active = (u.role === 'coach' ? 'coach' : 'user') === r
+                  return (
+                    <button
+                      key={r}
+                      disabled={busyId === u.id || active}
+                      onClick={() => handleSetRole(u, r)}
+                      style={{
+                        height: 32, fontSize: 11, padding: '0 10px', border: 'none', cursor: 'pointer',
+                        textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600,
+                        fontFamily: 'var(--font-mono)',
+                        background: active ? 'var(--accent)' : 'var(--surface-2)',
+                        color: active ? '#000' : 'var(--muted)',
+                      }}
+                    >
+                      {r}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            <button
+              className="btn btn-secondary"
+              style={{ height: 32, fontSize: 11, padding: '0 12px', flexShrink: 0, opacity: isSelf ? 0.4 : 1 }}
+              disabled={busyId === u.id || isSelf}
+              onClick={() => handleDelete(u)}
+            >
+              Delete
+            </button>
+          </>
         )}
       </div>
     )

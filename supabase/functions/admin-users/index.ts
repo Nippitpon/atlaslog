@@ -3,7 +3,11 @@
 // (which must NEVER be exposed to the client). Deploy via dashboard or:
 //   supabase functions deploy admin-users
 //
-// Actions (POST body): { action: 'list' } | { action: 'confirm', userId } | { action: 'delete', userId }
+// Actions (POST body):
+//   { action: 'list' }
+//   { action: 'confirm', userId }
+//   { action: 'delete', userId }
+//   { action: 'set-role', userId, role: 'user' | 'coach' }
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
@@ -38,7 +42,7 @@ Deno.serve(async (req) => {
       .from('profiles').select('role').eq('id', userData.user.id).single()
     if (!profile || profile.role !== 'admin') return json({ error: 'Forbidden' }, 403)
 
-    const { action, userId } = await req.json()
+    const { action, userId, role } = await req.json()
 
     if (action === 'list') {
       const { data, error } = await admin.auth.admin.listUsers()
@@ -61,6 +65,21 @@ Deno.serve(async (req) => {
     if (action === 'confirm') {
       if (!userId) return json({ error: 'userId required' }, 400)
       const { error } = await admin.auth.admin.updateUserById(userId, { email_confirm: true })
+      if (error) return json({ error: error.message }, 500)
+      return json({ ok: true })
+    }
+
+    if (action === 'set-role') {
+      if (!userId) return json({ error: 'userId required' }, 400)
+      if (role !== 'user' && role !== 'coach') return json({ error: 'role must be user or coach' }, 400)
+      if (userId === userData.user.id) return json({ error: 'Cannot change your own role' }, 400)
+
+      // Never demote/alter an admin via this action.
+      const { data: target } = await admin.from('profiles').select('role').eq('id', userId).single()
+      if (target?.role === 'admin') return json({ error: 'Cannot change an admin\'s role' }, 400)
+
+      const { error } = await admin
+        .from('profiles').update({ role }).eq('id', userId)
       if (error) return json({ error: error.message }, 500)
       return json({ ok: true })
     }

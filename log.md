@@ -1,6 +1,6 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-22
+> อัปเดตล่าสุด: 2026-06-22 (Phase 4.1: admin-assignable coach role + UI fixes)
 
 ---
 
@@ -13,6 +13,28 @@
 | 3 | Supabase Auth + Cloud Sync | ✅ Done — เชื่อม Supabase จริง + ทดสอบ local ผ่าน (เหลือ Vercel env vars สำหรับ production) |
 | 3.5 | Admin-Confirms-Users (signup approval gate) | ✅ Done (commit `edf1f70`) — เดิมเรียก "Phase 4" แต่จริง ๆ เป็นส่วนต่อ auth |
 | 4 | Social: Coach-Athlete + Program sharing + In-app reminder | ✅ Done — merged main + deploy prod + ทดสอบ prod ผ่าน (2026-06-22, `f6529fe`) |
+| 4.1 | Admin-assignable Coach role + UI/UX fixes | ✅ Done (2026-06-22) — ทดสอบ prod ผ่าน |
+
+---
+
+## Phase 4.1 — Admin-assignable Coach role + UI fixes (2026-06-22)
+
+**Design change:** เดิม coach เป็น "relational" (ใครมีลูกศิษย์ผูก = โค้ช, ไม่แตะ `profiles.role`)
+ตอนนี้ admin กำหนด role ได้ → `isCoach = (profiles.role === 'coach') OR มี active athlete links`
+(คง derived-coach เดิมไว้ ไม่ทำให้โค้ชเก่าหลุด)
+
+- **Backend** `supabase/functions/admin-users/index.ts` — action ใหม่ `set-role` {userId, role:'user'|'coach'};
+  guard: เปลี่ยน role ตัวเองไม่ได้ + แตะ admin ไม่ได้ → **deploy แล้วผ่าน Dashboard**
+- **DB constraint:** `profiles.role` เดิม `check (role in ('user','admin'))` ปฏิเสธค่า `coach` → 500
+  แก้ด้วย `ALTER ... CHECK (role IN ('user','admin','coach'))` ใน Supabase SQL Editor → ผ่าน
+- `apps/web/src/lib/adminApi.ts` — `setUserRole()` + ดึงข้อความ error จริงจาก `FunctionsHttpError.context`
+  (เดิม supabase-js ซ่อนไว้เป็น generic "non-2xx status code")
+- `features/admin/AdminPage.tsx` — toggle USER/COACH ในแถว user ที่ confirm แล้ว (ไม่ใช่ admin/ตัวเอง)
+- `store/useAuthStore.ts` — `loadIsCoach(id, role)` เช็ค role==='coach' ก่อน
+- **UI fixes:** (1) `.card` เพิ่ม `color: var(--text)` — ปุ่ม `<button class=card>` (Admin/Coach Panel)
+  เดิมใช้สี UA default มืดใน dark theme; (2) ช่อง 1RM ใน ProfilePage width 72→116 (162.5 ถูกตัด)
+- **Docs:** `docs/excel-import-guide.md` + ไฟล์ตัวอย่าง `apps/web/public/atlaslog-program-template.xlsx`
+  + ลิงก์ดาวน์โหลด template ในหน้า Import
 
 ---
 
