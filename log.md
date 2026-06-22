@@ -1,6 +1,6 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-22 (Phase 4.1 + open bug: Import by code "not found")
+> อัปเดตล่าสุด: 2026-06-22 (Phase 4.1 + fixed: Import-by-code cross-account RLS)
 
 ---
 
@@ -38,25 +38,27 @@
 
 ---
 
-## 🐞 OPEN BUG (ยังไม่แก้ — เดี๋ยวกลับมาทำ) — "Import by code" ขึ้น "Program not found for that code"
+## ✅ FIXED BUG — "Import by code" ขึ้น "Program not found for that code" (แก้ 2026-06-22)
 
-**อาการ:** ส่งรหัสให้ user อีกคน แล้วเขาเอาไปใส่ช่อง **Import by code** (Programs) → ขึ้น
-`Program not found for that code` (พบ 2026-06-22)
+**อาการ:** เจ้าของแชร์โปรแกรมได้โค้ด 6 หลัก แต่ผู้ใช้ **อีกบัญชี** เอาไปใส่ช่อง Import by code →
+ขึ้น `Program not found for that code` (เจ้าของเองอ่านโค้ดตัวเองได้ปกติ)
 
-**แนวทางไล่หาสาเหตุ (เรียงตามความน่าจะเป็น):**
-1. **ใส่ผิดประเภทโค้ด** — แอปมี 2 โค้ด: **Coach code (8 ตัว)** จาก Profile → COACHING (ผูกโค้ช)
-   vs **Share code (6 ตัว)** จากปุ่ม Share บนการ์ดโปรแกรม (เก็บใน `shared_programs`). ถ้าเอา
-   coach code ไปใส่ Import by code จะไม่เจอแน่นอน → **เช็คก่อนว่าโค้ดกี่ตัว/มาจากปุ่มไหน**
-2. **RLS policy ของ `shared_programs`** — ต้องมี SELECT policy ให้ผู้ใช้ "คนอื่น" อ่านข้ามบัญชีได้:
-   `"any authed reads by code" for select using (auth.role() = 'authenticated')` (SUPABASE_SETUP.md:82).
-   ถ้า policy นี้ไม่ได้ถูกรันจริง (หรือมีแต่ owner-only) คนอื่นจะอ่านไม่ได้ → 0 rows → "not found".
-   สงสัยว่า e2e เดิมอาจ share→import **ในบัญชีเดียว** เลยไม่จับบั๊ก cross-account นี้
-   - เช็ค: `select policyname, cmd, qual from pg_policies where tablename='shared_programs';`
-   - เช็คว่า insert ตอน Share สำเร็จจริง: `select code,name,owner_id from public.shared_programs order by created_at desc limit 10;`
-   - ระวัง `auth.role()` อาจคืน null ในบางเวอร์ชัน → พิจารณาเปลี่ยนเป็น policy แบบ `to authenticated`
+**สาเหตุจริง (ยืนยันแล้ว):** SELECT policy ของ `shared_programs` ใช้ `auth.role() = 'authenticated'`
+ซึ่ง Supabase deprecate แล้ว → คืนค่าเพี้ยน/null → เงื่อนไขเป็น false → ผู้ใช้คนอื่นอ่านได้ 0 แถว
+(insert ทำงานปกติ — มีแถว `KB22FT` ใน DB; ปัญหาอยู่ฝั่งอ่านข้ามบัญชีล้วน ๆ).
+e2e เดิม share→import ในบัญชีเดียวเลยไม่จับบั๊กนี้
 
-> โค้ดที่เกี่ยว: `apps/web/src/lib/shareApi.ts` (`createShare` / `importShare` — query
-> `shared_programs.code` ด้วย `.single()`). เอกสารฟีเจอร์: `docs/coaching-guide.md`
+**วิธีแก้ (รันใน Supabase SQL Editor — DDL ถาวรแล้ว):**
+```sql
+drop policy if exists "any authed reads by code" on public.shared_programs;
+create policy "any authed reads by code" on public.shared_programs
+  for select to authenticated using (true);
+```
+ทดสอบยืนยัน: login บัญชีอื่น → Import `KB22FT` → โปรแกรมเข้า MY PROGRAMS สำเร็จ ✅
+(`SUPABASE_SETUP.md` อัปเดตให้ใช้ policy แบบใหม่แล้ว)
+
+**โค้ดที่แก้คู่กัน (commit `1fe3cfe`):** `ProgramsPage.tsx` — Share ไม่กลืน error เงียบอีก
+(ขึ้น sheet "Share failed") + label Import-by-code ชี้ชัดว่าใช้ share code 6 หลัก ไม่ใช่ coach code
 
 ---
 

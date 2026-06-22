@@ -79,8 +79,11 @@ create table public.shared_programs (
 alter table public.shared_programs enable row level security;
 create policy "insert own share" on public.shared_programs for insert
   with check (auth.uid() = owner_id);
+-- NOTE: use `to authenticated using (true)` — NOT `auth.role() = 'authenticated'`
+-- (deprecated; returns null in some projects → cross-account reads silently fail
+-- → importer gets "Program not found for that code")
 create policy "any authed reads by code" on public.shared_programs for select
-  using (auth.role() = 'authenticated');
+  to authenticated using (true);
 create policy "delete own share" on public.shared_programs for delete
   using (auth.uid() = owner_id);
 
