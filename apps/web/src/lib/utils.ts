@@ -3,12 +3,16 @@ import { EXERCISES } from './data.js'
 
 export function weeklyVolume(history: Session[]) {
   const today = new Date()
-  today.setHours(12, 0, 0, 0)
+  today.setHours(0, 0, 0, 0)
+
+  // Start of the current calendar week = Sunday (getDay(): 0=Sun..6=Sat)
+  const weekStart = new Date(today)
+  weekStart.setDate(weekStart.getDate() - today.getDay())
+
   const days = []
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(today)
-    d.setDate(d.getDate() - i)
-    d.setHours(0, 0, 0, 0)
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekStart)
+    d.setDate(d.getDate() + i)
     const next = new Date(d)
     next.setDate(next.getDate() + 1)
     const vol = history
@@ -18,7 +22,7 @@ export function weeklyVolume(history: Session[]) {
       date: d,
       label: ['S','M','T','W','T','F','S'][d.getDay()],
       volume: vol,
-      isToday: i === 0,
+      isToday: d.getTime() === today.getTime(),
     })
   }
   return days
