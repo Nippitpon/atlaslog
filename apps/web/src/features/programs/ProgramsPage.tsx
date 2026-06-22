@@ -27,6 +27,7 @@ export function ProgramsPage() {
   const [showImport, setShowImport] = useState(false)
 
   const [shareCode, setShareCode] = useState<string | null>(null)
+  const [shareErr, setShareErr] = useState<string | null>(null)
   const [sharing, setSharing] = useState(false)
   const [showImportCode, setShowImportCode] = useState(false)
   const [importCode, setImportCode] = useState('')
@@ -40,10 +41,11 @@ export function ProgramsPage() {
 
   const handleShare = async (sp: typeof customPrograms[number]) => {
     setSharing(true)
+    setShareErr(null)
     try {
       setShareCode(await createShare(sp))
-    } catch {
-      setShareCode(null)
+    } catch (e) {
+      setShareErr(e instanceof Error ? e.message : String(e))
     } finally {
       setSharing(false)
     }
@@ -347,6 +349,20 @@ export function ProgramsPage() {
         </div>
       )}
 
+      {/* Share-code error sheet */}
+      {shareErr && (
+        <div className="sheet-backdrop" onClick={() => setShareErr(null)}>
+          <div className="sheet" onClick={e => e.stopPropagation()}>
+            <div className="sheet-handle" />
+            <h3 className="t-display" style={{ marginBottom: 6 }}>Share failed</h3>
+            <div className="t-mono" style={{ fontSize: 12, color: '#ef4444', marginBottom: 16 }}>{shareErr}</div>
+            <button className="btn btn-primary" style={{ width: '100%', height: 44 }} onClick={() => setShareErr(null)}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Import-by-code sheet */}
       {showImportCode && (
         <div className="sheet-backdrop" onClick={() => setShowImportCode(false)}>
@@ -359,13 +375,15 @@ export function ProgramsPage() {
               </button>
             </div>
             <p className="t-mono" style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16 }}>
-              Enter a share code from another lifter or your coach.
+              Enter the 6-character code from another lifter's <b>Share</b> button.
+              This is <b>not</b> a coach code — to connect a coach, use Profile → Coaching.
             </p>
             <input
               className="input-num"
               type="text"
               value={importCode}
               placeholder="ABC123"
+              maxLength={6}
               onChange={e => setImportCode(e.target.value.toUpperCase())}
               style={{ width: '100%', textAlign: 'center', fontSize: 22, letterSpacing: '0.12em', marginBottom: 12 }}
             />
