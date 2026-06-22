@@ -35,6 +35,19 @@
   เดิมใช้สี UA default มืดใน dark theme; (2) ช่อง 1RM ใน ProfilePage width 72→116 (162.5 ถูกตัด)
 - **Docs:** `docs/excel-import-guide.md` + ไฟล์ตัวอย่าง `apps/web/public/atlaslog-program-template.xlsx`
   + ลิงก์ดาวน์โหลด template ในหน้า Import
+- **commit:** `ed4cc5d` (role + UI fixes + excel docs) — push main → Vercel deploy, prod-verified
+
+### งานเพิ่มเติม session 2026-06-22 (commits ต่อเนื่อง)
+
+- **Weekly Volume chart (Home)** — `lib/utils.ts` `weeklyVolume()` เดิมเป็น rolling 7 วันล่าสุด
+  (จุดเริ่มเลื่อนตามวันปัจจุบัน) → เปลี่ยนเป็น **สัปดาห์ตามปฏิทินเริ่มวันอาทิตย์** (Sun→Sat,
+  ป้าย S M T W T F S, วันนี้ไฮไลต์). commit `70e720d`
+  - หมายเหตุ: เคยลอง Monday-start ก่อน แล้วผู้ใช้ขอเปลี่ยนเป็น Sunday-start
+  - ค้าง: การ์ด "SBD TOTAL (WEEK)" ยังเป็น rolling 7 วัน (ไม่ได้แก้ — ไม่ถูกสั่ง)
+- **เอกสาร COACHING** — `docs/coaching-guide.md` (linking / coach panel / program sharing +
+  สถาปัตยกรรม RLS vs Edge Function). commit `d7f7e82`
+- **Import-by-code UX** — commit `1fe3cfe` (ดู FIXED BUG ด้านล่าง)
+- **บั๊ก Import-by-code + แก้ RLS** — commit `472e226` (ดู FIXED BUG ด้านล่าง)
 
 ---
 
