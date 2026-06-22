@@ -184,9 +184,17 @@ export function ProgramsPage() {
 
               return (
                 <div key={sp.id} style={{ position: 'relative' }}>
-                  <button
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => navigate(`/programs/${sp.id}`)}
-                    style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%' }}>
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        navigate(`/programs/${sp.id}`)
+                      }
+                    }}
+                    style={{ cursor: 'pointer', display: 'block', width: '100%' }}>
                     <div className="card" style={{ position: 'relative', overflow: 'hidden' }}>
                       <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0,
                         width: 3, background: '#a78bfa' }} />
@@ -257,7 +265,7 @@ export function ProgramsPage() {
                         </div>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 </div>
               )
             })}
