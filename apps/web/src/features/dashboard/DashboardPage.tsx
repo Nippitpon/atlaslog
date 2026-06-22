@@ -2,10 +2,26 @@ import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
+import { useAuthStore } from '../../store/useAuthStore.js'
+import { markAllRead } from '../../lib/notificationsApi.js'
 import { STRUCTURED_PROGRAMS, dayToProgram } from '../../lib/twelveWeekProgram.js'
 import { calcWeight } from '../../lib/rpeTable.js'
 import { weeklyVolume, getDayOfWeek } from '../../lib/utils.js'
-import { IconUser, IconDumbbell, IconSearch, IconPlus, IconCheck } from '../../components/icons/index.js'
+import { IconUser, IconDumbbell, IconSearch, IconPlus, IconCheck, IconBell } from '../../components/icons/index.js'
+
+const DAY_SHORT = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+
+function notificationText(n: { type: string; data: Record<string, unknown> | null }): string {
+  if (n.type === 'coach_linked') {
+    const email = (n.data?.athlete_email as string) || 'An athlete'
+    return `${email} connected to you as an athlete`
+  }
+  if (n.type === 'program_shared') {
+    const name = (n.data?.program_name as string) || 'A program'
+    return `${name} was shared with you`
+  }
+  return n.type
+}
 
 
 const PHASE_COLOR: Record<string, string> = {
@@ -19,6 +35,18 @@ export function DashboardPage() {
   const navigate = useNavigate()
   const { history, setShowPicker, startWorkout } = useAppStore()
   const { configs, getWeekStatus, getDayStatus, getConfig, getCustomAccessories, customPrograms } = useProgramStore()
+  const { notifications, refreshNotifications } = useAuthStore()
+
+  const unread = useMemo(() => notifications.filter(n => !n.readAt), [notifications])
+
+  const dismissNotifications = async () => {
+    const { user } = useAuthStore.getState()
+    if (!user) return
+    try {
+      await markAllRead(user.id)
+      await refreshNotifications()
+    } catch { /* ignore */ }
+  }
 
   const week = weeklyVolume(history)
   const maxVol = Math.max(1, ...week.map(d => d.volume))
@@ -85,6 +113,18 @@ export function DashboardPage() {
     return null
   }, [configs, getWeekStatus, customPrograms])
 
+  // Today's scheduled training day (pure client, no push) — reminder banner
+  const todayReminder = useMemo(() => {
+    if (!activeProgramInfo) return null
+    const todayShort = DAY_SHORT[new Date().getDay()]
+    if (!todayShort) return null
+    const { program, currentWeek } = activeProgramInfo
+    const day = currentWeek.days.find(d => d.dayOfWeek === todayShort)
+    if (!day) return null
+    if (getDayStatus(program.id, currentWeek.id, day.id) === 'done') return null
+    return { day, program, currentWeek }
+  }, [activeProgramInfo, getDayStatus])
+
   const quickStart = () => {
     if (!activeProgramInfo) { setShowPicker(true); return }
     const { program, currentWeek } = activeProgramInfo
@@ -131,6 +171,52 @@ export function DashboardPage() {
           <IconUser size={20} />
         </button>
       </div>
+
+      {/* Notifications banner */}
+      {unread.length > 0 && (
+        <div style={{ padding: '0 20px', marginBottom: 16 }}>
+          <div className="card card-tight" style={{ borderLeft: '3px solid var(--accent)', paddingLeft: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <IconBell size={15} style={{ color: 'var(--accent)' }} />
+              <div className="t-eyebrow" style={{ fontSize: 9, flex: 1 }}>NOTIFICATIONS</div>
+              <button
+                onClick={() => void dismissNotifications()}
+                style={{ all: 'unset', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)' }}
+              >
+                MARK ALL READ
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {unread.slice(0, 5).map(n => (
+                <div key={n.id} style={{ fontSize: 13, color: 'var(--text)' }}>
+                  {notificationText(n)}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Today's training reminder */}
+      {todayReminder && (
+        <div style={{ padding: '0 20px', marginBottom: 16 }}>
+          <button
+            style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box' }}
+            onClick={() => navigate(`/programs/${todayReminder.program.id}/week/${todayReminder.currentWeek.id}`)}
+          >
+            <div className="card card-tight" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ fontSize: 22 }}>🗓️</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>TODAY'S SESSION</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>
+                  {todayReminder.day.focus}
+                </div>
+              </div>
+              <span className="t-mono" style={{ fontSize: 11, color: 'var(--accent)' }}>START →</span>
+            </div>
+          </button>
+        </div>
+      )}
 
       {/* Stats card */}
       <div style={{ padding: '0 20px', marginBottom: 16 }}>

@@ -7,8 +7,10 @@ import { programVolume } from '../../lib/utils.js'
 import { PROGRAMS } from '../../lib/data.js'
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { ImportProgramSheet } from './ImportProgramSheet.js'
+import { createShare, importShare } from '../../lib/shareApi.js'
 import {
   IconSearch, IconClock, IconTrendingUp, IconChevronRight, IconUpload, IconTrash,
+  IconShare, IconCopy, IconLink, IconX,
 } from '../../components/icons/index.js'
 
 const PHASE_COLOR: Record<string, string> = {
@@ -21,12 +23,52 @@ const PHASE_COLOR: Record<string, string> = {
 export function ProgramsPage() {
   const navigate = useNavigate()
   const { startWorkout } = useAppStore()
-  const { progress, customPrograms, removeCustomProgram } = useProgramStore()
+  const { progress, customPrograms, removeCustomProgram, addCustomProgram } = useProgramStore()
   const [showImport, setShowImport] = useState(false)
+
+  const [shareCode, setShareCode] = useState<string | null>(null)
+  const [sharing, setSharing] = useState(false)
+  const [showImportCode, setShowImportCode] = useState(false)
+  const [importCode, setImportCode] = useState('')
+  const [importBusy, setImportBusy] = useState(false)
+  const [importErr, setImportErr] = useState<string | null>(null)
 
   const handleQuickPick = (p: Program) => {
     startWorkout(p)
     navigate('/workout')
+  }
+
+  const handleShare = async (sp: typeof customPrograms[number]) => {
+    setSharing(true)
+    try {
+      setShareCode(await createShare(sp))
+    } catch {
+      setShareCode(null)
+    } finally {
+      setSharing(false)
+    }
+  }
+
+  const handleImportCode = async () => {
+    const code = importCode.trim()
+    if (!code) return
+    setImportBusy(true)
+    setImportErr(null)
+    try {
+      const program = await importShare(code)
+      addCustomProgram(program)
+      setShowImportCode(false)
+      setImportCode('')
+      navigate(`/programs/${program.id}`)
+    } catch (e) {
+      setImportErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setImportBusy(false)
+    }
+  }
+
+  const copyShareCode = () => {
+    if (shareCode) void navigator.clipboard.writeText(shareCode).catch(() => {})
   }
 
   return (
@@ -37,6 +79,9 @@ export function ProgramsPage() {
           <h1>Programs</h1>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn-icon" onClick={() => setShowImportCode(true)} aria-label="Import program by share code">
+            <IconLink size={18} />
+          </button>
           <button className="btn-icon" onClick={() => setShowImport(true)} aria-label="Import program from Excel">
             <IconUpload size={18} />
           </button>
@@ -139,9 +184,17 @@ export function ProgramsPage() {
 
               return (
                 <div key={sp.id} style={{ position: 'relative' }}>
-                  <button
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => navigate(`/programs/${sp.id}`)}
-                    style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%' }}>
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        navigate(`/programs/${sp.id}`)
+                      }
+                    }}
+                    style={{ cursor: 'pointer', display: 'block', width: '100%' }}>
                     <div className="card" style={{ position: 'relative', overflow: 'hidden' }}>
                       <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0,
                         width: 3, background: '#a78bfa' }} />
@@ -161,17 +214,31 @@ export function ProgramsPage() {
                             </div>
                             <div style={{ fontSize: 12, color: 'var(--text-2)' }}>{sp.focus}</div>
                           </div>
-                          <button
-                            onClick={e => { e.stopPropagation(); removeCustomProgram(sp.id) }}
-                            style={{
-                              background: 'transparent', border: 'none', cursor: 'pointer',
-                              color: 'var(--muted)', padding: 4, borderRadius: 6,
-                              display: 'flex', alignItems: 'center',
-                            }}
-                            aria-label="Remove program"
-                          >
-                            <IconTrash size={14} />
-                          </button>
+                          <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                            <button
+                              onClick={e => { e.stopPropagation(); void handleShare(sp) }}
+                              disabled={sharing}
+                              style={{
+                                background: 'transparent', border: 'none', cursor: 'pointer',
+                                color: 'var(--muted)', padding: 4, borderRadius: 6,
+                                display: 'flex', alignItems: 'center',
+                              }}
+                              aria-label="Share program"
+                            >
+                              <IconShare size={14} />
+                            </button>
+                            <button
+                              onClick={e => { e.stopPropagation(); removeCustomProgram(sp.id) }}
+                              style={{
+                                background: 'transparent', border: 'none', cursor: 'pointer',
+                                color: 'var(--muted)', padding: 4, borderRadius: 6,
+                                display: 'flex', alignItems: 'center',
+                              }}
+                              aria-label="Remove program"
+                            >
+                              <IconTrash size={14} />
+                            </button>
+                          </div>
                         </div>
 
                         <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
@@ -198,7 +265,7 @@ export function ProgramsPage() {
                         </div>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 </div>
               )
             })}
@@ -247,6 +314,75 @@ export function ProgramsPage() {
       </div>
 
       {showImport && <ImportProgramSheet onClose={() => setShowImport(false)} />}
+
+      {/* Share-code result sheet */}
+      {shareCode && (
+        <div className="sheet-backdrop" onClick={() => setShareCode(null)}>
+          <div className="sheet" onClick={e => e.stopPropagation()}>
+            <div className="sheet-handle" />
+            <h3 className="t-display" style={{ marginBottom: 6 }}>Share program</h3>
+            <p className="t-mono" style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16 }}>
+              Send this code — anyone can import it under Programs → link icon.
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <div className="t-mono" style={{
+                flex: 1, fontSize: 24, fontWeight: 700, letterSpacing: '0.16em', textAlign: 'center',
+                background: 'var(--surface-2)', border: '1px solid var(--border)',
+                borderRadius: 10, padding: '14px', color: 'var(--accent)',
+              }}>
+                {shareCode}
+              </div>
+              <button
+                className="btn btn-secondary"
+                style={{ height: 52, fontSize: 12, padding: '0 14px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}
+                onClick={copyShareCode}
+              >
+                <IconCopy size={16} /> Copy
+              </button>
+            </div>
+            <button className="btn btn-primary" style={{ width: '100%', height: 44 }} onClick={() => setShareCode(null)}>
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Import-by-code sheet */}
+      {showImportCode && (
+        <div className="sheet-backdrop" onClick={() => setShowImportCode(false)}>
+          <div className="sheet" onClick={e => e.stopPropagation()}>
+            <div className="sheet-handle" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <h3 className="t-display">Import by code</h3>
+              <button className="btn-icon" onClick={() => setShowImportCode(false)} aria-label="Close">
+                <IconX size={18} />
+              </button>
+            </div>
+            <p className="t-mono" style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16 }}>
+              Enter a share code from another lifter or your coach.
+            </p>
+            <input
+              className="input-num"
+              type="text"
+              value={importCode}
+              placeholder="ABC123"
+              onChange={e => setImportCode(e.target.value.toUpperCase())}
+              style={{ width: '100%', textAlign: 'center', fontSize: 22, letterSpacing: '0.12em', marginBottom: 12 }}
+            />
+            {importErr && (
+              <div className="t-mono" style={{ fontSize: 11, color: '#ef4444', marginBottom: 12 }}>{importErr}</div>
+            )}
+            <button
+              className="btn btn-primary"
+              style={{ width: '100%', height: 44, opacity: importCode.trim() ? 1 : 0.4 }}
+              disabled={importBusy || !importCode.trim()}
+              onClick={handleImportCode}
+            >
+              {importBusy ? 'Importing…' : 'Import'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

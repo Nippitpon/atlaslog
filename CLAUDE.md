@@ -177,4 +177,9 @@ pnpm lint         # ESLint
 | 1 | Fix App.tsx router, Dashboard stats, Logger flow, History display | No |
 | 2 | Excel import feature (xlsx + ImportProgramSheet) | No |
 | 3 | Supabase Auth + cloud sync for history and custom programs | Yes |
-| 4 | Social features, coach-athlete tracking, push notifications | Yes |
+| 3.5 | Admin-confirms-users (signup approval gate) — done | Yes |
+| 4 | Social: coach-athlete + program sharing + in-app reminder | Yes |
+| 5 | Push notifications (Web Push / VAPID) — deferred | Yes |
+
+> หมายเหตุ: "Phase 4" เดิมรวม push notifications ไว้ด้วย แต่ push ถูกแยกเป็น Phase 5 (ROI ต่ำ:
+> iOS ต้องติดตั้ง PWA ก่อน + free tier ไม่มี cron). Phase 4 ใช้ in-app reminder แทน (ฟรี)
