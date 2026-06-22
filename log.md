@@ -1,6 +1,6 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-22 (Phase 4.1: admin-assignable coach role + UI fixes)
+> อัปเดตล่าสุด: 2026-06-22 (Phase 4.1 + open bug: Import by code "not found")
 
 ---
 
@@ -35,6 +35,28 @@
   เดิมใช้สี UA default มืดใน dark theme; (2) ช่อง 1RM ใน ProfilePage width 72→116 (162.5 ถูกตัด)
 - **Docs:** `docs/excel-import-guide.md` + ไฟล์ตัวอย่าง `apps/web/public/atlaslog-program-template.xlsx`
   + ลิงก์ดาวน์โหลด template ในหน้า Import
+
+---
+
+## 🐞 OPEN BUG (ยังไม่แก้ — เดี๋ยวกลับมาทำ) — "Import by code" ขึ้น "Program not found for that code"
+
+**อาการ:** ส่งรหัสให้ user อีกคน แล้วเขาเอาไปใส่ช่อง **Import by code** (Programs) → ขึ้น
+`Program not found for that code` (พบ 2026-06-22)
+
+**แนวทางไล่หาสาเหตุ (เรียงตามความน่าจะเป็น):**
+1. **ใส่ผิดประเภทโค้ด** — แอปมี 2 โค้ด: **Coach code (8 ตัว)** จาก Profile → COACHING (ผูกโค้ช)
+   vs **Share code (6 ตัว)** จากปุ่ม Share บนการ์ดโปรแกรม (เก็บใน `shared_programs`). ถ้าเอา
+   coach code ไปใส่ Import by code จะไม่เจอแน่นอน → **เช็คก่อนว่าโค้ดกี่ตัว/มาจากปุ่มไหน**
+2. **RLS policy ของ `shared_programs`** — ต้องมี SELECT policy ให้ผู้ใช้ "คนอื่น" อ่านข้ามบัญชีได้:
+   `"any authed reads by code" for select using (auth.role() = 'authenticated')` (SUPABASE_SETUP.md:82).
+   ถ้า policy นี้ไม่ได้ถูกรันจริง (หรือมีแต่ owner-only) คนอื่นจะอ่านไม่ได้ → 0 rows → "not found".
+   สงสัยว่า e2e เดิมอาจ share→import **ในบัญชีเดียว** เลยไม่จับบั๊ก cross-account นี้
+   - เช็ค: `select policyname, cmd, qual from pg_policies where tablename='shared_programs';`
+   - เช็คว่า insert ตอน Share สำเร็จจริง: `select code,name,owner_id from public.shared_programs order by created_at desc limit 10;`
+   - ระวัง `auth.role()` อาจคืน null ในบางเวอร์ชัน → พิจารณาเปลี่ยนเป็น policy แบบ `to authenticated`
+
+> โค้ดที่เกี่ยว: `apps/web/src/lib/shareApi.ts` (`createShare` / `importShare` — query
+> `shared_programs.code` ด้วย `.single()`). เอกสารฟีเจอร์: `docs/coaching-guide.md`
 
 ---
 
