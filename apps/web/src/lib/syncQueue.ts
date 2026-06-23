@@ -1,4 +1,4 @@
-import type { Session, StructuredProgram } from '@atlaslog/shared'
+import type { Session, StructuredProgram, ProgramStateSnapshot, BodyMetricEntry, RunEntry } from '@atlaslog/shared'
 import { supabase } from './supabase.js'
 import type { User } from '@supabase/supabase-js'
 
@@ -8,6 +8,11 @@ type SyncOp =
   | { kind: 'session-upsert'; payload: Session }
   | { kind: 'program-upsert'; payload: StructuredProgram }
   | { kind: 'program-delete'; payload: { id: string } }
+  | { kind: 'program-state-upsert'; payload: ProgramStateSnapshot }
+  | { kind: 'body-metric-upsert'; payload: BodyMetricEntry }
+  | { kind: 'body-metric-delete'; payload: { id: string } }
+  | { kind: 'run-upsert'; payload: RunEntry }
+  | { kind: 'run-delete'; payload: { id: string } }
 
 function readQueue(): SyncOp[] {
   try {
@@ -27,7 +32,13 @@ function writeQueue(ops: SyncOp[]) {
 }
 
 function enqueue(op: SyncOp) {
-  writeQueue([...readQueue(), op])
+  const q = readQueue()
+  // Program state is a full snapshot — only the latest matters, drop stale ones
+  if (op.kind === 'program-state-upsert') {
+    writeQueue([...q.filter(o => o.kind !== 'program-state-upsert'), op])
+  } else {
+    writeQueue([...q, op])
+  }
 }
 
 function sessionRow(session: Session, userId: string) {
@@ -52,6 +63,41 @@ async function runOp(op: SyncOp, userId: string): Promise<void> {
     const { error } = await supabase
       .from('custom_programs')
       .upsert({ id: op.payload.id, user_id: userId, program: op.payload })
+    if (error) throw error
+  } else if (op.kind === 'program-state-upsert') {
+    const { error } = await supabase.from('program_state').upsert({
+      user_id: userId,
+      progress: op.payload.progress,
+      configs: op.payload.configs,
+      custom_accessories: op.payload.customAccessories,
+      updated_at: new Date().toISOString(),
+    })
+    if (error) throw error
+  } else if (op.kind === 'body-metric-upsert') {
+    const { error } = await supabase.from('body_metrics').upsert({
+      id: op.payload.id,
+      user_id: userId,
+      date: op.payload.date,
+      weight_kg: op.payload.weightKg,
+      skeletal_muscle_kg: op.payload.skeletalMuscleKg ?? null,
+      body_fat_pct: op.payload.bodyFatPct ?? null,
+    })
+    if (error) throw error
+  } else if (op.kind === 'body-metric-delete') {
+    const { error } = await supabase.from('body_metrics').delete().eq('id', op.payload.id)
+    if (error) throw error
+  } else if (op.kind === 'run-upsert') {
+    const { error } = await supabase.from('runs').upsert({
+      id: op.payload.id,
+      user_id: userId,
+      date: op.payload.date,
+      distance_km: op.payload.distanceKm,
+      duration_min: op.payload.durationMin,
+      note: op.payload.note ?? null,
+    })
+    if (error) throw error
+  } else if (op.kind === 'run-delete') {
+    const { error } = await supabase.from('runs').delete().eq('id', op.payload.id)
     if (error) throw error
   } else {
     const { error } = await supabase.from('custom_programs').delete().eq('id', op.payload.id)
@@ -83,6 +129,36 @@ export async function syncProgramDelete(id: string) {
   const { data } = await supabase.auth.getUser()
   if (!data.user) return enqueue({ kind: 'program-delete', payload: { id } })
   await attempt({ kind: 'program-delete', payload: { id } }, data.user.id)
+}
+
+export async function syncProgramState(snapshot: ProgramStateSnapshot) {
+  const { data } = await supabase.auth.getUser()
+  if (!data.user) return enqueue({ kind: 'program-state-upsert', payload: snapshot })
+  await attempt({ kind: 'program-state-upsert', payload: snapshot }, data.user.id)
+}
+
+export async function syncBodyMetric(entry: BodyMetricEntry) {
+  const { data } = await supabase.auth.getUser()
+  if (!data.user) return enqueue({ kind: 'body-metric-upsert', payload: entry })
+  await attempt({ kind: 'body-metric-upsert', payload: entry }, data.user.id)
+}
+
+export async function syncBodyMetricDelete(id: string) {
+  const { data } = await supabase.auth.getUser()
+  if (!data.user) return enqueue({ kind: 'body-metric-delete', payload: { id } })
+  await attempt({ kind: 'body-metric-delete', payload: { id } }, data.user.id)
+}
+
+export async function syncRun(entry: RunEntry) {
+  const { data } = await supabase.auth.getUser()
+  if (!data.user) return enqueue({ kind: 'run-upsert', payload: entry })
+  await attempt({ kind: 'run-upsert', payload: entry }, data.user.id)
+}
+
+export async function syncRunDelete(id: string) {
+  const { data } = await supabase.auth.getUser()
+  if (!data.user) return enqueue({ kind: 'run-delete', payload: { id } })
+  await attempt({ kind: 'run-delete', payload: { id } }, data.user.id)
 }
 
 let flushing = false

@@ -100,6 +100,59 @@ alter table public.notifications enable row level security;
 create policy "own notifications" on public.notifications for all using (auth.uid() = user_id);
 ```
 
+## 2c. Program State sync (cross-device progress)
+
+> แก้บั๊ก: progress/1RM/วันเริ่มโปรแกรม เดิมอยู่ localStorage เครื่องเดียว → เปิดอีกเครื่องแล้ว
+> Active Program ไม่รู้ว่าซ้อมถึงวันไหน. ตารางนี้ sync ทั้ง state (1 row/user) ขึ้น cloud.
+
+รัน SQL เพิ่มใน **SQL Editor**:
+
+```sql
+-- per-user program progress + configs (1RM/start date) + custom accessories
+create table public.program_state (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  progress jsonb not null default '{}',
+  configs jsonb not null default '{}',
+  custom_accessories jsonb not null default '{}',
+  updated_at timestamptz default now()
+);
+alter table public.program_state enable row level security;
+create policy "own program state" on public.program_state for all using (auth.uid() = user_id);
+```
+
+## 2d. Body Composition + Running (Phase B)
+
+> เก็บน้ำหนักตัว/มวลกล้ามเนื้อ/%ไขมัน (เผื่อคำนวณ BMR·TDEE ใน phase ถัดไป) + log การวิ่ง.
+> รัน SQL เพิ่มใน **SQL Editor**:
+
+```sql
+-- body composition log
+create table public.body_metrics (
+  id text primary key,
+  user_id uuid references auth.users(id) on delete cascade,
+  date timestamptz not null,
+  weight_kg numeric not null,
+  skeletal_muscle_kg numeric,
+  body_fat_pct numeric,
+  created_at timestamptz default now()
+);
+alter table public.body_metrics enable row level security;
+create policy "own body metrics" on public.body_metrics for all using (auth.uid() = user_id);
+
+-- running / cardio log
+create table public.runs (
+  id text primary key,
+  user_id uuid references auth.users(id) on delete cascade,
+  date timestamptz not null,
+  distance_km numeric not null,
+  duration_min numeric not null,
+  note text,
+  created_at timestamptz default now()
+);
+alter table public.runs enable row level security;
+create policy "own runs" on public.runs for all using (auth.uid() = user_id);
+```
+
 ### Deploy Edge Function `coach`
 
 เหมือน `admin-users` — Supabase inject `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` ให้อัตโนมัติ

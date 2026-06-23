@@ -84,3 +84,15 @@ export const IconCopy = (p: IconProps) => <Icon {...p} d={<>
   <rect x="9" y="9" width="11" height="11" rx="2"/>
   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
 </>} />
+export const IconRun = (p: IconProps) => <Icon {...p} d={<>
+  <circle cx="13" cy="4" r="2"/>
+  <path d="M13 6l-3 4 3 3v5"/>
+  <path d="M10 10L6 9l-2 3"/>
+  <path d="M13 13l4 1 1 4"/>
+</>} />
+export const IconScale = (p: IconProps) => <Icon {...p} d={<>
+  <rect x="3" y="3" width="18" height="18" rx="3"/>
+  <path d="M8 8h8"/>
+  <circle cx="12" cy="14" r="3"/>
+  <path d="M12 14l1.5-2"/>
+</>} />

@@ -63,6 +63,27 @@ export interface Session {
   exercises?: WorkoutExercise[]
 }
 
+// ─── Body Composition & Running (Phase B) ─────────────────────────────────────
+
+// Body composition log entry. Skeletal muscle + body fat are optional now but
+// stored so a later phase can derive BMR / TDEE.
+export interface BodyMetricEntry {
+  id: string
+  date: string             // ISO timestamp
+  weightKg: number
+  skeletalMuscleKg?: number
+  bodyFatPct?: number
+}
+
+// Running / cardio session. Pace is derived (durationMin / distanceKm), not stored.
+export interface RunEntry {
+  id: string
+  date: string             // ISO timestamp
+  distanceKm: number
+  durationMin: number
+  note?: string
+}
+
 // ─── Structured (Hierarchical) Program Types ──────────────────────────────────
 
 export type DayStatus = 'not_started' | 'in_progress' | 'done'
@@ -123,6 +144,21 @@ export interface ProgramProgressState {
       [dayId: string]: DayStatus
     }
   }
+}
+
+export interface ProgramCustomAccessories {
+  [programId: string]: {
+    [weekId: string]: {
+      [dayId: string]: StructuredExercise[]
+    }
+  }
+}
+
+// Full per-user program state synced to cloud (one row per user)
+export interface ProgramStateSnapshot {
+  progress: ProgramProgressState
+  configs: { [programId: string]: ProgramConfig }
+  customAccessories: ProgramCustomAccessories
 }
 
 // ─── Phase 4 — Social (Coach-Athlete / Sharing / Notifications) ────────────────

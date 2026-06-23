@@ -9,7 +9,7 @@ import { IconChevronLeft } from '../../components/icons/index.js'
 export function AthleteDetailPage() {
   const navigate = useNavigate()
   const { athleteId } = useParams()
-  const { isCoach } = useAuthStore()
+  const { isCoach, roleLoaded } = useAuthStore()
 
   const [sessions, setSessions] = useState<Session[]>([])
   const [programs, setPrograms] = useState<StructuredProgram[]>([])
@@ -28,6 +28,7 @@ export function AthleteDetailPage() {
     return () => { active = false }
   }, [isCoach, athleteId])
 
+  if (!roleLoaded) return null
   if (!isCoach) return <Navigate to="/" replace />
 
   const totalVol = sessions.reduce((s, h) => s + h.volume, 0)

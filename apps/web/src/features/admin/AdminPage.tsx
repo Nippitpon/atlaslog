@@ -5,7 +5,7 @@ import { useAuthStore } from '../../store/useAuthStore.js'
 import { listUsers, confirmUser, deleteUser, setUserRole } from '../../lib/adminApi.js'
 
 export function AdminPage() {
-  const { user, isAdmin } = useAuthStore()
+  const { user, isAdmin, roleLoaded } = useAuthStore()
 
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
@@ -27,6 +27,7 @@ export function AdminPage() {
   // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch-on-mount
   useEffect(() => { if (isAdmin) void load() }, [isAdmin, load])
 
+  if (!roleLoaded) return null
   if (!isAdmin) return <Navigate to="/" replace />
 
   const runAction = async (id: string, fn: () => Promise<void>) => {

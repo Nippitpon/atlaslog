@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { DayStatus, ProgramProgressState, ProgramConfig, StructuredExercise, StructuredProgram } from '@atlaslog/shared'
-import { syncProgramUpsert, syncProgramDelete } from '../lib/syncQueue.js'
+import type { DayStatus, ProgramProgressState, ProgramConfig, StructuredExercise, StructuredProgram, ProgramStateSnapshot } from '@atlaslog/shared'
+import { syncProgramUpsert, syncProgramDelete, syncProgramState } from '../lib/syncQueue.js'
 
 type CustomAccessories = {
   [programId: string]: {
@@ -32,6 +32,17 @@ interface ProgramStore {
   removeCustomProgram: (programId: string) => void
   setCustomPrograms: (programs: StructuredProgram[]) => void
   clearCustomPrograms: () => void
+  setProgramState: (snapshot: ProgramStateSnapshot) => void
+}
+
+// Debounce cloud sync of the full program-state blob; coalesces rapid edits
+let stateSyncTimer: ReturnType<typeof setTimeout> | null = null
+function queueStateSync(get: () => ProgramStore) {
+  if (stateSyncTimer) clearTimeout(stateSyncTimer)
+  stateSyncTimer = setTimeout(() => {
+    const { progress, configs, customAccessories } = get()
+    void syncProgramState({ progress, configs, customAccessories })
+  }, 800)
 }
 
 export const useProgramStore = create<ProgramStore>()(
@@ -69,6 +80,7 @@ export const useProgramStore = create<ProgramStore>()(
             },
           },
         }))
+        queueStateSync(get)
       },
 
       resetProgram: (programId) => {
@@ -81,12 +93,14 @@ export const useProgramStore = create<ProgramStore>()(
           delete nextCustom[programId]
           return { progress: nextProgress, configs: nextConfigs, customAccessories: nextCustom }
         })
+        queueStateSync(get)
       },
 
       setConfig: (programId, config) => {
         set(state => ({
           configs: { ...state.configs, [programId]: config },
         }))
+        queueStateSync(get)
       },
 
       getConfig: (programId) => {
@@ -106,6 +120,7 @@ export const useProgramStore = create<ProgramStore>()(
             },
           },
         }))
+        queueStateSync(get)
       },
 
       getCustomAccessories: (programId, weekId, dayId) => {
@@ -135,10 +150,18 @@ export const useProgramStore = create<ProgramStore>()(
           }
         })
         void syncProgramDelete(programId)
+        queueStateSync(get)
       },
 
       setCustomPrograms: (programs) => set({ customPrograms: programs }),
       clearCustomPrograms: () => set({ customPrograms: [] }),
+
+      // Load cloud snapshot on login — does NOT re-trigger sync
+      setProgramState: (snapshot) => set({
+        progress: snapshot.progress ?? {},
+        configs: snapshot.configs ?? {},
+        customAccessories: snapshot.customAccessories ?? {},
+      }),
     }),
     {
       name: 'atlas:v1:program-progress',

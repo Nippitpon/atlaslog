@@ -1,9 +1,9 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Session, Workout, Program } from '@atlaslog/shared'
+import type { Session, Workout, Program, BodyMetricEntry, RunEntry } from '@atlaslog/shared'
 import { makeSeedHistory } from '../lib/data.js'
 import { useProgramStore } from './useProgramStore.js'
-import { syncSession } from '../lib/syncQueue.js'
+import { syncSession, syncBodyMetric, syncBodyMetricDelete, syncRun, syncRunDelete } from '../lib/syncQueue.js'
 
 interface OneRMs { squat: number; bench: number; deadlift: number }
 
@@ -14,6 +14,8 @@ interface AppStore {
   showPicker: boolean
   finishedSession: Session | null
   personalOneRMs: OneRMs
+  bodyMetrics: BodyMetricEntry[]
+  runs: RunEntry[]
 
   setTheme: (t: 'dark' | 'light') => void
   setWorkout: (w: Workout | null) => void
@@ -26,6 +28,14 @@ interface AppStore {
   updateWorkout: (w: Workout) => void
   finishWorkout: () => Session | null
   cancelWorkout: () => void
+
+  addBodyMetric: (entry: BodyMetricEntry) => void
+  removeBodyMetric: (id: string) => void
+  setBodyMetrics: (entries: BodyMetricEntry[]) => void
+  addRun: (entry: RunEntry) => void
+  removeRun: (id: string) => void
+  setRuns: (entries: RunEntry[]) => void
+  clearMetrics: () => void
 }
 
 export const useAppStore = create<AppStore>()(
@@ -37,6 +47,8 @@ export const useAppStore = create<AppStore>()(
       showPicker: false,
       finishedSession: null,
       personalOneRMs: { squat: 0, bench: 0, deadlift: 0 },
+      bodyMetrics: [],
+      runs: [],
 
       setTheme: (theme) => set({ theme }),
       setWorkout: (workout) => set({ workout }),
@@ -97,6 +109,28 @@ export const useAppStore = create<AppStore>()(
       },
 
       cancelWorkout: () => set({ workout: null }),
+
+      addBodyMetric: (entry) => {
+        set(state => ({ bodyMetrics: [entry, ...state.bodyMetrics.filter(e => e.id !== entry.id)] }))
+        void syncBodyMetric(entry)
+      },
+      removeBodyMetric: (id) => {
+        set(state => ({ bodyMetrics: state.bodyMetrics.filter(e => e.id !== id) }))
+        void syncBodyMetricDelete(id)
+      },
+      setBodyMetrics: (bodyMetrics) => set({ bodyMetrics }),
+
+      addRun: (entry) => {
+        set(state => ({ runs: [entry, ...state.runs.filter(e => e.id !== entry.id)] }))
+        void syncRun(entry)
+      },
+      removeRun: (id) => {
+        set(state => ({ runs: state.runs.filter(e => e.id !== id) }))
+        void syncRunDelete(id)
+      },
+      setRuns: (runs) => set({ runs }),
+
+      clearMetrics: () => set({ bodyMetrics: [], runs: [] }),
     }),
     {
       name: 'atlas:v2',
@@ -105,6 +139,8 @@ export const useAppStore = create<AppStore>()(
         history: state.history,
         workout: state.workout,
         personalOneRMs: state.personalOneRMs,
+        bodyMetrics: state.bodyMetrics,
+        runs: state.runs,
       }),
     }
   )
