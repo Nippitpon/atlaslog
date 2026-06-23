@@ -1,6 +1,21 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-23 (UX fixes รอบ 3: เอา FAB ออก + Running weekly totals)
+> อัปเดตล่าสุด: 2026-06-23 (UX fixes รอบ 4: COACHING เฉพาะ coach)
+
+---
+
+## 2026-06-23 — UX fixes รอบ 4: COACHING เฉพาะ coach
+
+- **ลบ section COACHING ออกจาก Profile ทั้งหมด** (MY COACH CODE + CONNECT A COACH + handlers/state/
+  imports linkCoach/IconCopy) — `ProfilePage.tsx`
+- **เหลือเฉพาะปุ่ม "Coaching"** (เดิม "Coach Panel") ที่ขึ้นเฉพาะ `isCoach` → กด → `/coach`
+  (MY ATHLETES) — relabel แล้ว
+- **การใส่โค้ด** → ใช้ Programs → Import by code เท่านั้น (ของเดิม ไม่ต้องแตะ)
+- **ผล:** `pnpm build` + `pnpm lint` ผ่าน
+- ✅ **e2e (Playwright 390px):**
+  - athlete.a (non-coach): Profile ไม่มี COACHING/MY COACH CODE/CONNECT A COACH/ปุ่ม Coaching เลย
+    (เหลือ LIFETIME, 1RM, BODY, PREFERENCES)
+  - coach.test (isCoach): มีปุ่ม "Coaching · MY ATHLETES →" → กดไป `/coach` เห็น athlete.a · 0 errors
 
 ---
 
