@@ -24,21 +24,25 @@
 - **Admin** เห็นเมนู Coaching เสมอ (`isCoach || isAdmin`)
 - **ผู้ใช้ทั่วไป (non-coach)** จะ **ไม่เห็น** อะไรเกี่ยวกับ coaching ในหน้า Profile เลย
 
-### ขั้นตอนการผูก — **โค้ชเป็นฝ่าย add** (ตั้งแต่ 2026-06-23)
+### ขั้นตอนการผูก — **โค้ช add + นักกีฬาต้อง Accept** (consent flow, ตั้งแต่ 2026-06-23)
 
 ```
-โค้ช: Profile → ปุ่ม Coaching → หน้า Athletes → ส่วน "ADD ATHLETE"
-      → กรอก อีเมล หรือ โค้ด (8 ตัวแรกของ uuid) ของนักกีฬา → กด Add
+โค้ช:    Profile → ปุ่ม Coaching → หน้า Athletes → ส่วน "ADD ATHLETE"
+         → กรอก อีเมล หรือ โค้ด (8 ตัวแรกของ uuid) ของนักกีฬา → กด Add
+นักกีฬา: หน้า Home → การ์ด "COACH REQUEST" → กด Accept (หรือ Decline)
 ```
 
 - ใส่ได้ทั้ง **อีเมล** หรือ **โค้ด** ของนักกีฬา (ระบบ resolve ให้เอง ผ่าน Edge Function)
-- เมื่อ add สำเร็จ:
-  - สร้าง/อัปเดตแถวใน `coach_athlete` (`coach_id` = โค้ช, `athlete_id` = นักกีฬา, `status='active'`)
-  - **นักกีฬาได้ notification** `coach_added` → ขึ้นแบนเนอร์บนหน้า Home: *"\<coach email\> added you as an athlete"*
-  - โค้ชเห็นข้อความ `Added <athlete email>` และนักกีฬาโผล่ใน MY ATHLETES ทันที
-- ป้องกัน: add ตัวเองไม่ได้ · ถ้าหาอีเมล/โค้ดไม่เจอ → `Athlete not found`
+- เมื่อโค้ช add:
+  - สร้างแถวใน `coach_athlete` แบบ **`status='pending'`** → โค้ช **ยังอ่านข้อมูลนักกีฬาไม่ได้**
+    (RLS coach-read เช็ค `status='active'`)
+  - นักกีฬาได้ notification `coach_request` → การ์ด **COACH REQUEST** บน Home (Accept/Decline)
+  - โค้ชเห็น `Request sent to …` และนักกีฬาขึ้นใน MY ATHLETES สถานะ **PENDING**
+- นักกีฬา **Accept** → `status='active'` → โค้ชเริ่มเห็นข้อมูลได้ + โค้ชได้ notification `coach_linked`
+- นักกีฬา **Decline** → ลบแถวทิ้ง → โค้ชได้ notification `coach_declined`
+- ป้องกัน: add ตัวเองไม่ได้ · ถ้าหาอีเมล/โค้ดไม่เจอ → `Athlete not found` · ถ้า active อยู่แล้วจะไม่ downgrade
 
-> 💡 **นักกีฬาไม่ต้องทำอะไร** — ไม่มีช่อง "กรอกโค้ดโค้ช" ในหน้า Profile อีกแล้ว โค้ชจัดการฝั่งเดียว
+> 💡 **นักกีฬาคุมความยินยอม** — โค้ชเห็นข้อมูลได้ต่อเมื่อนักกีฬากด Accept เท่านั้น
 
 ### การยกเลิกการผูก (Unlink)
 โค้ชเปิดหน้า Athletes → กด **Unlink** ข้างชื่อนักกีฬา → ยืนยัน
@@ -107,8 +111,9 @@ Programs → ปุ่มลิงก์ (🔗 มุมขวาบน) → ใ
 ### Edge Function `coach` — actions
 | action | ใครเรียก | ทำอะไร |
 |--------|---------|--------|
-| `add-athlete` { athlete } | โค้ช | resolve อีเมล/โค้ด → upsert `coach_athlete` (coach = ผู้เรียก) → notify นักกีฬา (`coach_added`) |
-| `list-athletes` | โค้ช | คืนรายชื่อนักกีฬา active + อีเมล |
+| `add-athlete` { athlete } | โค้ช | resolve อีเมล/โค้ด → upsert `coach_athlete` **status pending** → notify นักกีฬา (`coach_request`) |
+| `respond-link` { coachId, accept } | นักกีฬา | accept → status active + notify โค้ช (`coach_linked`); decline → ลบแถว + notify (`coach_declined`) |
+| `list-athletes` | โค้ช | คืนรายชื่อนักกีฬา active + pending + อีเมล + status |
 | `resolve-link` { code } | (legacy) | นักกีฬาผูกตัวเองกับโค้ชด้วยโค้ด — ยังมีใน backend แต่ **ไม่มี UI เรียกแล้ว** |
 
 ### ตารางที่เกี่ยวข้อง (Supabase)

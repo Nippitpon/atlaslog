@@ -153,6 +153,21 @@ alter table public.runs enable row level security;
 create policy "own runs" on public.runs for all using (auth.uid() = user_id);
 ```
 
+## 2e. Coach consent — pending status (2026-06-23)
+
+> โค้ช add นักกีฬา → ลิงก์เริ่มเป็น `pending` (นักกีฬาต้องกด Accept ก่อน โค้ชถึงอ่านข้อมูลได้).
+> RLS coach-read มีเงื่อนไข `status = 'active'` อยู่แล้ว → pending = โค้ชยังอ่านไม่ได้โดยอัตโนมัติ.
+> ต้องขยาย CHECK constraint ให้รับค่า `pending`:
+
+```sql
+alter table public.coach_athlete drop constraint if exists coach_athlete_status_check;
+alter table public.coach_athlete add constraint coach_athlete_status_check
+  check (status in ('pending','active','archived'));
+```
+
+> หลังรัน SQL นี้ → **redeploy edge function `coach`** (มี action `add-athlete` แบบ pending +
+> `respond-link` ใหม่)
+
 ### Deploy Edge Function `coach`
 
 เหมือน `admin-users` — Supabase inject `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` ให้อัตโนมัติ

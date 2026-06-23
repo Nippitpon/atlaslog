@@ -10,7 +10,7 @@ import { ImportProgramSheet } from './ImportProgramSheet.js'
 import { createShare, importShare } from '../../lib/shareApi.js'
 import {
   IconSearch, IconClock, IconTrendingUp, IconChevronRight, IconUpload, IconTrash,
-  IconShare, IconCopy, IconLink, IconX,
+  IconShare, IconCopy, IconLink, IconX, IconPlus,
 } from '../../components/icons/index.js'
 
 const PHASE_COLOR: Record<string, string> = {
@@ -81,6 +81,9 @@ export function ProgramsPage() {
           <h1>Programs</h1>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn-icon" onClick={() => navigate('/programs/new')} aria-label="Create program">
+            <IconPlus size={18} />
+          </button>
           <button className="btn-icon" onClick={() => setShowImportCode(true)} aria-label="Import program by share code">
             <IconLink size={18} />
           </button>
@@ -211,7 +214,7 @@ export function ProgramsPage() {
                               </div>
                               <span className="pill" style={{ fontSize: 8, background: 'rgba(167,139,250,0.15)',
                                 borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }}>
-                                EXCEL
+                                {sp.source === 'manual' ? 'CUSTOM' : 'EXCEL'}
                               </span>
                             </div>
                             <div style={{ fontSize: 12, color: 'var(--text-2)' }}>{sp.focus}</div>

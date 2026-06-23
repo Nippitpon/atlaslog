@@ -6,9 +6,10 @@
 // athlete emails (which live in auth.users, not readable by the client).
 //
 // Actions (POST body):
-//   { action: 'resolve-link', code }    athlete links to a coach by code/email
-//   { action: 'add-athlete', athlete }  coach links an athlete by email/code
-//   { action: 'list-athletes' }         coach lists their active athletes (+email)
+//   { action: 'resolve-link', code }       athlete links to a coach by code/email
+//   { action: 'add-athlete', athlete }     coach REQUESTS an athlete (status pending)
+//   { action: 'respond-link', coachId, accept }  athlete accepts/declines a request
+//   { action: 'list-athletes' }            coach lists their athletes (+email, +status)
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
@@ -40,7 +41,7 @@ Deno.serve(async (req) => {
     if (userErr || !userData.user) return json({ error: 'Invalid token' }, 401)
     const caller = userData.user
 
-    const { action, code, athlete } = await req.json()
+    const { action, code, athlete, coachId, accept } = await req.json()
 
     // Resolve a user by email or 8-char uuid prefix.
     const resolveUser = async (raw: string) => {
@@ -80,26 +81,65 @@ Deno.serve(async (req) => {
       if (!target) return json({ error: 'Athlete not found' }, 404)
       if (target.id === caller.id) return json({ error: 'Cannot add yourself' }, 400)
 
+      // Don't downgrade an already-active link
+      const { data: existing } = await admin.from('coach_athlete')
+        .select('status').eq('coach_id', caller.id).eq('athlete_id', target.id).maybeSingle()
+      if (existing?.status === 'active') {
+        return json({ ok: true, athleteEmail: target.email ?? '', status: 'active' })
+      }
+
+      // Request consent: link starts pending → coach can't read until athlete accepts (RLS)
       const { error } = await admin.from('coach_athlete').upsert(
-        { coach_id: caller.id, athlete_id: target.id, status: 'active' },
+        { coach_id: caller.id, athlete_id: target.id, status: 'pending' },
         { onConflict: 'coach_id,athlete_id' },
       )
       if (error) return json({ error: error.message }, 500)
 
       await admin.from('notifications').insert({
         user_id: target.id,
-        type: 'coach_added',
+        type: 'coach_request',
         data: { coach_id: caller.id, coach_email: caller.email ?? '' },
       })
-      return json({ ok: true, athleteEmail: target.email ?? '' })
+      return json({ ok: true, athleteEmail: target.email ?? '', status: 'pending' })
+    }
+
+    if (action === 'respond-link') {
+      // Caller is the athlete responding to a pending request from coachId
+      if (!coachId) return json({ error: 'Missing coachId' }, 400)
+      const { data: link } = await admin.from('coach_athlete')
+        .select('status').eq('coach_id', coachId).eq('athlete_id', caller.id).maybeSingle()
+      if (!link) return json({ error: 'Request not found' }, 404)
+
+      if (accept) {
+        const { error } = await admin.from('coach_athlete')
+          .update({ status: 'active' })
+          .eq('coach_id', coachId).eq('athlete_id', caller.id)
+        if (error) return json({ error: error.message }, 500)
+        await admin.from('notifications').insert({
+          user_id: coachId,
+          type: 'coach_linked',
+          data: { athlete_id: caller.id, athlete_email: caller.email ?? '' },
+        })
+      } else {
+        const { error } = await admin.from('coach_athlete')
+          .delete().eq('coach_id', coachId).eq('athlete_id', caller.id)
+        if (error) return json({ error: error.message }, 500)
+        await admin.from('notifications').insert({
+          user_id: coachId,
+          type: 'coach_declined',
+          data: { athlete_id: caller.id, athlete_email: caller.email ?? '' },
+        })
+      }
+      return json({ ok: true })
     }
 
     if (action === 'list-athletes') {
+      // Include pending so the coach can see requests awaiting acceptance
       const { data: links, error } = await admin
         .from('coach_athlete')
-        .select('athlete_id, created_at')
+        .select('athlete_id, created_at, status')
         .eq('coach_id', caller.id)
-        .eq('status', 'active')
+        .in('status', ['active', 'pending'])
       if (error) return json({ error: error.message }, 500)
 
       const { data: usersData } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
@@ -109,6 +149,7 @@ Deno.serve(async (req) => {
         id: l.athlete_id,
         email: emailMap.get(l.athlete_id) ?? '',
         linkedAt: l.created_at,
+        status: l.status,
       }))
       return json({ athletes })
     }

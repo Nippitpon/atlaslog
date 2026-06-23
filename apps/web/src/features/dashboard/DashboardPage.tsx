@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
-import { markAllRead } from '../../lib/notificationsApi.js'
+import { markAllRead, markRead } from '../../lib/notificationsApi.js'
+import { respondCoachRequest } from '../../lib/coachApi.js'
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { weeklyVolume, getDayOfWeek } from '../../lib/utils.js'
-import { IconUser, IconDumbbell, IconSearch, IconCheck, IconBell, IconRun } from '../../components/icons/index.js'
+import { IconUser, IconDumbbell, IconSearch, IconCheck, IconBell, IconRun, IconUsers } from '../../components/icons/index.js'
 
 const DAY_SHORT = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 
@@ -18,6 +19,10 @@ function notificationText(n: { type: string; data: Record<string, unknown> | nul
   if (n.type === 'coach_added') {
     const email = (n.data?.coach_email as string) || 'A coach'
     return `${email} added you as an athlete`
+  }
+  if (n.type === 'coach_declined') {
+    const email = (n.data?.athlete_email as string) || 'An athlete'
+    return `${email} declined your coach request`
   }
   if (n.type === 'program_shared') {
     const name = (n.data?.program_name as string) || 'A program'
@@ -41,12 +46,22 @@ export function DashboardPage() {
   const { notifications, refreshNotifications } = useAuthStore()
 
   const unread = useMemo(() => notifications.filter(n => !n.readAt), [notifications])
+  const coachRequests = useMemo(() => unread.filter(n => n.type === 'coach_request'), [unread])
+  const bannerNotifs = useMemo(() => unread.filter(n => n.type !== 'coach_request'), [unread])
 
   const dismissNotifications = async () => {
     const { user } = useAuthStore.getState()
     if (!user) return
     try {
       await markAllRead(user.id)
+      await refreshNotifications()
+    } catch { /* ignore */ }
+  }
+
+  const respondRequest = async (notifId: string, coachId: string, accept: boolean) => {
+    try {
+      await respondCoachRequest(coachId, accept)
+      await markRead(notifId)
       await refreshNotifications()
     } catch { /* ignore */ }
   }
@@ -146,8 +161,46 @@ export function DashboardPage() {
         </button>
       </div>
 
+      {/* Coach requests — need the athlete's consent */}
+      {coachRequests.length > 0 && (
+        <div style={{ padding: '0 20px', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {coachRequests.map(n => {
+            const coachId = (n.data?.coach_id as string) || ''
+            const coachEmail = (n.data?.coach_email as string) || 'A coach'
+            return (
+              <div key={n.id} className="card card-tight" style={{ borderLeft: '3px solid #f97316', paddingLeft: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <IconUsers size={15} style={{ color: '#f97316' }} />
+                  <div className="t-eyebrow" style={{ fontSize: 9 }}>COACH REQUEST</div>
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 10 }}>
+                  <b>{coachEmail}</b> wants to coach you. ยอมรับเพื่อให้โค้ชเห็นข้อมูลการซ้อมของคุณ
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    className="btn btn-primary"
+                    style={{ flex: 1, height: 40, fontSize: 12 }}
+                    disabled={!coachId}
+                    onClick={() => void respondRequest(n.id, coachId, true)}
+                  >
+                    Accept
+                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ flex: 1, height: 40, fontSize: 12 }}
+                    onClick={() => void respondRequest(n.id, coachId, false)}
+                  >
+                    Decline
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {/* Notifications banner */}
-      {unread.length > 0 && (
+      {bannerNotifs.length > 0 && (
         <div style={{ padding: '0 20px', marginBottom: 16 }}>
           <div className="card card-tight" style={{ borderLeft: '3px solid var(--accent)', paddingLeft: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -161,7 +214,7 @@ export function DashboardPage() {
               </button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {unread.slice(0, 5).map(n => (
+              {bannerNotifs.slice(0, 5).map(n => (
                 <div key={n.id} style={{ fontSize: 13, color: 'var(--text)' }}>
                   {notificationText(n)}
                 </div>
