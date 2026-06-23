@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { StructuredExercise, StructuredProgram, StructuredDay } from '@atlaslog/shared'
 import { useProgramStore } from '../../store/useProgramStore.js'
-import { EXERCISES } from '../../lib/data.js'
+import { allExercises } from '../../lib/data.js'
 import { IconChevronLeft, IconPlus, IconX, IconCheck, IconSearch } from '../../components/icons/index.js'
 
 type DayDraft = { dayOfWeek: StructuredDay['dayOfWeek']; focus: string; exercises: StructuredExercise[] }
@@ -193,11 +193,11 @@ function ExercisePicker({ onPick, onClose }: { onPick: (ex: StructuredExercise) 
   const [reps, setReps] = useState('10')
   const [rpe, setRpe] = useState('')
 
-  const filtered = EXERCISES.filter(e =>
+  const filtered = allExercises().filter(e =>
     e.name.toLowerCase().includes(search.toLowerCase()) || e.group.toLowerCase().includes(search.toLowerCase()))
 
   const confirm = () => {
-    const ex = EXERCISES.find(e => e.id === pickedId)
+    const ex = allExercises().find(e => e.id === pickedId)
     if (!ex) return
     onPick({
       exerciseId: ex.id,

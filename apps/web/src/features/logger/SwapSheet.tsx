@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { EXERCISES } from '../../lib/data.js'
+import { allExercises } from '../../lib/data.js'
 import { muscleColor } from '../../lib/utils.js'
 import { IconSearch, IconDumbbell } from '../../components/icons/index.js'
 
@@ -12,7 +12,7 @@ interface SwapSheetProps {
 
 export function SwapSheet({ current, title = 'Swap Exercise', onPick, onClose }: SwapSheetProps) {
   const [q, setQ] = useState('')
-  const filtered = EXERCISES.filter(e => e.name.toLowerCase().includes(q.toLowerCase()))
+  const filtered = allExercises().filter(e => e.name.toLowerCase().includes(q.toLowerCase()))
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>

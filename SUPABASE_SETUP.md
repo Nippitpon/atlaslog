@@ -168,6 +168,29 @@ alter table public.coach_athlete add constraint coach_athlete_status_check
 > หลังรัน SQL นี้ → **redeploy edge function `coach`** (มี action `add-athlete` แบบ pending +
 > `respond-link` ใหม่)
 
+## 2f. Custom exercises (coach/admin เพิ่มท่าใน Library)
+
+> coach/admin เพิ่มท่าเองได้ในหน้า Library → เก็บใน cloud, ทุกคน (authenticated) อ่านได้
+> (ทีมใช้ท่าเดียวกัน), แก้/ลบได้เฉพาะเจ้าของ. `group` ใช้ชื่อคอลัมน์ `muscle_group` (`group` เป็น reserved word)
+
+```sql
+create table public.custom_exercises (
+  id text primary key,
+  name text not null,
+  muscle_group text not null,
+  equipment text,
+  created_by uuid references auth.users(id) on delete cascade,
+  created_at timestamptz default now()
+);
+alter table public.custom_exercises enable row level security;
+create policy "authed read exercises" on public.custom_exercises for select to authenticated using (true);
+create policy "insert own exercise" on public.custom_exercises for insert with check (auth.uid() = created_by);
+create policy "delete own exercise" on public.custom_exercises for delete using (auth.uid() = created_by);
+```
+
+> หมายเหตุ: การจำกัด "เฉพาะ coach/admin" บังคับฝั่ง UI (ปุ่มเพิ่มโชว์เฉพาะ `isCoach || isAdmin`)
+> เหมือน coach features อื่น ๆ; RLS บังคับ insert/delete เป็น own-row
+
 ### Deploy Edge Function `coach`
 
 เหมือน `admin-users` — Supabase inject `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` ให้อัตโนมัติ

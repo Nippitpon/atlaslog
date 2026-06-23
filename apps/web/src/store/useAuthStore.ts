@@ -40,12 +40,13 @@ async function loadIsCoach(userId: string, role: string): Promise<boolean> {
 }
 
 async function loadUserData(userId: string) {
-  const [sessionsRes, programsRes, stateRes, bodyRes, runsRes] = await Promise.all([
+  const [sessionsRes, programsRes, stateRes, bodyRes, runsRes, exRes] = await Promise.all([
     supabase.from('sessions').select('*').eq('user_id', userId).order('date', { ascending: false }),
     supabase.from('custom_programs').select('*').eq('user_id', userId),
     supabase.from('program_state').select('*').eq('user_id', userId).maybeSingle(),
     supabase.from('body_metrics').select('*').eq('user_id', userId).order('date', { ascending: false }),
     supabase.from('runs').select('*').eq('user_id', userId).order('date', { ascending: false }),
+    supabase.from('custom_exercises').select('*').order('created_at', { ascending: true }),
   ])
   if (sessionsRes.data) {
     useAppStore.getState().setHistory(
@@ -98,6 +99,17 @@ async function loadUserData(userId: string) {
         distanceKm: r.distance_km,
         durationMin: r.duration_min,
         note: r.note ?? undefined,
+      }))
+    )
+  }
+  if (exRes.data) {
+    useAppStore.getState().setCustomExercises(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (exRes.data as any[]).map(r => ({
+        id: r.id,
+        name: r.name,
+        group: r.muscle_group,
+        equipment: r.equipment ?? '',
       }))
     )
   }

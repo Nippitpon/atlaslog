@@ -1,4 +1,4 @@
-import type { Session, StructuredProgram, ProgramStateSnapshot, BodyMetricEntry, RunEntry } from '@atlaslog/shared'
+import type { Session, StructuredProgram, ProgramStateSnapshot, BodyMetricEntry, RunEntry, Exercise } from '@atlaslog/shared'
 import { supabase } from './supabase.js'
 import type { User } from '@supabase/supabase-js'
 
@@ -13,6 +13,8 @@ type SyncOp =
   | { kind: 'body-metric-delete'; payload: { id: string } }
   | { kind: 'run-upsert'; payload: RunEntry }
   | { kind: 'run-delete'; payload: { id: string } }
+  | { kind: 'exercise-upsert'; payload: Exercise }
+  | { kind: 'exercise-delete'; payload: { id: string } }
 
 function readQueue(): SyncOp[] {
   try {
@@ -99,6 +101,18 @@ async function runOp(op: SyncOp, userId: string): Promise<void> {
   } else if (op.kind === 'run-delete') {
     const { error } = await supabase.from('runs').delete().eq('id', op.payload.id)
     if (error) throw error
+  } else if (op.kind === 'exercise-upsert') {
+    const { error } = await supabase.from('custom_exercises').upsert({
+      id: op.payload.id,
+      name: op.payload.name,
+      muscle_group: op.payload.group,
+      equipment: op.payload.equipment || null,
+      created_by: userId,
+    })
+    if (error) throw error
+  } else if (op.kind === 'exercise-delete') {
+    const { error } = await supabase.from('custom_exercises').delete().eq('id', op.payload.id)
+    if (error) throw error
   } else {
     const { error } = await supabase.from('custom_programs').delete().eq('id', op.payload.id)
     if (error) throw error
@@ -159,6 +173,18 @@ export async function syncRunDelete(id: string) {
   const { data } = await supabase.auth.getUser()
   if (!data.user) return enqueue({ kind: 'run-delete', payload: { id } })
   await attempt({ kind: 'run-delete', payload: { id } }, data.user.id)
+}
+
+export async function syncExercise(ex: Exercise) {
+  const { data } = await supabase.auth.getUser()
+  if (!data.user) return enqueue({ kind: 'exercise-upsert', payload: ex })
+  await attempt({ kind: 'exercise-upsert', payload: ex }, data.user.id)
+}
+
+export async function syncExerciseDelete(id: string) {
+  const { data } = await supabase.auth.getUser()
+  if (!data.user) return enqueue({ kind: 'exercise-delete', payload: { id } })
+  await attempt({ kind: 'exercise-delete', payload: { id } }, data.user.id)
 }
 
 let flushing = false

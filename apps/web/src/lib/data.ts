@@ -24,6 +24,25 @@ export const EXERCISES: Exercise[] = [
 
 export const MUSCLE_GROUPS = ['All', 'Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core']
 
+// Groups selectable when creating an exercise (no "All")
+export const EXERCISE_GROUPS = MUSCLE_GROUPS.filter(g => g !== 'All')
+// Equipment suggestions (datalist) — user may also type a custom value
+export const EQUIPMENT_OPTIONS = ['Barbell', 'Dumbbell', 'Cable', 'Machine', 'Bodyweight', 'Kettlebell', 'Band', 'Smith Machine']
+
+// User-added exercises (coach/admin). Mirror of useAppStore.customExercises kept
+// here as a live binding so non-React helpers (getExercise) resolve them too.
+export let CUSTOM_EXERCISES: Exercise[] = []
+export function setCustomExercisesRegistry(list: Exercise[]) { CUSTOM_EXERCISES = list }
+export function allExercises(): Exercise[] { return [...EXERCISES, ...CUSTOM_EXERCISES] }
+
+// Build a unique kebab-case id from a name, avoiding ids already taken
+export function makeExerciseId(name: string, taken: Set<string>): string {
+  const base = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'exercise'
+  let id = base, i = 2
+  while (taken.has(id)) id = `${base}-${i++}`
+  return id
+}
+
 export const PROGRAMS: Program[] = [
   {
     id: 'push', name: 'Push Day', focus: 'Chest · Shoulders · Triceps', duration: 62,

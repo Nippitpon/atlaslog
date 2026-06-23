@@ -1,6 +1,30 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-23 (รอบ 7: Athlete consent + Create Program)
+> อัปเดตล่าสุด: 2026-06-23 (รอบ 8: Custom exercises — coach/admin เพิ่มท่าใน Library)
+>
+> 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-06-23 — รอบ 8: Custom exercises (coach/admin เพิ่มท่าใน Library)
+
+> coach/admin เพิ่มท่าเองได้ในหน้า Library เก็บ cloud (ทุกคนเห็น, แก้/ลบเฉพาะเจ้าของ) ตามแพทเทิร์น body_metrics/runs
+
+- **DB:** ตารางใหม่ `custom_exercises` (id, name, **muscle_group** (group=reserved), equipment, created_by)
+  + RLS: authed read / insert+delete own-row (SUPABASE_SETUP **section 2f**)
+- `data.ts` — `CUSTOM_EXERCISES` live binding + `setCustomExercisesRegistry()` + `allExercises()` +
+  `EXERCISE_GROUPS` + `EQUIPMENT_OPTIONS` + `makeExerciseId()` (slug + กัน id ซ้ำ)
+- `utils.getExercise` — หา custom ด้วย (ผ่าน live binding) → History/Logger resolve ชื่อท่า custom ได้
+- `syncQueue` — ops `exercise-upsert/delete` + fns; `useAppStore` `customExercises[]` +
+  add/remove/set (อัปเดต registry mirror + sync) + persist + onRehydrate set registry + clear ตอน signout
+- `useAuthStore.loadUserData` — pull `custom_exercises` (ทุกแถว ไม่ filter user) ตอน login
+- **LibraryPage** — ปุ่ม **+** เฉพาะ `isCoach||isAdmin` → sheet New Exercise:
+  **name** (text, บังคับ) · **group** (select EXERCISE_GROUPS, บังคับ) · **equipment** (input+datalist,
+  เลือกหรือพิมพ์เอง, optional); custom row มี tag CUSTOM + ลบได้ (coach/admin); list/pickers ใช้ allExercises()
+- pickers (SwapSheet, AccessoryEditSheet, CreateProgram ExercisePicker) → `allExercises()` เห็นท่า custom
+- **ผล:** `pnpm build` + `pnpm lint` ผ่าน
+- ⚠️ **ต้องรัน SQL section 2f (`custom_exercises`) ก่อน** sync ถึงทำงาน (ก่อนรัน: add ขึ้น local + enqueue
+  รอ flush) — ไม่ต้อง redeploy edge function (ใช้ RLS ตรง ๆ ไม่ผ่าน edge fn)
 >
 > 📘 คู่มือฟีเจอร์ Coaching ฉบับล่าสุด: `docs/coaching-guide.md`
 
