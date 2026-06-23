@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import type { AthleteSummary } from '@atlaslog/shared'
 import { useAuthStore } from '../../store/useAuthStore.js'
-import { listAthletes, unlinkAthlete } from '../../lib/coachApi.js'
+import { listAthletes, unlinkAthlete, addAthlete } from '../../lib/coachApi.js'
 import { IconChevronRight } from '../../components/icons/index.js'
 
 export function CoachPage() {
@@ -14,6 +14,9 @@ export function CoachPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [athleteInput, setAthleteInput] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [addMsg, setAddMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -32,6 +35,23 @@ export function CoachPage() {
 
   if (!roleLoaded) return null
   if (!canCoach) return <Navigate to="/" replace />
+
+  const handleAdd = async () => {
+    const value = athleteInput.trim()
+    if (!value) return
+    setAdding(true)
+    setAddMsg(null)
+    try {
+      const email = await addAthlete(value)
+      setAddMsg({ ok: true, text: `Added ${email || 'athlete'}` })
+      setAthleteInput('')
+      await load()
+    } catch (e) {
+      setAddMsg({ ok: false, text: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setAdding(false)
+    }
+  }
 
   const handleUnlink = async (a: AthleteSummary) => {
     if (!window.confirm(`Unlink ${a.email}? You will no longer see their data.`)) return
@@ -76,13 +96,47 @@ export function CoachPage() {
         </div>
       )}
 
+      {/* Add athlete */}
+      <div style={{ padding: '0 20px 20px' }}>
+        <div className="t-eyebrow" style={{ marginBottom: 10 }}>ADD ATHLETE</div>
+        <div className="card">
+          <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 6 }}>
+            Enter the athlete's email or code
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              className="input-num"
+              type="text"
+              value={athleteInput}
+              placeholder="Athlete email / code"
+              onChange={e => setAthleteInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') void handleAdd() }}
+              style={{ flex: 1, minWidth: 0, textAlign: 'left', fontFamily: 'var(--font-mono)', textTransform: 'none', fontSize: 13 }}
+            />
+            <button
+              className="btn btn-primary"
+              style={{ height: 40, fontSize: 11, padding: '0 14px', flexShrink: 0, opacity: athleteInput.trim() ? 1 : 0.4 }}
+              disabled={adding || !athleteInput.trim()}
+              onClick={() => void handleAdd()}
+            >
+              {adding ? '...' : 'Add'}
+            </button>
+          </div>
+          {addMsg && (
+            <div className="t-mono" style={{ fontSize: 11, marginTop: 8, color: addMsg.ok ? '#4ade80' : '#ef4444' }}>
+              {addMsg.text}
+            </div>
+          )}
+        </div>
+      </div>
+
       <div style={{ padding: '0 20px 32px' }}>
         <div className="t-eyebrow" style={{ marginBottom: 10 }}>MY ATHLETES ({athletes.length})</div>
         {loading && athletes.length === 0 ? (
           <div className="t-mono" style={{ fontSize: 13, color: 'var(--muted)' }}>Loading…</div>
         ) : athletes.length === 0 ? (
           <div className="t-mono" style={{ fontSize: 12, color: 'var(--muted)' }}>
-            No athletes yet. Share your coach code from Profile.
+            No athletes yet. Add one by email above.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

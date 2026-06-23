@@ -13,6 +13,11 @@ export function linkCoach(code: string): Promise<string> {
     .then(r => r.coachEmail)
 }
 
+export function addAthlete(athlete: string): Promise<string> {
+  return call<{ ok: true; athleteEmail: string }>({ action: 'add-athlete', athlete })
+    .then(r => r.athleteEmail)
+}
+
 export function listAthletes(): Promise<AthleteSummary[]> {
   return call<{ athletes: AthleteSummary[] }>({ action: 'list-athletes' }).then(r => r.athletes)
 }

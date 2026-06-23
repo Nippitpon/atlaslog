@@ -6,8 +6,9 @@
 // athlete emails (which live in auth.users, not readable by the client).
 //
 // Actions (POST body):
-//   { action: 'resolve-link', code }   athlete links to a coach by code/email
-//   { action: 'list-athletes' }        coach lists their active athletes (+email)
+//   { action: 'resolve-link', code }    athlete links to a coach by code/email
+//   { action: 'add-athlete', athlete }  coach links an athlete by email/code
+//   { action: 'list-athletes' }         coach lists their active athletes (+email)
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
@@ -39,10 +40,10 @@ Deno.serve(async (req) => {
     if (userErr || !userData.user) return json({ error: 'Invalid token' }, 401)
     const caller = userData.user
 
-    const { action, code } = await req.json()
+    const { action, code, athlete } = await req.json()
 
-    // Resolve a coach code (8-char uuid prefix) or email to a user id.
-    const resolveCoach = async (raw: string) => {
+    // Resolve a user by email or 8-char uuid prefix.
+    const resolveUser = async (raw: string) => {
       const value = String(raw ?? '').trim().toLowerCase()
       if (!value) return null
       // Email match
@@ -56,7 +57,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'resolve-link') {
-      const coach = await resolveCoach(code)
+      const coach = await resolveUser(code)
       if (!coach) return json({ error: 'Coach not found' }, 404)
       if (coach.id === caller.id) return json({ error: 'Cannot link to yourself' }, 400)
 
@@ -72,6 +73,25 @@ Deno.serve(async (req) => {
         data: { athlete_id: caller.id, athlete_email: caller.email ?? '' },
       })
       return json({ ok: true, coachEmail: coach.email ?? '' })
+    }
+
+    if (action === 'add-athlete') {
+      const target = await resolveUser(athlete)
+      if (!target) return json({ error: 'Athlete not found' }, 404)
+      if (target.id === caller.id) return json({ error: 'Cannot add yourself' }, 400)
+
+      const { error } = await admin.from('coach_athlete').upsert(
+        { coach_id: caller.id, athlete_id: target.id, status: 'active' },
+        { onConflict: 'coach_id,athlete_id' },
+      )
+      if (error) return json({ error: error.message }, 500)
+
+      await admin.from('notifications').insert({
+        user_id: target.id,
+        type: 'coach_added',
+        data: { coach_id: caller.id, coach_email: caller.email ?? '' },
+      })
+      return json({ ok: true, athleteEmail: target.email ?? '' })
     }
 
     if (action === 'list-athletes') {
