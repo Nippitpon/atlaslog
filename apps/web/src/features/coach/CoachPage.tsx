@@ -42,8 +42,9 @@ export function CoachPage() {
     setAdding(true)
     setAddMsg(null)
     try {
-      const email = await addAthlete(value)
-      setAddMsg({ ok: true, text: `Added ${email || 'athlete'}` })
+      const { athleteEmail, status } = await addAthlete(value)
+      const who = athleteEmail || 'athlete'
+      setAddMsg({ ok: true, text: status === 'active' ? `${who} already linked` : `Request sent to ${who}` })
       setAthleteInput('')
       await load()
     } catch (e) {
@@ -153,8 +154,8 @@ export function CoachPage() {
                     <div style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {a.email}
                     </div>
-                    <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
-                      ATHLETE
+                    <div className="t-mono" style={{ fontSize: 10, marginTop: 2, color: a.status === 'pending' ? '#f97316' : 'var(--muted)' }}>
+                      {a.status === 'pending' ? 'PENDING — awaiting accept' : 'ATHLETE'}
                     </div>
                   </div>
                   <IconChevronRight size={16} style={{ color: 'var(--muted)', flexShrink: 0 }} />

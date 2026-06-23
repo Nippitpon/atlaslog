@@ -1,8 +1,41 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-23 (รอบ 6: Coach add athletes ✅ deploy + e2e ผ่าน)
+> อัปเดตล่าสุด: 2026-06-23 (รอบ 7: Athlete consent + Create Program)
 >
 > 📘 คู่มือฟีเจอร์ Coaching ฉบับล่าสุด: `docs/coaching-guide.md`
+
+---
+
+## 2026-06-23 — รอบ 7: Athlete ต้อง accept + Create Program
+
+### 1. Coach add → Athlete ต้องกด Accept (consent flow)
+> เดิม add แล้ว active ทันที → เปลี่ยนเป็น **pending จนกว่า athlete จะ accept** (RLS coach-read
+> เช็ค `status='active'` อยู่แล้ว → pending = โค้ชยังอ่านข้อมูลไม่ได้)
+- **Edge fn `coach`:**
+  - `add-athlete` → insert `status='pending'` (กัน downgrade ถ้า active อยู่แล้ว) + notify athlete
+    type `coach_request` {coach_id, coach_email}
+  - action ใหม่ `respond-link` {coachId, accept} → accept: update active + notify โค้ช `coach_linked`;
+    decline: ลบแถว + notify โค้ช `coach_declined`
+  - `list-athletes` → คืน `status` ด้วย (โชว์ pending/active)
+- **DB:** ALTER `coach_athlete` CHECK ให้รับ `pending` (SUPABASE_SETUP **section 2e**)
+- `types.ts` `AthleteSummary.status` · `coachApi` `addAthlete` (คืน status) + `respondCoachRequest`
+- `CoachPage` — badge "PENDING — awaiting accept" + ข้อความ "Request sent to …"
+- `DashboardPage` — การ์ด **COACH REQUEST** (Accept/Decline) แยกจาก banner ปกติ;
+  notificationText รองรับ `coach_declined`
+
+### 2. Create Program (+ ในหน้า Programs) — โครง 1 สัปดาห์ × N
+- หน้าใหม่ `/programs/new` (`CreateProgramPage.tsx`): ชื่อ/โฟกัส/จำนวนสัปดาห์ + เพิ่มวัน
+  (เลือก Mon–Sat + focus) + เพิ่มท่าต่อวัน (picker จาก library + main/accessory + sets/reps/RPE)
+  → สร้าง StructuredProgram (`source:'manual'`) ทำซ้ำ template N สัปดาห์ → addCustomProgram (sync)
+- `ProgramsPage` — ปุ่ม **+** ใน header → `/programs/new`; pill "CUSTOM" สำหรับ source manual
+- `types.ts` `StructuredProgram.source` += `'manual'`
+- แก้ z-index picker sheet (zIndex 100) กันปุ่ม Add to Day ชน bottom nav
+
+- **ผล:** `pnpm build` + `pnpm lint` ผ่าน
+- ✅ **e2e Create Program (Playwright 390px):** สร้าง "My PPL" 4 สัปดาห์ + วัน Mon "Push Day" +
+  MAIN Bench Press 4×5 → overview แสดง 4 weeks + tag CUSTOM → Week 1 detail แสดงท่าถูก + Start ได้ · 0 errors
+- ⚠️ **consent flow ต้องทำ backend ก่อน e2e:** (1) รัน SQL section 2e (ALTER pending) (2) **redeploy
+  edge function `coach`** — แล้วค่อยทดสอบ add→pending→athlete accept→active
 
 ---
 

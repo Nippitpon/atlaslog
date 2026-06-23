@@ -3,6 +3,7 @@ import { AppShell } from './components/layout/AppShell.js'
 import { DashboardPage } from './features/dashboard/DashboardPage.js'
 import { ProgramsPage } from './features/programs/ProgramsPage.js'
 import { ProgramOverviewPage } from './features/programs/ProgramOverviewPage.js'
+import { CreateProgramPage } from './features/programs/CreateProgramPage.js'
 import { WeekDetailPage } from './features/programs/WeekDetailPage.js'
 import { LoggerPage } from './features/logger/LoggerPage.js'
 import { HistoryPage } from './features/history/HistoryPage.js'
@@ -22,6 +23,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true,                                         element: <DashboardPage /> },
       { path: 'programs',                                    element: <ProgramsPage /> },
+      { path: 'programs/new',                                element: <CreateProgramPage /> },
       { path: 'programs/:programId',                         element: <ProgramOverviewPage /> },
       { path: 'programs/:programId/week/:weekId',            element: <WeekDetailPage /> },
       { path: 'workout',                                     element: <LoggerPage /> },

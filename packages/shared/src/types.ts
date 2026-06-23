@@ -123,7 +123,7 @@ export interface StructuredProgram {
   focus: string
   weeks: StructuredWeek[]
   isCustom?: boolean
-  source?: 'builtin' | 'excel'
+  source?: 'builtin' | 'excel' | 'manual'
 }
 
 export interface ProgramOneRMs {
@@ -175,6 +175,7 @@ export interface AthleteSummary {
   id: string
   email: string
   linkedAt: string
+  status: 'pending' | 'active'
 }
 
 export interface SharedProgram {

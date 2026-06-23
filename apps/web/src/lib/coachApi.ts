@@ -13,9 +13,13 @@ export function linkCoach(code: string): Promise<string> {
     .then(r => r.coachEmail)
 }
 
-export function addAthlete(athlete: string): Promise<string> {
-  return call<{ ok: true; athleteEmail: string }>({ action: 'add-athlete', athlete })
-    .then(r => r.athleteEmail)
+export function addAthlete(athlete: string): Promise<{ athleteEmail: string; status: string }> {
+  return call<{ ok: true; athleteEmail: string; status: string }>({ action: 'add-athlete', athlete })
+    .then(r => ({ athleteEmail: r.athleteEmail, status: r.status }))
+}
+
+export function respondCoachRequest(coachId: string, accept: boolean): Promise<void> {
+  return call<{ ok: true }>({ action: 'respond-link', coachId, accept }).then(() => undefined)
 }
 
 export function listAthletes(): Promise<AthleteSummary[]> {
