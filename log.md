@@ -35,6 +35,14 @@
   bodyMetrics + runs กลับมาครบจาก cloud (mapping ถูก) → **0 console errors**
 - `pnpm build` + `pnpm lint` ผ่าน · `grep service_role dist` = 0
 
+### ✅ Committed + deployed 2026-06-23
+- branch `feat/body-running-and-sync-fixes` (commit `a783f69`) → merge --no-ff เข้า `main`
+  (merge `cd20d17`) → push origin → **Vercel auto-deploy**
+- รวมงานทั้งวันในก้อนเดียว: 4 bug fixes แรก + A1 + A2 + B1 + B2 (ไฟล์ทับซ้อนกันเลย commit รวม)
+- prod (https://atlaslog-web.vercel.app) เข้าถึงได้หลัง push
+- ⚠️ prod feature retest เต็ม (Playwright) ยังไม่ได้ทำรอบนี้ (MCP playwright หลุดหลัง kill node) —
+  verify แล้วบน local + Supabase จริง; prod ใช้ Supabase project เดียวกัน + ตาราง 2c/2d รันแล้ว
+
 ---
 
 ## 2026-06-23 — A1 History แสดงทุก set + A2 sync progress ข้ามเครื่อง
