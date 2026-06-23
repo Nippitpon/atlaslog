@@ -1,8 +1,26 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-23 (รอบ 9: Create=coach/admin only + program visibility Private/Code/Public)
+> อัปเดตล่าสุด: 2026-06-23 (รอบ 10: Profile reorder/1RM popup + program type general/powerlifting)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-06-23 — รอบ 10: Profile 1RM popup + program type (general/powerlifting)
+
+- **ProfilePage:** ย้าย **BODY COMPOSITION ขึ้นเหนือ** 1RM; เปลี่ยน PERSONAL 1RM จาก card inline →
+  **ปุ่มเมนู** (โชว์ค่า S/B/D ปัจจุบัน) → กดเปิด **popup sheet** (inputs + Save)
+- **Program type:** `StructuredProgram.programType?: 'general' | 'powerlifting'` (undefined = powerlifting, legacy)
+  - **CreateProgramPage:** selector **PROGRAM TYPE** (General / Powerlifting)
+  - **General** → ไม่คำนวณน้ำหนัก (log เอง); **Powerlifting** → คำนวณจาก 1RM
+- **Weight calc (WeekDetailPage):** `isPowerlifting ? (config.oneRMs ถ้ามี else personalOneRMs โปรไฟล์) : null`
+  - powerlifting created program → ใช้ **profile 1RM ไม่ต้อง setup**; built-in เดิมที่มี config 1RM ยังใช้ config (ไม่ regress)
+- ไม่มี SQL/edge — programType อยู่ใน program jsonb (sync ผ่าน custom_programs เอง)
+- **ผล:** `pnpm build` + `pnpm lint` ผ่าน
+- ✅ **e2e (Playwright 390px):**
+  - Profile: BODY อยู่เหนือ 1RM · 1RM เป็นปุ่ม → popup → save 150/100/180 (athlete) / 200/120/220 (coach)
+  - PL program (Back Squat main, RPE8, **ไม่ setup config**) → week แสดง **155kg** (= profile squat 200 × RPE8@5 ≈77.5%)
+  - General program (Back Squat RPE8) → **ไม่มี kg** (ไม่คำนวณ) · 0 console errors
 
 ---
 

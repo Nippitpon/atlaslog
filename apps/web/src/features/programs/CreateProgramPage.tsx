@@ -23,6 +23,7 @@ export function CreateProgramPage() {
   const [focus, setFocus] = useState('')
   const [weeks, setWeeks] = useState('4')
   const [days, setDays] = useState<DayDraft[]>([])
+  const [programType, setProgramType] = useState<'general' | 'powerlifting'>('general')
   const [visibility, setVisibility] = useState<Visibility>('private')
   const [busy, setBusy] = useState(false)
   const [publishedCode, setPublishedCode] = useState<string | null>(null)
@@ -58,6 +59,7 @@ export function CreateProgramPage() {
       focus: focus.trim() || 'Custom',
       isCustom: true,
       source: 'manual',
+      programType,
       weeks: Array.from({ length: weeksNum }, (_, wi) => ({
         id: `week-${wi + 1}`,
         weekNumber: wi + 1,
@@ -134,6 +136,33 @@ export function CreateProgramPage() {
             1 สัปดาห์ที่สร้างจะถูกทำซ้ำ {weeksNum} สัปดาห์
           </div>
         </div>
+      </div>
+
+      {/* Program type */}
+      <div style={{ padding: '0 20px 20px' }}>
+        <div className="t-eyebrow" style={{ marginBottom: 10 }}>PROGRAM TYPE</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {([
+            { v: 'general', label: 'General', desc: 'บันทึกน้ำหนักเอง' },
+            { v: 'powerlifting', label: 'Powerlifting', desc: 'คำนวณจาก 1RM โปรไฟล์' },
+          ] as const).map(({ v, label, desc }) => (
+            <button key={v} onClick={() => setProgramType(v)}
+              style={{
+                all: 'unset', cursor: 'pointer', flex: 1, boxSizing: 'border-box',
+                padding: '12px', borderRadius: 12, textAlign: 'center',
+                border: `1px solid ${programType === v ? 'var(--accent)' : 'var(--border)'}`,
+                background: programType === v ? 'rgba(212,255,58,0.10)' : 'var(--surface-2)',
+              }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14, color: programType === v ? 'var(--accent)' : 'var(--text)' }}>{label}</div>
+              <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', marginTop: 2 }}>{desc}</div>
+            </button>
+          ))}
+        </div>
+        {programType === 'powerlifting' && (
+          <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 8 }}>
+            ท่า squat/bench/deadlift จะคำนวณน้ำหนักจาก Personal 1RM ในโปรไฟล์ (ใส่ % หรือ RPE ในแต่ละท่า)
+          </div>
+        )}
       </div>
 
       {/* Week template — days */}
