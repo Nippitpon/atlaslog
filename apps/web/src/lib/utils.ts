@@ -33,12 +33,12 @@ export function getExercise(id: string) {
 }
 
 export function formatDate(iso: string) {
-  const d = new Date(iso)
-  const now = new Date()
-  const diff = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
+  const d = new Date(iso); d.setHours(0, 0, 0, 0)
+  const now = new Date(); now.setHours(0, 0, 0, 0)
+  const diff = Math.round((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
   if (diff === 0) return 'TODAY'
   if (diff === 1) return 'YESTERDAY'
-  if (diff < 7) return `${diff} DAYS AGO`
+  if (diff > 0 && diff < 7) return `${diff} DAYS AGO`
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase()
 }
 

@@ -9,9 +9,11 @@ export function RunsPage() {
   const navigate = useNavigate()
   const { runs, addRun, removeRun } = useAppStore()
 
+  const todayStr = new Date().toISOString().slice(0, 10)
   const [dist, setDist] = useState('')
   const [dur, setDur] = useState('')
   const [note, setNote] = useState('')
+  const [date, setDate] = useState(todayStr)
 
   const sorted = useMemo(() => [...runs].sort((a, b) => b.date.localeCompare(a.date)), [runs])
 
@@ -25,14 +27,16 @@ export function RunsPage() {
 
   const handleAdd = () => {
     if (!canSave) return
+    // Anchor the chosen day at local noon so it lands on the right calendar date
+    const iso = date === todayStr ? new Date().toISOString() : new Date(`${date}T12:00:00`).toISOString()
     addRun({
       id: 'run' + Date.now(),
-      date: new Date().toISOString(),
+      date: iso,
       distanceKm: Number(dist),
       durationMin: Number(dur),
       note: note.trim() || undefined,
     })
-    setDist(''); setDur(''); setNote('')
+    setDist(''); setDur(''); setNote(''); setDate(todayStr)
   }
 
   const handleDelete = (r: RunEntry) => {
@@ -73,6 +77,14 @@ export function RunsPage() {
       <div style={{ padding: '0 20px 20px' }}>
         <div className="t-eyebrow" style={{ marginBottom: 10 }}>LOG A RUN</div>
         <div className="card">
+          <div style={{ marginBottom: 8 }}>
+            <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>DATE</div>
+            <input
+              className="input-num" type="date"
+              value={date} max={todayStr} onChange={e => setDate(e.target.value || todayStr)}
+              style={{ width: '100%', textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 14 }}
+            />
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div>
               <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>DISTANCE (km)</div>

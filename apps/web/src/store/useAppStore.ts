@@ -26,6 +26,7 @@ interface AppStore {
   clearHistory: () => void
   startWorkout: (program: Program) => void
   updateWorkout: (w: Workout) => void
+  addExerciseToWorkout: (exerciseId: string) => void
   finishWorkout: () => Session | null
   cancelWorkout: () => void
 
@@ -74,6 +75,15 @@ export const useAppStore = create<AppStore>()(
       },
 
       updateWorkout: (workout) => set({ workout }),
+
+      addExerciseToWorkout: (exerciseId) => set(state => {
+        if (!state.workout) return {}
+        const exercises = [
+          ...state.workout.exercises,
+          { exerciseId, isMain: false, sets: [{ w: 0, r: 8, done: false }] },
+        ]
+        return { workout: { ...state.workout, exercises, currentIdx: exercises.length - 1 } }
+      }),
 
       finishWorkout: () => {
         const { workout, history } = get()
