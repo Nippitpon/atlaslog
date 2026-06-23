@@ -20,9 +20,10 @@
 - ✅ **e2e frontend (Playwright 390px):** coach.test → /coach เห็น section ADD ATHLETE; กด Add →
   ได้ error "Edge Function returned a non-2xx status code" (เพราะ edge function ยังไม่ redeploy →
   action `add-athlete` = Unknown) = wiring ทำงานถูก
-- ⚠️ **ต้อง REDEPLOY edge function `coach`** (Dashboard วางโค้ดใหม่ หรือ `npx supabase functions
-  deploy coach`) → แล้ว add-athlete ถึงทำงาน. หลัง redeploy ค่อย e2e เต็ม (coach add athlete →
-  ขึ้นใน MY ATHLETES + athlete ได้ notification)
+- ✅ **redeploy edge function `coach` แล้ว + e2e เต็มผ่าน (2026-06-23):** coach.test unlink athlete.a
+  → MY ATHLETES (0) → ADD ATHLETE กรอก `athlete.a@atlaslog.app` → "Added athlete.a@..." →
+  MY ATHLETES (1) กลับมา → login athlete.a เห็น notification banner "coach.test@atlaslog.app
+  added you as an athlete" บน Home · 0 console errors
 
 ---
 
