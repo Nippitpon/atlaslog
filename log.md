@@ -307,10 +307,13 @@
 | 6 | Coach add athletes (edge action `add-athlete`) | ✅ Done (2026-06-23) — e2e + deploy |
 | 7 | Athlete consent (pending→Accept) + Create Program (`/programs/new`, 1 wk × N) | ✅ Done (2026-06-23) — e2e + deploy |
 | 8 | Custom exercises ใน Library (coach/admin เพิ่มท่า, cloud `custom_exercises`) | ✅ Done (2026-06-23) — e2e + deploy |
+| 9 | Create=coach/admin only + program visibility Private/Code/**Public** (Discover) | ✅ Done (2026-06-23) — e2e + deploy |
+| 10 | Profile: BODY เหนือ 1RM + 1RM เป็น popup · program type general/powerlifting (PL คำนวณจาก profile 1RM ไม่ต้อง setup) | ✅ Done (2026-06-23) — e2e + deploy |
 
 > **Supabase ที่ต้องมี (รันครบแล้ว):** SUPABASE_SETUP sections 2 / 2b / 2c (`program_state`) /
-> 2d (`body_metrics`,`runs`) / 2e (coach_athlete `pending`) / 2f (`custom_exercises`) +
-> edge functions `admin-users`, `coach` (deploy ล่าสุดมี add-athlete/respond-link)
+> 2d (`body_metrics`,`runs`) / 2e (coach_athlete `pending`) / 2f (`custom_exercises`) /
+> 2g (`shared_programs.is_public`) + edge functions `admin-users`, `coach`
+> (deploy ล่าสุดมี add-athlete/respond-link). รอบ 10 ไม่มี SQL/edge ใหม่ (programType อยู่ใน program jsonb)
 
 ---
 
