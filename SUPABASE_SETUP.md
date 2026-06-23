@@ -191,6 +191,16 @@ create policy "delete own exercise" on public.custom_exercises for delete using 
 > หมายเหตุ: การจำกัด "เฉพาะ coach/admin" บังคับฝั่ง UI (ปุ่มเพิ่มโชว์เฉพาะ `isCoach || isAdmin`)
 > เหมือน coach features อื่น ๆ; RLS บังคับ insert/delete เป็น own-row
 
+## 2g. Public programs (Discover)
+
+> ตอน Create Program (coach/admin) เลือก visibility ได้: Private / Share-by-code / **Public**.
+> Public = โผล่ใน section "PUBLIC PROGRAMS" ให้ทุกคนเห็น+import. ใช้ตาราง `shared_programs` เดิม
+> + คอลัมน์ `is_public`. (select policy เดิม `to authenticated using(true)` อ่าน public list ได้อยู่แล้ว)
+
+```sql
+alter table public.shared_programs add column if not exists is_public boolean not null default false;
+```
+
 ### Deploy Edge Function `coach`
 
 เหมือน `admin-users` — Supabase inject `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` ให้อัตโนมัติ
