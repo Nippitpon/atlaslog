@@ -4,10 +4,9 @@ import { useAppStore } from '../../store/useAppStore.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
 import { markAllRead } from '../../lib/notificationsApi.js'
-import { STRUCTURED_PROGRAMS, dayToProgram } from '../../lib/twelveWeekProgram.js'
-import { calcWeight } from '../../lib/rpeTable.js'
+import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { weeklyVolume, getDayOfWeek } from '../../lib/utils.js'
-import { IconUser, IconDumbbell, IconSearch, IconPlus, IconCheck, IconBell, IconRun } from '../../components/icons/index.js'
+import { IconUser, IconDumbbell, IconSearch, IconCheck, IconBell, IconRun } from '../../components/icons/index.js'
 
 const DAY_SHORT = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 
@@ -33,8 +32,8 @@ const PHASE_COLOR: Record<string, string> = {
 
 export function DashboardPage() {
   const navigate = useNavigate()
-  const { history, setShowPicker, startWorkout } = useAppStore()
-  const { configs, getDayStatus, getConfig, getCustomAccessories, customPrograms, progress } = useProgramStore()
+  const { history } = useAppStore()
+  const { configs, getDayStatus, customPrograms, progress } = useProgramStore()
   const { notifications, refreshNotifications } = useAuthStore()
 
   const unread = useMemo(() => notifications.filter(n => !n.readAt), [notifications])
@@ -130,40 +129,6 @@ export function DashboardPage() {
     return { day, program, currentWeek }
   }, [activeProgramInfo, getDayStatus])
 
-  const quickStart = () => {
-    if (!activeProgramInfo) { setShowPicker(true); return }
-    const { program, currentWeek } = activeProgramInfo
-    const config = getConfig(program.id)
-
-    const targetDay =
-      currentWeek.days.find(d => getDayStatus(program.id, currentWeek.id, d.id) === 'in_progress') ||
-      currentWeek.days.find(d => getDayStatus(program.id, currentWeek.id, d.id) === 'not_started')
-
-    if (!targetDay) { navigate(`/programs/${program.id}/week/${currentWeek.id}`); return }
-
-    const SBD: Record<string, 'squat' | 'bench' | 'deadlift'> = { squat: 'squat', bench: 'bench', deadlift: 'deadlift' }
-    const weightOverrides: Record<string, number> = {}
-    if (config) {
-      const oneRMs = config.oneRMs
-      targetDay.exercises.forEach(ex => {
-        const liftKey = SBD[ex.exerciseId]
-        if (!liftKey || !oneRMs[liftKey] || ex.rpe === undefined) return
-        const rm = oneRMs[liftKey]
-        const weight = ex.pct !== undefined
-          ? Math.round(rm * ex.pct / 2.5) * 2.5
-          : typeof ex.reps === 'number' ? calcWeight(rm, ex.reps, ex.rpe) : 0
-        if (weight > 0) weightOverrides[`${ex.exerciseId}:${ex.rpe}`] = weight
-      })
-    }
-
-    const customAcc = getCustomAccessories(program.id, currentWeek.id, targetDay.id)
-    const effectiveDay = customAcc
-      ? { ...targetDay, exercises: [...targetDay.exercises.filter(e => e.type === 'main'), ...customAcc] }
-      : targetDay
-
-    startWorkout(dayToProgram(program.id, currentWeek.id, effectiveDay, weightOverrides))
-    navigate('/workout')
-  }
 
   return (
     <div className="atlas-screen screen-enter">
@@ -412,21 +377,6 @@ export function DashboardPage() {
         ))}
       </div>
 
-      {/* Quick Start FAB */}
-      <button
-        onClick={quickStart}
-        aria-label="Quick start workout"
-        style={{
-          position: 'fixed', bottom: 80, right: 20, zIndex: 20,
-          width: 56, height: 56, borderRadius: '50%',
-          background: 'var(--accent)', border: 'none', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 4px 16px rgba(212,255,58,0.35)',
-          color: 'var(--accent-ink)',
-        }}
-      >
-        <IconPlus size={26} stroke={2.5} />
-      </button>
     </div>
   )
 }

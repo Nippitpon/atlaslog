@@ -1,6 +1,20 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-23 (UX fixes รอบ 2: Home overflow, run date, profile font, add-exercise)
+> อัปเดตล่าสุด: 2026-06-23 (UX fixes รอบ 3: เอา FAB ออก + Running weekly totals)
+
+---
+
+## 2026-06-23 — UX fixes รอบ 3
+
+1. **เอาปุ่ม + (Quick Start FAB) ออกจาก Home** — `DashboardPage.tsx` ลบ FAB + ฟังก์ชัน `quickStart`
+   + เก็บกวาด import/destructure ที่ไม่ใช้ (dayToProgram, calcWeight, IconPlus, setShowPicker,
+   startWorkout, getConfig, getCustomAccessories) — เริ่มซ้อมผ่านหน้า Programs แทน
+2. **Running summary = Weekly total** — `RunsPage` เปลี่ยนการ์ดสรุปจาก all-time → **THIS WEEK**
+   (calendar week Sun–Sat) DISTANCE + TIME + AVG PACE; RECENT RUNS ยังแสดงทุกครั้งเหมือนเดิม
+- **ผล:** `pnpm build` + `pnpm lint` ผ่าน
+- ✅ **e2e (Playwright 390px):** Home ไม่มี FAB (`aria-label="Quick start workout"` = null);
+  RunsPage "THIS WEEK" = 5km/30min/6:00 (เฉพาะ run วันนี้) — run 6/20 (สัปดาห์ก่อน) ไม่ถูกนับ
+  ในยอดสัปดาห์ แต่ยังอยู่ใน RECENT RUNS · 0 console errors
 
 ---
 

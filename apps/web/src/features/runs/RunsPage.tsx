@@ -17,9 +17,13 @@ export function RunsPage() {
 
   const sorted = useMemo(() => [...runs].sort((a, b) => b.date.localeCompare(a.date)), [runs])
 
-  const totals = useMemo(() => {
-    const distanceKm = runs.reduce((s, r) => s + r.distanceKm, 0)
-    const durationMin = runs.reduce((s, r) => s + r.durationMin, 0)
+  // Weekly totals — current calendar week (Sun–Sat), matching the rest of the app
+  const weekly = useMemo(() => {
+    const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - start.getDay())
+    const end = new Date(start); end.setDate(end.getDate() + 7)
+    const inWeek = runs.filter(r => { const d = new Date(r.date); return d >= start && d < end })
+    const distanceKm = inWeek.reduce((s, r) => s + r.distanceKm, 0)
+    const durationMin = inWeek.reduce((s, r) => s + r.durationMin, 0)
     return { distanceKm, durationMin, pace: formatPace(distanceKm, durationMin) }
   }, [runs])
 
@@ -55,21 +59,24 @@ export function RunsPage() {
         </div>
       </div>
 
-      {/* Totals */}
+      {/* Weekly totals */}
       <div style={{ padding: '0 20px 16px' }}>
-        <div className="card" style={{ display: 'flex', justifyContent: 'space-between' }}>
-          {[
-            { label: 'DISTANCE', val: totals.distanceKm.toFixed(1), unit: 'km' },
-            { label: 'TIME', val: Math.round(totals.durationMin), unit: 'min' },
-            { label: 'AVG PACE', val: totals.pace, unit: '/km' },
-          ].map(({ label, val, unit }) => (
-            <div key={label} style={{ textAlign: 'center', flex: 1 }}>
-              <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>{label}</div>
-              <div className="t-mono tnum" style={{ fontSize: 20, fontWeight: 700, color: 'var(--accent)' }}>
-                {val}<span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 2 }}>{unit}</span>
+        <div className="card">
+          <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 10 }}>THIS WEEK</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            {[
+              { label: 'DISTANCE', val: weekly.distanceKm.toFixed(1), unit: 'km' },
+              { label: 'TIME', val: Math.round(weekly.durationMin), unit: 'min' },
+              { label: 'AVG PACE', val: weekly.pace, unit: '/km' },
+            ].map(({ label, val, unit }) => (
+              <div key={label} style={{ textAlign: 'center', flex: 1 }}>
+                <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>{label}</div>
+                <div className="t-mono tnum" style={{ fontSize: 20, fontWeight: 700, color: 'var(--accent)' }}>
+                  {val}<span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 2 }}>{unit}</span>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
 
