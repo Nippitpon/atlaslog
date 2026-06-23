@@ -34,8 +34,14 @@
 - **ผล:** `pnpm build` + `pnpm lint` ผ่าน
 - ✅ **e2e Create Program (Playwright 390px):** สร้าง "My PPL" 4 สัปดาห์ + วัน Mon "Push Day" +
   MAIN Bench Press 4×5 → overview แสดง 4 weeks + tag CUSTOM → Week 1 detail แสดงท่าถูก + Start ได้ · 0 errors
-- ⚠️ **consent flow ต้องทำ backend ก่อน e2e:** (1) รัน SQL section 2e (ALTER pending) (2) **redeploy
-  edge function `coach`** — แล้วค่อยทดสอบ add→pending→athlete accept→active
+- ✅ **consent flow — SQL 2e + redeploy edge fn เสร็จ + e2e ผ่าน (Playwright 390px, 2026-06-23):**
+  - coach.test ADD athlete.a → "Request sent" + badge **PENDING**
+  - **พิสูจน์ pending กันอ่าน:** โค้ชเปิด detail athlete.a ตอน pending → **0 WORKOUTS** (RLS ตัด
+    แม้ athlete.a มี session จริง)
+  - athlete.a login → Home การ์ด **COACH REQUEST** "coach.test wants to coach you" → กด **Accept** →
+    การ์ดหาย
+  - coach.test login → athlete.a เป็น **ATHLETE (active)** → detail เห็นข้อมูลจริง (6 WORKOUTS,
+    16k KG, PROGRAMS 2) → RLS เปิด access หลัง active · 0 console errors
 
 ---
 
