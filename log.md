@@ -1,6 +1,37 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-23 (A1/A2 bug fixes + B1 body composition + B2 running)
+> อัปเดตล่าสุด: 2026-06-23 (UX fixes รอบ 2: Home overflow, run date, profile font, add-exercise)
+
+---
+
+## 2026-06-23 — UX fixes รอบ 2 (จาก feedback ผู้ใช้)
+
+1. **Home: ปุ่ม Running หลุดขอบจอ** — shortcuts row เดิม flex 3 ปุ่ม (Programs/Exercises/Running)
+   ล้นที่ 390px → เปลี่ยนเป็น `grid` 3 คอลัมน์ + ปุ่ม compact (padding 6, gap 6, font 13,
+   minWidth 0 + ellipsis) — `DashboardPage.tsx`
+2. **Running เก็บวันที่** — `RunsPage` เพิ่มช่อง DATE (input type=date, default วันนี้, max วันนี้,
+   log ย้อนหลังได้) → past date anchor ที่ noon กัน timezone เลื่อนวัน
+3. **Profile: ฟอนต์ช่อง "Coach code / email" ล้น** — ลด fontSize → 13 + minWidth 0 — `ProfilePage.tsx`
+4. **เพิ่มท่าระหว่างซ้อม + บันทึกใน History** —
+   - `useAppStore.addExerciseToWorkout(exerciseId)` — append WorkoutExercise (1 set ว่าง) เข้า
+     workout ปัจจุบัน + ตั้ง currentIdx ไปท่าใหม่ → finish แล้วเข้า History อัตโนมัติ
+   - `LoggerPage` — ปุ่ม **"+ Add"** ท้าย exercise tab strip → เปิด picker (reuse `SwapSheet`
+     ที่ทำให้ `current`/`title` เป็น optional)
+   - `LibraryPage` — แถวเดิมเป็น `<div>` ไม่มี onClick (chevron หลอกว่าคลิกได้) → เปลี่ยนเป็น
+     `<button>` เปิด action sheet: ถ้ามี workout active → "Add to current workout" (เข้า /workout);
+     ถ้าไม่มี → hint + ปุ่มไป Programs
+   - หมายเหตุ: flow วางแผนล่วงหน้าต่อวัน (WeekDetailPage → Edit → `AccessoryEditSheet`) มีอยู่แล้ว
+     และ accessory ที่เพิ่มเข้า workout ตอน Start → บันทึกใน History อยู่แล้ว
+5. **formatDate นับเป็น calendar-day** — เดิม floor เวลาที่ผ่านจริง → run ที่ anchor noon โชว์
+   "2 DAYS AGO" แทน 3 → แก้ให้ zero time ทั้งสองวันแล้ว round (ถูกต้องกว่า + ช่วย History) — `utils.ts`
+- **ผล:** `pnpm build` + `pnpm lint` ผ่าน · `grep service_role dist` = 0
+- ✅ **e2e ผ่าน (Playwright 390px, athlete.a, หลัง reconnect MCP):**
+  - #1 ปุ่ม Running ขอบขวา 370 < 390 ไม่ล้น
+  - #2 log run ย้อนหลัง 2026-06-20 → เก็บวันถูก → แสดง "3 DAYS AGO"
+  - #3 ช่อง coach code fontSize 13, scrollWidth 218 ≤ 220 ไม่ล้น
+  - #4 Logger "+ Add" → เลือก Barbell Curl → finish → **History แสดง Barbell Curl 30×10 TOP**;
+    Library คลิกได้: มี workout → "Add to current workout" (Cable Fly เข้า workout); ไม่มี → hint + Go to Programs
+  - 0 console errors
 
 ---
 

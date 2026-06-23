@@ -4,12 +4,13 @@ import { muscleColor } from '../../lib/utils.js'
 import { IconSearch, IconDumbbell } from '../../components/icons/index.js'
 
 interface SwapSheetProps {
-  current: string
+  current?: string
+  title?: string
   onPick: (id: string) => void
   onClose: () => void
 }
 
-export function SwapSheet({ current, onPick, onClose }: SwapSheetProps) {
+export function SwapSheet({ current, title = 'Swap Exercise', onPick, onClose }: SwapSheetProps) {
   const [q, setQ] = useState('')
   const filtered = EXERCISES.filter(e => e.name.toLowerCase().includes(q.toLowerCase()))
 
@@ -18,7 +19,7 @@ export function SwapSheet({ current, onPick, onClose }: SwapSheetProps) {
       <div className="sheet" style={{ maxHeight: '80%', display: 'flex', flexDirection: 'column' }}
         onClick={e => e.stopPropagation()}>
         <div className="sheet-handle" />
-        <h3 className="t-display" style={{ margin: '0 0 12px', fontSize: 22 }}>Swap Exercise</h3>
+        <h3 className="t-display" style={{ margin: '0 0 12px', fontSize: 22 }}>{title}</h3>
         <div className="search-bar" style={{ marginBottom: 12 }}>
           <IconSearch size={18} style={{ color: 'var(--muted)' }} />
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search exercises…" />

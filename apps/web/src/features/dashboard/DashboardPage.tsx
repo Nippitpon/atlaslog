@@ -394,19 +394,22 @@ export function DashboardPage() {
       })()}
 
       {/* Shortcuts */}
-      <div style={{ padding: '0 20px', marginBottom: 28, display: 'flex', gap: 10 }}>
-        <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => navigate('/programs')}>
-          <IconDumbbell size={18} />
-          Programs
-        </button>
-        <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => navigate('/library')}>
-          <IconSearch size={18} />
-          Exercises
-        </button>
-        <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => navigate('/runs')}>
-          <IconRun size={18} />
-          Running
-        </button>
+      <div style={{ padding: '0 20px', marginBottom: 28, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+        {[
+          { label: 'Programs', Ic: IconDumbbell, to: '/programs' },
+          { label: 'Exercises', Ic: IconSearch, to: '/library' },
+          { label: 'Running', Ic: IconRun, to: '/runs' },
+        ].map(({ label, Ic, to }) => (
+          <button
+            key={to}
+            className="btn btn-secondary"
+            style={{ minWidth: 0, padding: '0 6px', gap: 6, fontSize: 13 }}
+            onClick={() => navigate(to)}
+          >
+            <Ic size={17} />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+          </button>
+        ))}
       </div>
 
       {/* Quick Start FAB */}

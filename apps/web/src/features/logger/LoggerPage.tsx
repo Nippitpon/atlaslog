@@ -11,8 +11,9 @@ import type { Workout } from '@atlaslog/shared'
 
 export function LoggerPage() {
   const navigate = useNavigate()
-  const { workout, updateWorkout, finishWorkout, cancelWorkout, history } = useAppStore()
+  const { workout, updateWorkout, addExerciseToWorkout, finishWorkout, cancelWorkout, history } = useAppStore()
   const [showSwap, setShowSwap] = useState(false)
+  const [showAddExercise, setShowAddExercise] = useState(false)
   const [showCancel, setShowCancel] = useState(false)
 
   // all hooks must be called before any early return
@@ -135,6 +136,16 @@ export function LoggerPage() {
             </button>
           )
         })}
+        <button onClick={() => setShowAddExercise(true)} aria-label="Add exercise"
+          style={{
+            flexShrink: 0, background: 'var(--surface-1)',
+            border: '1px dashed var(--border-strong)', borderRadius: 12,
+            padding: '8px 14px', cursor: 'pointer', color: 'var(--text-2)',
+            display: 'flex', alignItems: 'center', gap: 6, alignSelf: 'stretch',
+          }}>
+          <IconPlus size={16} stroke={2.5} />
+          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 13 }}>Add</span>
+        </button>
       </div>
 
       <div style={{ padding: '0 20px 12px' }}>
@@ -258,6 +269,17 @@ export function LoggerPage() {
             setShowSwap(false)
           }}
           onClose={() => setShowSwap(false)}
+        />
+      )}
+
+      {showAddExercise && (
+        <SwapSheet
+          title="Add Exercise"
+          onPick={id => {
+            addExerciseToWorkout(id)
+            setShowAddExercise(false)
+          }}
+          onClose={() => setShowAddExercise(false)}
         />
       )}
 

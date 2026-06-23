@@ -215,7 +215,7 @@ export function ProfilePage() {
                 value={coachCode}
                 placeholder="Coach code / email"
                 onChange={e => setCoachCode(e.target.value)}
-                style={{ flex: 1, textAlign: 'left', fontFamily: 'var(--font-mono)', textTransform: 'none' }}
+                style={{ flex: 1, minWidth: 0, textAlign: 'left', fontFamily: 'var(--font-mono)', textTransform: 'none', fontSize: 13 }}
               />
               <button
                 className="btn btn-primary"
