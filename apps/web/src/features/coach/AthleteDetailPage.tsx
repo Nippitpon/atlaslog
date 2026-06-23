@@ -9,7 +9,8 @@ import { IconChevronLeft } from '../../components/icons/index.js'
 export function AthleteDetailPage() {
   const navigate = useNavigate()
   const { athleteId } = useParams()
-  const { isCoach, roleLoaded } = useAuthStore()
+  const { isCoach, isAdmin, roleLoaded } = useAuthStore()
+  const canCoach = isCoach || isAdmin
 
   const [sessions, setSessions] = useState<Session[]>([])
   const [programs, setPrograms] = useState<StructuredProgram[]>([])
@@ -17,7 +18,7 @@ export function AthleteDetailPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!isCoach || !athleteId) return
+    if (!canCoach || !athleteId) return
     let active = true
     // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch-on-mount
     setLoading(true)
@@ -26,10 +27,10 @@ export function AthleteDetailPage() {
       .catch(e => { if (active) setError(e instanceof Error ? e.message : String(e)) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [isCoach, athleteId])
+  }, [canCoach, athleteId])
 
   if (!roleLoaded) return null
-  if (!isCoach) return <Navigate to="/" replace />
+  if (!canCoach) return <Navigate to="/" replace />
 
   const totalVol = sessions.reduce((s, h) => s + h.volume, 0)
   const totalMin = sessions.reduce((s, h) => s + h.duration, 0)

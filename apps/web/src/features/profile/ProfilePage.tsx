@@ -123,8 +123,8 @@ export function ProfilePage() {
         </div>
       )}
 
-      {/* Coach panel entry */}
-      {isCoach && (
+      {/* Coach panel entry — coaches and admins */}
+      {(isCoach || isAdmin) && (
         <div style={{ padding: '0 20px 20px' }}>
           <button
             className="card card-tight"
