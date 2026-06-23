@@ -259,6 +259,17 @@
 | 3.5 | Admin-Confirms-Users (signup approval gate) | ✅ Done (commit `edf1f70`) — เดิมเรียก "Phase 4" แต่จริง ๆ เป็นส่วนต่อ auth |
 | 4 | Social: Coach-Athlete + Program sharing + In-app reminder | ✅ Done — merged main + deploy prod + ทดสอบ prod ผ่าน (2026-06-22, `f6529fe`) |
 | 4.1 | Admin-assignable Coach role + UI/UX fixes | ✅ Done (2026-06-22) — ทดสอบ prod ผ่าน |
+| A1/A2 | History แสดงทุก set + sync program progress ข้ามเครื่อง (`program_state`) | ✅ Done (2026-06-23) — e2e + deploy |
+| B1/B2 | Body composition (น้ำหนัก/กล้ามเนื้อ/ไขมัน) + Running/Cardio (`/runs`) | ✅ Done (2026-06-23) — e2e + deploy |
+| UX 2–3 | Logger +Add exercise·Library คลิกได้·run date·Home FAB ออก·Running weekly·formatDate | ✅ Done (2026-06-23) — e2e + deploy |
+| UX 4–5 | COACHING ใน Profile เฉพาะ coach/admin (ปุ่มเดียว → /coach) | ✅ Done (2026-06-23) — e2e + deploy |
+| 6 | Coach add athletes (edge action `add-athlete`) | ✅ Done (2026-06-23) — e2e + deploy |
+| 7 | Athlete consent (pending→Accept) + Create Program (`/programs/new`, 1 wk × N) | ✅ Done (2026-06-23) — e2e + deploy |
+| 8 | Custom exercises ใน Library (coach/admin เพิ่มท่า, cloud `custom_exercises`) | ✅ Done (2026-06-23) — e2e + deploy |
+
+> **Supabase ที่ต้องมี (รันครบแล้ว):** SUPABASE_SETUP sections 2 / 2b / 2c (`program_state`) /
+> 2d (`body_metrics`,`runs`) / 2e (coach_athlete `pending`) / 2f (`custom_exercises`) +
+> edge functions `admin-users`, `coach` (deploy ล่าสุดมี add-athlete/respond-link)
 
 ---
 
