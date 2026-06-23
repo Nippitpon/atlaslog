@@ -124,6 +124,9 @@ export interface StructuredProgram {
   weeks: StructuredWeek[]
   isCustom?: boolean
   source?: 'builtin' | 'excel' | 'manual'
+  // 'powerlifting' → working weights computed from 1RM (profile or config);
+  // 'general' → no 1RM calc, log weights manually. Undefined = powerlifting (legacy).
+  programType?: 'general' | 'powerlifting'
 }
 
 export interface ProgramOneRMs {

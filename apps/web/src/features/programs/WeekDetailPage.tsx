@@ -200,7 +200,7 @@ export function WeekDetailPage() {
   const { programId, weekId } = useParams<{ programId: string; weekId: string }>()
   const navigate = useNavigate()
   const { getDayStatus, getWeekStatus, getConfig, getCustomAccessories, setCustomAccessories, customPrograms } = useProgramStore()
-  const { startWorkout } = useAppStore()
+  const { startWorkout, personalOneRMs } = useAppStore()
   const [editingDayId, setEditingDayId] = useState<string | null>(null)
 
   const program = [...STRUCTURED_PROGRAMS, ...customPrograms].find(p => p.id === programId)
@@ -212,14 +212,22 @@ export function WeekDetailPage() {
   }
 
   const config = getConfig(program.id)
+  // Powerlifting (default) computes weights from 1RM; prefer per-program config
+  // 1RM if set, else fall back to the profile's Personal 1RM (no setup needed).
+  // General programs don't compute weights.
+  const isPowerlifting = (program.programType ?? 'powerlifting') === 'powerlifting'
+  const configRMs = config?.oneRMs
+  const hasConfigRMs = !!configRMs && (configRMs.squat > 0 || configRMs.bench > 0 || configRMs.deadlift > 0)
+  const calcRMs = isPowerlifting ? (hasConfigRMs ? configRMs! : personalOneRMs) : null
+
   const weekStatus = getWeekStatus(program.id, week.id, week.days.length)
   const phaseColor = PHASE_COLOR[week.phase] ?? 'var(--muted)'
 
   const handleStart = (day: StructuredDay) => {
-    // Build weight overrides for main SBD lifts
+    // Build weight overrides for main SBD lifts (powerlifting only)
     const weightOverrides: Record<string, number> = {}
-    if (config) {
-      const oneRMs = config.oneRMs
+    if (calcRMs) {
+      const oneRMs = calcRMs
       day.exercises.forEach(ex => {
         const liftKey = SBD_IDS[ex.exerciseId] as 'squat' | 'bench' | 'deadlift' | undefined
         if (!liftKey || !oneRMs[liftKey] || ex.rpe === undefined) return
@@ -296,7 +304,7 @@ export function WeekDetailPage() {
               day={day}
               status={getDayStatus(program.id, week.id, day.id)}
               accessories={accessories}
-              oneRMs={config?.oneRMs ?? null}
+              oneRMs={calcRMs}
               onStart={() => handleStart(day)}
               onEditAccessories={() => setEditingDayId(day.id)}
             />
