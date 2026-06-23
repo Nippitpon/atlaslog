@@ -1,6 +1,28 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-23 (UX fixes รอบ 5: admin เข้า Coaching ได้ด้วย)
+> อัปเดตล่าสุด: 2026-06-23 (รอบ 6: Coach add athletes — ต้อง REDEPLOY edge function `coach`)
+
+---
+
+## 2026-06-23 — รอบ 6: Coach add athletes ได้เอง (coach-initiated linking)
+
+> หลังลบ "CONNECT A COACH" ออกจาก Profile → ไม่มีทางผูก coach-athlete ทาง UI เลย.
+> เฟสนี้เพิ่มฝั่งโค้ชเป็นคน add athlete.
+
+- **Edge Function `coach`** — action ใหม่ `add-athlete` {athlete: email/code} → resolve user →
+  upsert `coach_athlete` (coach_id = caller, athlete_id = target, active) → notify athlete
+  (type `coach_added`, data.coach_email). rename helper `resolveCoach`→`resolveUser` (generic)
+- `lib/coachApi.ts` — `addAthlete(value)`
+- `features/coach/CoachPage.tsx` — section **ADD ATHLETE** (input email/code + ปุ่ม Add + Enter) →
+  addAthlete → refresh list + feedback; แก้ empty-state text เดิม (เลิกอ้าง coach code ใน Profile)
+- `DashboardPage.tsx` — `notificationText` รองรับ `coach_added` → "{coach_email} added you as an athlete"
+- **ผล:** `pnpm build` + `pnpm lint` ผ่าน
+- ✅ **e2e frontend (Playwright 390px):** coach.test → /coach เห็น section ADD ATHLETE; กด Add →
+  ได้ error "Edge Function returned a non-2xx status code" (เพราะ edge function ยังไม่ redeploy →
+  action `add-athlete` = Unknown) = wiring ทำงานถูก
+- ⚠️ **ต้อง REDEPLOY edge function `coach`** (Dashboard วางโค้ดใหม่ หรือ `npx supabase functions
+  deploy coach`) → แล้ว add-athlete ถึงทำงาน. หลัง redeploy ค่อย e2e เต็ม (coach add athlete →
+  ขึ้นใน MY ATHLETES + athlete ได้ notification)
 
 ---
 

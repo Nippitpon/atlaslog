@@ -15,6 +15,10 @@ function notificationText(n: { type: string; data: Record<string, unknown> | nul
     const email = (n.data?.athlete_email as string) || 'An athlete'
     return `${email} connected to you as an athlete`
   }
+  if (n.type === 'coach_added') {
+    const email = (n.data?.coach_email as string) || 'A coach'
+    return `${email} added you as an athlete`
+  }
   if (n.type === 'program_shared') {
     const name = (n.data?.program_name as string) || 'A program'
     return `${name} was shared with you`
