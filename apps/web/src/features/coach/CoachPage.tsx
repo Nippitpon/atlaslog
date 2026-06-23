@@ -7,7 +7,8 @@ import { IconChevronRight } from '../../components/icons/index.js'
 
 export function CoachPage() {
   const navigate = useNavigate()
-  const { isCoach, roleLoaded } = useAuthStore()
+  const { isCoach, isAdmin, roleLoaded } = useAuthStore()
+  const canCoach = isCoach || isAdmin
 
   const [athletes, setAthletes] = useState<AthleteSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -27,10 +28,10 @@ export function CoachPage() {
   }, [])
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch-on-mount
-  useEffect(() => { if (isCoach) void load() }, [isCoach, load])
+  useEffect(() => { if (canCoach) void load() }, [canCoach, load])
 
   if (!roleLoaded) return null
-  if (!isCoach) return <Navigate to="/" replace />
+  if (!canCoach) return <Navigate to="/" replace />
 
   const handleUnlink = async (a: AthleteSummary) => {
     if (!window.confirm(`Unlink ${a.email}? You will no longer see their data.`)) return

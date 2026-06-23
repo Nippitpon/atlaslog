@@ -1,6 +1,18 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-23 (UX fixes รอบ 4: COACHING เฉพาะ coach)
+> อัปเดตล่าสุด: 2026-06-23 (UX fixes รอบ 5: admin เข้า Coaching ได้ด้วย)
+
+---
+
+## 2026-06-23 — UX fixes รอบ 5: admin เข้า Coaching ได้
+
+- ปุ่ม Coaching ใน Profile: เงื่อนไข `isCoach` → **`isCoach || isAdmin`** — `ProfilePage.tsx`
+- guard `/coach` + `/coach/:id`: ใช้ `canCoach = isCoach || isAdmin` (เดิม `isCoach` ล้วน) +
+  อัปเดต useEffect deps — `CoachPage.tsx`, `AthleteDetailPage.tsx`
+- **ผล:** `pnpm build` + `pnpm lint` ผ่าน
+- ✅ **e2e (Playwright 390px):** coach.test เห็น Coaching (ไม่ regression); athlete.a (ไม่ใช่
+  coach/admin) ไม่เห็น · admin-positive verify ด้วย code review — login-test ไม่ได้ (ไม่มีรหัส
+  admin earthharuethai@gmail.com) แต่เป็น OR branch เดียวกับ coach + guard mirror กัน
 
 ---
 
