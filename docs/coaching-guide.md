@@ -71,6 +71,19 @@
 
 ---
 
+## 2.5 เพิ่มท่าใน Library (coach/admin)
+
+coach/admin เพิ่มท่าออกกำลังเองได้ (ผู้ใช้ทั่วไปไม่เห็นปุ่ม แต่ใช้ท่าที่เพิ่มได้)
+
+```
+Library → ปุ่ม + (มุมขวาบน, เฉพาะ coach/admin) → New Exercise
+   Name (บังคับ) · Muscle Group (เลือก, บังคับ) · Equipment (เลือก/พิมพ์เอง, optional)
+   → Add to Library
+```
+- เก็บใน `custom_exercises` (cloud) → **ทุกคนเห็น** ท่าเดียวกัน (ทีมใช้ร่วม); แก้/ลบเฉพาะเจ้าของ
+- ท่า custom มี tag **CUSTOM** + ปุ่มลบ (coach/admin); โผล่ในทุก picker (Logger, Create Program, Accessory)
+- `id` สร้างจากชื่อแบบ slug กันซ้ำอัตโนมัติ; เก็บ `{ id, name, group, equipment }`
+
 ## 3. Program Sharing — แชร์โปรแกรมด้วยโค้ด
 
 แชร์โปรแกรม **custom** หากันได้ (ไม่จำเป็นต้องเป็นคู่ coach-athlete ก็แชร์ได้ ขอแค่มีโค้ด)

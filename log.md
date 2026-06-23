@@ -23,8 +23,13 @@
   เลือกหรือพิมพ์เอง, optional); custom row มี tag CUSTOM + ลบได้ (coach/admin); list/pickers ใช้ allExercises()
 - pickers (SwapSheet, AccessoryEditSheet, CreateProgram ExercisePicker) → `allExercises()` เห็นท่า custom
 - **ผล:** `pnpm build` + `pnpm lint` ผ่าน
-- ⚠️ **ต้องรัน SQL section 2f (`custom_exercises`) ก่อน** sync ถึงทำงาน (ก่อนรัน: add ขึ้น local + enqueue
-  รอ flush) — ไม่ต้อง redeploy edge function (ใช้ RLS ตรง ๆ ไม่ผ่าน edge fn)
+- ✅ **รัน SQL section 2f แล้ว + e2e ผ่าน (Playwright 390px, 2026-06-23):**
+  - coach.test → Library ปุ่ม + → New Exercise "Hack Squat" / Legs / Machine → ขึ้นใน Library
+    tag **CUSTOM** (count 19→20), id `hack-squat`, sync-queue=`[]` (push cloud สำเร็จ)
+  - **cross-device + gating:** `localStorage.clear()` → login **athlete.a** → Hack Squat ขึ้น
+    (pull จาก cloud) แต่ **ไม่มีปุ่ม +** (gating coach/admin ทำงาน)
+  - picker Create Program (athlete) เห็น Hack Squat ด้วย · 0 console errors
+  - ไม่ต้อง redeploy edge function (ใช้ RLS ตรง ๆ ไม่ผ่าน edge fn)
 >
 > 📘 คู่มือฟีเจอร์ Coaching ฉบับล่าสุด: `docs/coaching-guide.md`
 
