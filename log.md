@@ -1,6 +1,78 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-22 (Phase 4.1 + fixed: Import-by-code cross-account RLS)
+> อัปเดตล่าสุด: 2026-06-23 (A1/A2 bug fixes + B1 body composition + B2 running)
+
+---
+
+## 2026-06-23 — B1 Body Composition + B2 Running (Phase B)
+
+> เก็บข้อมูลน้ำหนักตัว (body comp) + การวิ่ง, sync cloud + e2e ผ่าน. SQL section 2d รันแล้ว.
+
+### B1 — Body Composition (น้ำหนัก + มวลกล้ามเนื้อ + %ไขมัน)
+- ออกแบบเผื่อคำนวณ **BMR/TDEE ใน phase ถัดไป** (ตอนนี้เก็บข้อมูลดิบ)
+- `types.ts` `BodyMetricEntry { id, date, weightKg, skeletalMuscleKg?, bodyFatPct? }`
+- `useAppStore` — `bodyMetrics[]` + add/remove/set + persist + sync
+- **ProfilePage** section BODY COMPOSITION — กรอก 3 ค่า → Log today + ค่าล่าสุด + กราฟแนวโน้มน้ำหนัก (≥2 entries)
+
+### B2 — Running / Cardio (ระยะ + เวลา, pace อัตโนมัติ)
+- `types.ts` `RunEntry { id, date, distanceKm, durationMin, note? }` (pace = dur/dist, ไม่เก็บ)
+- `useAppStore` — `runs[]` + add/remove/set + persist + sync
+- **หน้าใหม่ `/runs`** (`features/runs/RunsPage.tsx`) — ฟอร์มเพิ่ม + totals (ระยะ/เวลา/pace เฉลี่ย) + รายการ + ลบ
+- **Dashboard** shortcut "Running" + **History** รวม run card ใน timeline เดียว (sort by date)
+- `formatPace()` ใน `utils.ts` (M:SS /km)
+
+### Sync / infra
+- `syncQueue.ts` — ops ใหม่: `body-metric-upsert/delete`, `run-upsert/delete` + sync fns
+- `useAuthStore.loadUserData` — pull `body_metrics` + `runs` ตอน login (map snake→camel)
+- `ProfilePage.handleSignOut` — `clearMetrics()` กัน data leak ข้ามบัญชี
+- ตาราง Supabase ใหม่ `body_metrics` + `runs` (SUPABASE_SETUP.md **section 2d**, รันแล้ว 2026-06-23)
+
+### ✅ e2e ผ่าน (Playwright 390px, athlete.a, 2026-06-23)
+- **B1:** Log 75kg/35kg(muscle)/15%(fat) → ค่าล่าสุดแสดงถูก
+- **B2:** Add run 5km/30min → totals 5.0km·30min·**6:00/km** (pace ถูก) → Run card โผล่บนสุด History
+  timeline คละกับ lifting session
+- **cross-device round-trip:** finish → sync-queue=`[]` → `localStorage.clear()` → re-login →
+  bodyMetrics + runs กลับมาครบจาก cloud (mapping ถูก) → **0 console errors**
+- `pnpm build` + `pnpm lint` ผ่าน · `grep service_role dist` = 0
+
+---
+
+## 2026-06-23 — A1 History แสดงทุก set + A2 sync progress ข้ามเครื่อง
+
+### A1 — History แสดง back-off set (เดิมโชว์แค่ TOP SET)
+- **อาการ:** ซ้อม Squat 140×3 (top) + back-off 2 เซ็ต แต่ History โชว์แค่บรรทัดเดียว
+- **สาเหตุ:** `HistoryPage.tsx` `SessionCard` จัดกลุ่ม set ตาม exerciseId แล้ว `reduce` เอาแค่
+  เซ็ตหนักสุดมาโชว์ — back-off (squat เบากว่า) ถูกบันทึกครบใน data แต่ไม่ render
+- **แก้:** render ทุก set ที่ done เป็น inline list (`140×3 TOP · 120×5 · 120×5`),
+  มาร์กเซ็ตหนักสุดด้วย label TOP สี accent. ไม่แตะ data model
+
+### A2 — Sync program progress/config ข้ามเครื่อง
+- **อาการ:** ซ้อม+record บนมือถือ → เปิด browser คอม History ขึ้น (sync แล้ว) แต่
+  Active Program บน Home ไม่รู้ว่าซ้อมถึงวันไหน
+- **สาเหตุ:** `useProgramStore` เก็บ `progress`/`configs`/`customAccessories` ใน localStorage
+  อย่างเดียว (ต่างจาก `sessions` ที่ sync) → อีกเครื่อง progress ว่าง
+- **แก้ (last-write-wins ทั้ง blob, 1 row/user):**
+  - ตารางใหม่ `program_state` (SUPABASE_SETUP.md **section 2c**) — progress + configs +
+    custom_accessories เป็น jsonb + RLS own-row
+  - `types.ts` — `ProgramStateSnapshot`, `ProgramCustomAccessories`
+  - `syncQueue.ts` — op `program-state-upsert` (dedupe: เก็บแค่ตัวล่าสุดใน queue)
+  - `useProgramStore` — `queueStateSync()` debounce 800ms ยิงทุก mutation
+    (setDayStatus/setConfig/setCustomAccessories/resetProgram/removeCustomProgram) +
+    `setProgramState()` สำหรับ pull (ไม่ re-trigger sync)
+  - `useAuthStore.loadUserData` — pull `program_state` (`.maybeSingle()`) ตอน login;
+    โหลดเฉพาะเมื่อ cloud มี row จริง (กัน clobber local ที่ยังค้างใน queue)
+  - `ProfilePage.handleSignOut` — clear program state กัน data leak ข้ามบัญชีบนเครื่องเดียวกัน
+- **ผล:** `pnpm build` + `pnpm lint` ผ่าน, `grep service_role dist` = 0
+- ✅ **รัน SQL section 2c ใน Supabase แล้ว** (2026-06-23, "Success. No rows returned")
+
+### ✅ e2e ผ่าน (Playwright 390px, บัญชี athlete.a, 2026-06-23)
+- **A1:** บันทึก Bench 90×3 (top) + 70×8 + 70×8 → History แสดงครบ 3 set:
+  `90kg×3 TOP · 70kg×8 · 70kg×8` (back-off ขึ้นแล้ว, มาร์ก TOP ถูกเซ็ต)
+- **A2 (cross-device round-trip เด็ดขาด):** finish workout → sync-queue = `[]` (push cloud สำเร็จ)
+  → `localStorage.clear()` (จำลองเครื่องใหม่) → login ใหม่ → Active Program กลับมาแสดง
+  **W4 · 3/12 weeks · 25%** + ไอคอน ✓ Mon/Tue/Thu (progress มาจาก cloud ล้วน ๆ) → **0 console errors**
+
+---
 
 ---
 
@@ -220,8 +292,10 @@ Commits: `9de2433` → `0f19806` → `9ad5a31` → pull-on-login commit
 | ~~**ไม่มี offline fallback**~~ | ✅ แก้แล้ว — `syncQueue.ts` enqueue เมื่อ fail + flush ตอน online/login | — |
 | ~~**Email confirmation UX**~~ | ✅ เพิ่มปุ่ม resend confirmation แล้ว | — |
 | ~~**signUp UI bug**~~ | ✅ หายเอง — เปิด Confirm email แล้ว signUp ไม่ได้ session ทันที, UI โชว์ "รอแอดมินอนุมัติ" ถูกต้อง (verify 2026-06-19) | — |
-| **admin guard race (ใหม่)** | navigate ตรงไป `/admin` ทันทีหลัง login ถูก redirect กลับ `/` เพราะ `loadRole()` async ยังไม่เสร็จ — กดปุ่มจาก Profile ใช้ได้ปกติ | ต่ำ |
-| **pull เฉพาะตอน SIGNED_IN** | reload หน้าใช้ local persist (INITIAL_SESSION ไม่ trigger pull) — ปกติพอ แต่ถ้าแก้ข้อมูลจากอีกเครื่องจะไม่ refresh จนกว่าจะ re-login | ต่ำ |
+| ~~**lint error DashboardPage**~~ | ✅ แก้แล้ว 2026-06-23 — ย้าย `getWeekStatus` เข้าไปเรียกใน useMemo callback ผ่าน `getState()`, เพิ่ม `progress` เป็น dep | — |
+| ~~**SBD TOTAL (WEEK) rolling 7 วัน**~~ | ✅ แก้แล้ว 2026-06-23 — เปลี่ยนเป็น calendar week (Sun–Sat) เหมือน Weekly Volume chart | — |
+| ~~**admin guard race**~~ | ✅ แก้แล้ว 2026-06-23 — เพิ่ม `roleLoaded` flag ใน AuthStore; guard รอก่อน redirect | — |
+| ~~**pull เฉพาะตอน SIGNED_IN**~~ | ✅ แก้แล้ว 2026-06-23 — `init()` เรียก `loadUserData()` ตอน `getSession()` เจอ user แล้ว | — |
 | ~~**ยังไม่ได้ทดสอบ production**~~ | ✅ ใส่ env vars ใน Vercel + login บน production ได้แล้ว | — |
 | ~~**Confirm email ปิดอยู่**~~ | ✅ เปิดกลับแล้ว 2026-06-19 (ตอนทำ admin-confirm flow) | — |
 

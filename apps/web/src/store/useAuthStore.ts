@@ -11,6 +11,7 @@ interface AuthStore {
   user: User | null
   isAdmin: boolean
   isCoach: boolean
+  roleLoaded: boolean
   notifications: AppNotification[]
   initialized: boolean
   init: () => void
@@ -39,9 +40,12 @@ async function loadIsCoach(userId: string, role: string): Promise<boolean> {
 }
 
 async function loadUserData(userId: string) {
-  const [sessionsRes, programsRes] = await Promise.all([
+  const [sessionsRes, programsRes, stateRes, bodyRes, runsRes] = await Promise.all([
     supabase.from('sessions').select('*').eq('user_id', userId).order('date', { ascending: false }),
     supabase.from('custom_programs').select('*').eq('user_id', userId),
+    supabase.from('program_state').select('*').eq('user_id', userId).maybeSingle(),
+    supabase.from('body_metrics').select('*').eq('user_id', userId).order('date', { ascending: false }),
+    supabase.from('runs').select('*').eq('user_id', userId).order('date', { ascending: false }),
   ])
   if (sessionsRes.data) {
     useAppStore.getState().setHistory(
@@ -62,12 +66,48 @@ async function loadUserData(userId: string) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     useProgramStore.getState().setCustomPrograms((programsRes.data as any[]).map(r => r.program))
   }
+  // Only overwrite local program state when the cloud actually has a row —
+  // otherwise preserve local edits still pending in the sync queue.
+  if (stateRes.data) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const s = stateRes.data as any
+    useProgramStore.getState().setProgramState({
+      progress: s.progress ?? {},
+      configs: s.configs ?? {},
+      customAccessories: s.custom_accessories ?? {},
+    })
+  }
+  if (bodyRes.data) {
+    useAppStore.getState().setBodyMetrics(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (bodyRes.data as any[]).map(r => ({
+        id: r.id,
+        date: r.date,
+        weightKg: r.weight_kg,
+        skeletalMuscleKg: r.skeletal_muscle_kg ?? undefined,
+        bodyFatPct: r.body_fat_pct ?? undefined,
+      }))
+    )
+  }
+  if (runsRes.data) {
+    useAppStore.getState().setRuns(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (runsRes.data as any[]).map(r => ({
+        id: r.id,
+        date: r.date,
+        distanceKm: r.distance_km,
+        durationMin: r.duration_min,
+        note: r.note ?? undefined,
+      }))
+    )
+  }
 }
 
 export const useAuthStore = create<AuthStore>()((set) => ({
   user: null,
   isAdmin: false,
   isCoach: false,
+  roleLoaded: false,
   notifications: [],
   initialized: false,
 
@@ -76,27 +116,31 @@ export const useAuthStore = create<AuthStore>()((set) => ({
       set({ user: data.session?.user ?? null, initialized: true })
       const u = data.session?.user
       if (u) {
+        loadUserData(u.id)
         void flushQueue()
         loadRole(u.id).then(role => {
           set({ isAdmin: role === 'admin' })
-          loadIsCoach(u.id, role).then(isCoach => set({ isCoach }))
+          loadIsCoach(u.id, role).then(isCoach => set({ isCoach, roleLoaded: true }))
         })
         fetchNotifications(u.id).then(notifications => set({ notifications })).catch(() => {})
+      } else {
+        set({ roleLoaded: true })
       }
     })
     supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
       set({ user: session?.user ?? null })
       if (event === 'SIGNED_IN' && session?.user) {
         const u = session.user
+        set({ roleLoaded: false })
         loadUserData(u.id)
         void flushQueue()
         loadRole(u.id).then(role => {
           set({ isAdmin: role === 'admin' })
-          loadIsCoach(u.id, role).then(isCoach => set({ isCoach }))
+          loadIsCoach(u.id, role).then(isCoach => set({ isCoach, roleLoaded: true }))
         })
         fetchNotifications(u.id).then(notifications => set({ notifications })).catch(() => {})
       }
-      if (event === 'SIGNED_OUT') set({ isAdmin: false, isCoach: false, notifications: [] })
+      if (event === 'SIGNED_OUT') set({ isAdmin: false, isCoach: false, notifications: [], roleLoaded: true })
     })
     window.addEventListener('online', () => { void flushQueue() })
   },

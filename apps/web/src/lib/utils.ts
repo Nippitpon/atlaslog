@@ -55,6 +55,15 @@ export function muscleColor(group: string) {
   return map[group] ?? '#888'
 }
 
+// Running pace: min/km → "M:SS" (per km)
+export function formatPace(distanceKm: number, durationMin: number): string {
+  if (!distanceKm || !durationMin) return '—'
+  const paceMin = durationMin / distanceKm
+  const m = Math.floor(paceMin)
+  const s = Math.round((paceMin - m) * 60)
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
 export function getDayOfWeek() {
   const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December']

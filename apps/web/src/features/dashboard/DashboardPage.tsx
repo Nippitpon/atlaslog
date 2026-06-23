@@ -7,7 +7,7 @@ import { markAllRead } from '../../lib/notificationsApi.js'
 import { STRUCTURED_PROGRAMS, dayToProgram } from '../../lib/twelveWeekProgram.js'
 import { calcWeight } from '../../lib/rpeTable.js'
 import { weeklyVolume, getDayOfWeek } from '../../lib/utils.js'
-import { IconUser, IconDumbbell, IconSearch, IconPlus, IconCheck, IconBell } from '../../components/icons/index.js'
+import { IconUser, IconDumbbell, IconSearch, IconPlus, IconCheck, IconBell, IconRun } from '../../components/icons/index.js'
 
 const DAY_SHORT = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 
@@ -34,7 +34,7 @@ const PHASE_COLOR: Record<string, string> = {
 export function DashboardPage() {
   const navigate = useNavigate()
   const { history, setShowPicker, startWorkout } = useAppStore()
-  const { configs, getWeekStatus, getDayStatus, getConfig, getCustomAccessories, customPrograms } = useProgramStore()
+  const { configs, getDayStatus, getConfig, getCustomAccessories, customPrograms, progress } = useProgramStore()
   const { notifications, refreshNotifications } = useAuthStore()
 
   const unread = useMemo(() => notifications.filter(n => !n.readAt), [notifications])
@@ -51,13 +51,16 @@ export function DashboardPage() {
   const week = weeklyVolume(history)
   const maxVol = Math.max(1, ...week.map(d => d.volume))
 
-  // SBD Total: best Squat + Bench + Deadlift from main sets this week
+  // SBD Total: best Squat + Bench + Deadlift from main sets this calendar week (Sun–Sat)
   const sbdTotal = useMemo(() => {
-    const weekStart = new Date()
-    weekStart.setDate(weekStart.getDate() - 6)
-    weekStart.setHours(0, 0, 0, 0)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const weekStart = new Date(today)
+    weekStart.setDate(weekStart.getDate() - today.getDay())
+    const weekEnd = new Date(weekStart)
+    weekEnd.setDate(weekEnd.getDate() + 7)
 
-    const sessionsThisWeek = history.filter(h => new Date(h.date) >= weekStart)
+    const sessionsThisWeek = history.filter(h => { const d = new Date(h.date); return d >= weekStart && d < weekEnd })
     let bestSquat = 0, bestBench = 0, bestDeadlift = 0
 
     sessionsThisWeek.forEach(s => {
@@ -76,6 +79,7 @@ export function DashboardPage() {
   // Active program: first program with a config that isn't fully done
   // If calendar-based week is already done, advance to first not-done week
   const activeProgramInfo = useMemo(() => {
+    const { getWeekStatus } = useProgramStore.getState()
     const allPrograms = [...STRUCTURED_PROGRAMS, ...customPrograms]
     for (const programId of Object.keys(configs)) {
       const program = allPrograms.find(p => p.id === programId)
@@ -111,7 +115,8 @@ export function DashboardPage() {
       return { program, config, currentWeek, currentWeekNum: displayWeekNum, doneWeeks, weekStatus }
     }
     return null
-  }, [configs, getWeekStatus, customPrograms])
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- progress triggers recompute; getWeekStatus reads it internally via store.get()
+  }, [configs, customPrograms, progress])
 
   // Today's scheduled training day (pure client, no push) — reminder banner
   const todayReminder = useMemo(() => {
@@ -397,6 +402,10 @@ export function DashboardPage() {
         <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => navigate('/library')}>
           <IconSearch size={18} />
           Exercises
+        </button>
+        <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => navigate('/runs')}>
+          <IconRun size={18} />
+          Running
         </button>
       </div>
 

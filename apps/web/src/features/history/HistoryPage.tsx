@@ -1,8 +1,48 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore.js'
-import { getExercise } from '../../lib/utils.js'
-import type { Session } from '@atlaslog/shared'
+import { getExercise, formatPace } from '../../lib/utils.js'
+import { IconRun } from '../../components/icons/index.js'
+import type { Session, RunEntry } from '@atlaslog/shared'
+
+type TimelineItem =
+  | { kind: 'session'; date: string; data: Session }
+  | { kind: 'run'; date: string; data: RunEntry }
+
+function RunCard({ r }: { r: RunEntry }) {
+  return (
+    <div className="card card-tight" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{
+        width: 48, flexShrink: 0,
+        background: 'var(--surface-2)', border: '1px solid var(--border)',
+        borderRadius: 10, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', padding: '8px 0',
+      }}>
+        <div className="t-display tnum" style={{ fontSize: 18, lineHeight: 1 }}>
+          {new Date(r.date).getDate()}
+        </div>
+        <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', marginTop: 2 }}>
+          {new Date(r.date).toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()}
+        </div>
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
+          <IconRun size={15} style={{ color: 'var(--accent)' }} />
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 16 }}>
+            Run{r.note ? ` · ${r.note}` : ''}
+          </div>
+        </div>
+        <div className="t-mono tnum" style={{ fontSize: 11, color: 'var(--muted)', display: 'flex', gap: 10 }}>
+          <span><span style={{ color: 'var(--text)', fontWeight: 600 }}>{r.distanceKm}</span>km</span>
+          <span>·</span>
+          <span>{Math.round(r.durationMin)}min</span>
+          <span>·</span>
+          <span>{formatPace(r.distanceKm, r.durationMin)}/km</span>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function SessionCard({ h }: { h: Session }) {
   const doneSets = (h.exercises ?? []).flatMap(e =>
@@ -51,19 +91,19 @@ function SessionCard({ h }: { h: Session }) {
         </div>
       </div>
 
-      {/* Exercise details */}
+      {/* Exercise details — every recorded set, heaviest marked TOP */}
       {exerciseOrder.length > 0 && (
         <div style={{
           borderTop: '1px solid var(--border)',
           paddingTop: 10,
-          display: 'flex', flexDirection: 'column', gap: 7,
+          display: 'flex', flexDirection: 'column', gap: 9,
         }}>
           {exerciseOrder.map(exId => {
             const meta = getExercise(exId)
             const sets = byExercise[exId]
-            const top = sets.reduce((best, s) =>
-              s.w > best.w || (s.w === best.w && s.r > best.r) ? s : best
-            , sets[0])
+            const topIdx = sets.reduce((bi, s, i) =>
+              s.w > sets[bi].w || (s.w === sets[bi].w && s.r > sets[bi].r) ? i : bi
+            , 0)
             return (
               <div key={exId} style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                 <div style={{
@@ -72,15 +112,20 @@ function SessionCard({ h }: { h: Session }) {
                 }}>
                   {meta.name}
                 </div>
-                <div className="t-mono tnum" style={{ fontSize: 11, color: 'var(--muted)' }}>
-                  <span style={{ color: 'var(--text)', fontWeight: 600 }}>{top.w}</span>
-                  <span style={{ fontSize: 9, marginLeft: 1 }}>kg</span>
-                  <span style={{ color: 'var(--muted)', margin: '0 3px' }}>×</span>
-                  <span>{top.r}</span>
-                  <span style={{ fontSize: 9, marginLeft: 1 }}>reps</span>
-                  <span className="t-eyebrow" style={{ fontSize: 8, marginLeft: 6, color: 'var(--muted)' }}>
-                    TOP SET
-                  </span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px 8px', minWidth: 0 }}>
+                  {sets.map((s, i) => (
+                    <span key={i} className="t-mono tnum" style={{ fontSize: 11, color: 'var(--muted)' }}>
+                      <span style={{ color: i === topIdx ? 'var(--text)' : 'var(--text-2)', fontWeight: i === topIdx ? 700 : 500 }}>{s.w}</span>
+                      <span style={{ fontSize: 9, marginLeft: 1 }}>kg</span>
+                      <span style={{ color: 'var(--muted)', margin: '0 2px' }}>×</span>
+                      <span style={{ color: i === topIdx ? 'var(--text)' : 'var(--text-2)' }}>{s.r}</span>
+                      {i === topIdx && (
+                        <span className="t-eyebrow" style={{ fontSize: 8, marginLeft: 5, color: 'var(--accent)' }}>
+                          TOP
+                        </span>
+                      )}
+                    </span>
+                  ))}
                 </div>
               </div>
             )
@@ -93,18 +138,24 @@ function SessionCard({ h }: { h: Session }) {
 
 export function HistoryPage() {
   const navigate = useNavigate()
-  const { history } = useAppStore()
+  const { history, runs } = useAppStore()
 
   const groups = useMemo(() => {
-    const g: Record<string, typeof history> = {}
-    history.forEach(h => {
-      const d = new Date(h.date)
-      const key = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase()
+    const items: TimelineItem[] = [
+      ...history.map((h): TimelineItem => ({ kind: 'session', date: h.date, data: h })),
+      ...runs.map((r): TimelineItem => ({ kind: 'run', date: r.date, data: r })),
+    ].sort((a, b) => b.date.localeCompare(a.date))
+
+    const g: Record<string, TimelineItem[]> = {}
+    items.forEach(it => {
+      const key = new Date(it.date).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase()
       if (!g[key]) g[key] = []
-      g[key].push(h)
+      g[key].push(it)
     })
     return Object.entries(g)
-  }, [history])
+  }, [history, runs])
+
+  const isEmpty = history.length === 0 && runs.length === 0
 
   return (
     <div className="atlas-screen screen-enter">
@@ -115,7 +166,7 @@ export function HistoryPage() {
         </div>
       </div>
 
-      {history.length === 0 ? (
+      {isEmpty ? (
         <div style={{ padding: '60px 20px', textAlign: 'center' }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>📋</div>
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 20, marginBottom: 8 }}>
@@ -134,7 +185,10 @@ export function HistoryPage() {
             <div className="t-eyebrow">{month}</div>
           </div>
           <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {items.map(h => <SessionCard key={h.id} h={h} />)}
+            {items.map(it => it.kind === 'session'
+              ? <SessionCard key={it.data.id} h={it.data} />
+              : <RunCard key={it.data.id} r={it.data} />
+            )}
           </div>
         </div>
       ))}

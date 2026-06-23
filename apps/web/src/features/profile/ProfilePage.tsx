@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
 import { linkCoach } from '../../lib/coachApi.js'
-import { IconBolt, IconUsers, IconCopy } from '../../components/icons/index.js'
+import { IconBolt, IconUsers, IconCopy, IconScale } from '../../components/icons/index.js'
 
 const LIFTS: { key: 'squat' | 'bench' | 'deadlift'; label: string; short: string }[] = [
   { key: 'squat',    label: 'Squat',    short: 'S' },
@@ -14,8 +14,8 @@ const LIFTS: { key: 'squat' | 'bench' | 'deadlift'; label: string; short: string
 
 export function ProfilePage() {
   const navigate = useNavigate()
-  const { history, theme, setTheme, personalOneRMs, setPersonalOneRMs, clearHistory } = useAppStore()
-  const { clearCustomPrograms } = useProgramStore()
+  const { history, theme, setTheme, personalOneRMs, setPersonalOneRMs, clearHistory, bodyMetrics, addBodyMetric, clearMetrics } = useAppStore()
+  const { clearCustomPrograms, setProgramState } = useProgramStore()
   const { user, isAdmin, isCoach, signOut } = useAuthStore()
 
   const myCode = (user?.id ?? '').slice(0, 8).toUpperCase()
@@ -52,6 +52,8 @@ export function ProfilePage() {
     await signOut()
     clearHistory()
     clearCustomPrograms()
+    clearMetrics()
+    setProgramState({ progress: {}, configs: {}, customAccessories: {} })
     navigate('/login')
   }
   const totalVol = history.reduce((s, h) => s + h.volume, 0)
@@ -71,6 +73,37 @@ export function ProfilePage() {
     draft.squat !== personalOneRMs.squat ||
     draft.bench !== personalOneRMs.bench ||
     draft.deadlift !== personalOneRMs.deadlift
+
+  // Body composition
+  const sortedMetrics = useMemo(
+    () => [...bodyMetrics].sort((a, b) => b.date.localeCompare(a.date)),
+    [bodyMetrics]
+  )
+  const latestBody = sortedMetrics[0]
+  const [bw, setBw] = useState('')
+  const [smm, setSmm] = useState('')
+  const [bf, setBf] = useState('')
+  const [bodySaved, setBodySaved] = useState(false)
+
+  const handleSaveBody = () => {
+    const weightKg = Number(bw)
+    if (!weightKg) return
+    addBodyMetric({
+      id: 'bm' + Date.now(),
+      date: new Date().toISOString(),
+      weightKg,
+      skeletalMuscleKg: smm ? Number(smm) : undefined,
+      bodyFatPct: bf ? Number(bf) : undefined,
+    })
+    setBw(''); setSmm(''); setBf('')
+    setBodySaved(true); setTimeout(() => setBodySaved(false), 1500)
+  }
+
+  // Weight trend — oldest→newest, last 10 entries
+  const trend = useMemo(() => sortedMetrics.slice(0, 10).reverse(), [sortedMetrics])
+  const trendMin = Math.min(...trend.map(e => e.weightKg))
+  const trendMax = Math.max(...trend.map(e => e.weightKg))
+  const trendRange = Math.max(1, trendMax - trendMin)
 
   return (
     <div className="atlas-screen screen-enter">
@@ -271,6 +304,90 @@ export function ProfilePage() {
             onClick={handleSave}
           >
             {saved ? 'Saved!' : 'Save 1RM'}
+          </button>
+        </div>
+      </div>
+
+      {/* Body composition */}
+      <div style={{ padding: '0 20px 20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <IconScale size={14} style={{ color: 'var(--muted)' }} />
+          <div className="t-eyebrow">BODY COMPOSITION</div>
+        </div>
+        <div className="card">
+          {/* Latest summary */}
+          {latestBody && (
+            <div style={{
+              display: 'flex', justifyContent: 'space-between',
+              background: 'var(--surface-2)', borderRadius: 10, padding: '10px 14px', marginBottom: 14,
+            }}>
+              {[
+                { label: 'WEIGHT', val: latestBody.weightKg, unit: 'kg' },
+                { label: 'MUSCLE', val: latestBody.skeletalMuscleKg, unit: 'kg' },
+                { label: 'FAT', val: latestBody.bodyFatPct, unit: '%' },
+              ].map(({ label, val, unit }) => (
+                <div key={label} style={{ textAlign: 'center', flex: 1 }}>
+                  <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 3 }}>{label}</div>
+                  <div className="t-mono tnum" style={{ fontSize: 16, fontWeight: 700, color: val != null ? 'var(--text)' : 'var(--muted)' }}>
+                    {val != null ? val : '—'}
+                    {val != null && <span style={{ fontSize: 9, color: 'var(--muted)', marginLeft: 1 }}>{unit}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Weight trend */}
+          {trend.length >= 2 && (
+            <div style={{ marginBottom: 14 }}>
+              <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 6 }}>
+                WEIGHT TREND · {trendMin}–{trendMax} kg
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 56 }}>
+                {trend.map(e => {
+                  const h = 20 + ((e.weightKg - trendMin) / trendRange) * 80
+                  return (
+                    <div key={e.id} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
+                      <div style={{ width: '100%', maxWidth: 18, height: `${h}%`, background: 'var(--accent)', borderRadius: 3, opacity: 0.85 }} />
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Inputs */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+            {[
+              { ph: 'Weight', unit: 'kg', val: bw, set: setBw },
+              { ph: 'Muscle', unit: 'kg', val: smm, set: setSmm },
+              { ph: 'Fat', unit: '%', val: bf, set: setBf },
+            ].map(({ ph, unit, val, set }) => (
+              <div key={ph}>
+                <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>{ph.toUpperCase()} ({unit})</div>
+                <input
+                  className="input-num tnum"
+                  type="number" inputMode="decimal"
+                  value={val} placeholder="0"
+                  onChange={e => set(e.target.value)}
+                  onFocus={e => e.target.select()}
+                  style={{ width: '100%', textAlign: 'center' }}
+                />
+              </div>
+            ))}
+          </div>
+
+          <button
+            className="btn btn-primary"
+            style={{ width: '100%', marginTop: 14, height: 44, fontSize: 13,
+              opacity: bw || bodySaved ? 1 : 0.4,
+              background: bodySaved ? '#4ade80' : undefined,
+              color: bodySaved ? '#000' : undefined,
+            }}
+            disabled={!bw && !bodySaved}
+            onClick={handleSaveBody}
+          >
+            {bodySaved ? 'Logged!' : 'Log today'}
           </button>
         </div>
       </div>
