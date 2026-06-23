@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
-import { linkCoach } from '../../lib/coachApi.js'
-import { IconBolt, IconUsers, IconCopy, IconScale } from '../../components/icons/index.js'
+import { IconBolt, IconUsers, IconScale } from '../../components/icons/index.js'
 
 const LIFTS: { key: 'squat' | 'bench' | 'deadlift'; label: string; short: string }[] = [
   { key: 'squat',    label: 'Squat',    short: 'S' },
@@ -17,36 +16,6 @@ export function ProfilePage() {
   const { history, theme, setTheme, personalOneRMs, setPersonalOneRMs, clearHistory, bodyMetrics, addBodyMetric, clearMetrics } = useAppStore()
   const { clearCustomPrograms, setProgramState } = useProgramStore()
   const { user, isAdmin, isCoach, signOut } = useAuthStore()
-
-  const myCode = (user?.id ?? '').slice(0, 8).toUpperCase()
-  const [copied, setCopied] = useState(false)
-  const [coachCode, setCoachCode] = useState('')
-  const [linking, setLinking] = useState(false)
-  const [linkMsg, setLinkMsg] = useState<{ ok: boolean; text: string } | null>(null)
-
-  const handleCopyCode = async () => {
-    try {
-      await navigator.clipboard.writeText(myCode)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    } catch { /* clipboard unavailable */ }
-  }
-
-  const handleLinkCoach = async () => {
-    const code = coachCode.trim()
-    if (!code) return
-    setLinking(true)
-    setLinkMsg(null)
-    try {
-      const coachEmail = await linkCoach(code)
-      setLinkMsg({ ok: true, text: `Connected to ${coachEmail || 'coach'}` })
-      setCoachCode('')
-    } catch (e) {
-      setLinkMsg({ ok: false, text: e instanceof Error ? e.message : String(e) })
-    } finally {
-      setLinking(false)
-    }
-  }
 
   const handleSignOut = async () => {
     await signOut()
@@ -169,74 +138,12 @@ export function ProfilePage() {
               color: 'var(--accent)',
             }}><IconUsers size={16} /></div>
             <div style={{ flex: 1, fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 15 }}>
-              Coach Panel
+              Coaching
             </div>
             <span className="t-mono" style={{ fontSize: 11, color: 'var(--muted)' }}>MY ATHLETES →</span>
           </button>
         </div>
       )}
-
-      {/* Coaching — code + connect */}
-      <div style={{ padding: '0 20px 20px' }}>
-        <div className="t-eyebrow" style={{ marginBottom: 10 }}>COACHING</div>
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* My coach code */}
-          <div>
-            <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 6 }}>
-              MY COACH CODE — share with your athletes
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div className="t-mono" style={{
-                flex: 1, fontSize: 18, fontWeight: 700, letterSpacing: '0.12em',
-                background: 'var(--surface-2)', border: '1px solid var(--border)',
-                borderRadius: 8, padding: '10px 14px', color: 'var(--accent)',
-              }}>
-                {myCode || '—'}
-              </div>
-              <button
-                className="btn btn-secondary"
-                style={{ height: 40, fontSize: 11, padding: '0 12px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}
-                onClick={handleCopyCode}
-              >
-                <IconCopy size={14} /> {copied ? 'Copied' : 'Copy'}
-              </button>
-            </div>
-          </div>
-
-          {/* Connect a coach */}
-          <div>
-            <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 6 }}>
-              CONNECT A COACH — enter their code or email
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input
-                className="input-num"
-                type="text"
-                value={coachCode}
-                placeholder="Coach code / email"
-                onChange={e => setCoachCode(e.target.value)}
-                style={{ flex: 1, minWidth: 0, textAlign: 'left', fontFamily: 'var(--font-mono)', textTransform: 'none', fontSize: 13 }}
-              />
-              <button
-                className="btn btn-primary"
-                style={{ height: 40, fontSize: 11, padding: '0 14px', flexShrink: 0, opacity: coachCode.trim() ? 1 : 0.4 }}
-                disabled={linking || !coachCode.trim()}
-                onClick={handleLinkCoach}
-              >
-                {linking ? '...' : 'Connect'}
-              </button>
-            </div>
-            {linkMsg && (
-              <div className="t-mono" style={{
-                fontSize: 11, marginTop: 8,
-                color: linkMsg.ok ? '#4ade80' : '#ef4444',
-              }}>
-                {linkMsg.text}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* Lifetime stats */}
       <div style={{ padding: '0 20px 20px' }}>
