@@ -1,6 +1,8 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-23 (รอบ 6: Coach add athletes — ต้อง REDEPLOY edge function `coach`)
+> อัปเดตล่าสุด: 2026-06-23 (รอบ 6: Coach add athletes ✅ deploy + e2e ผ่าน)
+>
+> 📘 คู่มือฟีเจอร์ Coaching ฉบับล่าสุด: `docs/coaching-guide.md`
 
 ---
 
