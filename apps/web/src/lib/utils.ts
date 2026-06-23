@@ -1,5 +1,5 @@
 import type { Session } from '@atlaslog/shared'
-import { EXERCISES } from './data.js'
+import { EXERCISES, CUSTOM_EXERCISES } from './data.js'
 
 export function weeklyVolume(history: Session[]) {
   const today = new Date()
@@ -29,7 +29,9 @@ export function weeklyVolume(history: Session[]) {
 }
 
 export function getExercise(id: string) {
-  return EXERCISES.find(e => e.id === id) ?? { id, name: 'Exercise', group: '', equipment: '' }
+  return EXERCISES.find(e => e.id === id)
+    ?? CUSTOM_EXERCISES.find(e => e.id === id)
+    ?? { id, name: 'Exercise', group: '', equipment: '' }
 }
 
 export function formatDate(iso: string) {

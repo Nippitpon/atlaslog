@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { StructuredExercise } from '@atlaslog/shared'
-import { EXERCISES } from '../../lib/data.js'
+import { allExercises } from '../../lib/data.js'
 import { IconX, IconPlus, IconCheck } from '../../components/icons/index.js'
 
 interface Props {
@@ -24,7 +24,7 @@ export function AccessoryEditSheet({ accessories, onSave, onClose }: Props) {
 
   const addExercise = () => {
     if (!pickedId) return
-    const ex = EXERCISES.find(e => e.id === pickedId)
+    const ex = allExercises().find(e => e.id === pickedId)
     if (!ex) return
     const newEx: StructuredExercise = {
       exerciseId: ex.id,
@@ -39,7 +39,7 @@ export function AccessoryEditSheet({ accessories, onSave, onClose }: Props) {
     setSearch('')
   }
 
-  const filtered = EXERCISES.filter(e =>
+  const filtered = allExercises().filter(e =>
     e.name.toLowerCase().includes(search.toLowerCase()) ||
     e.group.toLowerCase().includes(search.toLowerCase())
   )

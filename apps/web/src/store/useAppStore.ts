@@ -1,9 +1,9 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Session, Workout, Program, BodyMetricEntry, RunEntry } from '@atlaslog/shared'
-import { makeSeedHistory } from '../lib/data.js'
+import type { Session, Workout, Program, BodyMetricEntry, RunEntry, Exercise } from '@atlaslog/shared'
+import { makeSeedHistory, setCustomExercisesRegistry } from '../lib/data.js'
 import { useProgramStore } from './useProgramStore.js'
-import { syncSession, syncBodyMetric, syncBodyMetricDelete, syncRun, syncRunDelete } from '../lib/syncQueue.js'
+import { syncSession, syncBodyMetric, syncBodyMetricDelete, syncRun, syncRunDelete, syncExercise, syncExerciseDelete } from '../lib/syncQueue.js'
 
 interface OneRMs { squat: number; bench: number; deadlift: number }
 
@@ -16,6 +16,7 @@ interface AppStore {
   personalOneRMs: OneRMs
   bodyMetrics: BodyMetricEntry[]
   runs: RunEntry[]
+  customExercises: Exercise[]
 
   setTheme: (t: 'dark' | 'light') => void
   setWorkout: (w: Workout | null) => void
@@ -36,6 +37,9 @@ interface AppStore {
   addRun: (entry: RunEntry) => void
   removeRun: (id: string) => void
   setRuns: (entries: RunEntry[]) => void
+  addCustomExercise: (ex: Exercise) => void
+  removeCustomExercise: (id: string) => void
+  setCustomExercises: (list: Exercise[]) => void
   clearMetrics: () => void
 }
 
@@ -50,6 +54,7 @@ export const useAppStore = create<AppStore>()(
       personalOneRMs: { squat: 0, bench: 0, deadlift: 0 },
       bodyMetrics: [],
       runs: [],
+      customExercises: [],
 
       setTheme: (theme) => set({ theme }),
       setWorkout: (workout) => set({ workout }),
@@ -140,7 +145,28 @@ export const useAppStore = create<AppStore>()(
       },
       setRuns: (runs) => set({ runs }),
 
-      clearMetrics: () => set({ bodyMetrics: [], runs: [] }),
+      addCustomExercise: (ex) => {
+        set(state => {
+          const list = [...state.customExercises.filter(e => e.id !== ex.id), ex]
+          setCustomExercisesRegistry(list)
+          return { customExercises: list }
+        })
+        void syncExercise(ex)
+      },
+      removeCustomExercise: (id) => {
+        set(state => {
+          const list = state.customExercises.filter(e => e.id !== id)
+          setCustomExercisesRegistry(list)
+          return { customExercises: list }
+        })
+        void syncExerciseDelete(id)
+      },
+      setCustomExercises: (list) => {
+        setCustomExercisesRegistry(list)
+        set({ customExercises: list })
+      },
+
+      clearMetrics: () => { setCustomExercisesRegistry([]); set({ bodyMetrics: [], runs: [], customExercises: [] }) },
     }),
     {
       name: 'atlas:v2',
@@ -151,7 +177,11 @@ export const useAppStore = create<AppStore>()(
         personalOneRMs: state.personalOneRMs,
         bodyMetrics: state.bodyMetrics,
         runs: state.runs,
+        customExercises: state.customExercises,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state?.customExercises) setCustomExercisesRegistry(state.customExercises)
+      },
     }
   )
 )
