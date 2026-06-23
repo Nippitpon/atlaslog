@@ -1,8 +1,25 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-23 (รอบ 8: Custom exercises — coach/admin เพิ่มท่าใน Library)
+> อัปเดตล่าสุด: 2026-06-23 (รอบ 9: Create=coach/admin only + program visibility Private/Code/Public)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-06-23 — รอบ 9: Create gating + program visibility (Public programs)
+
+> (1) เฉพาะ coach/admin สร้างโปรแกรมได้ (2) ตอนสร้างเลือก visibility: Private / Code / Public.
+> user ธรรมดาใช้ได้แค่ public programs + import code
+
+- **DB:** `alter table shared_programs add column is_public boolean default false` (SUPABASE_SETUP **2g**)
+- `shareApi` — `createShare(program, isPublic)` + `listPublicPrograms()` (select is_public=true) + type `PublicProgram`
+- **CreateProgramPage** — guard `!canCreate (isCoach||isAdmin)` → redirect /programs; selector
+  **VISIBILITY: Private / Share by code / Public**; on create → addCustomProgram +
+  (code→createShare แล้วโชว์โค้ด, public→createShare is_public) ; rename canCreate→canSave
+- **ProgramsPage** — ปุ่ม **+** เฉพาะ coach/admin; section ใหม่ **PUBLIC PROGRAMS** (listPublicPrograms
+  ตอน mount) → กด GET → importShare(code) → addCustomProgram → overview
+- **ผล:** `pnpm build` + `pnpm lint` ผ่าน
+- ⚠️ **ต้องรัน SQL 2g (`is_public`) ก่อน** public ถึงทำงาน — ไม่ต้อง redeploy edge fn (RLS ตรง ๆ)
 
 ---
 

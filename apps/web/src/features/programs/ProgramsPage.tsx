@@ -1,13 +1,14 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Program } from '@atlaslog/shared'
 import { useAppStore } from '../../store/useAppStore.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
+import { useAuthStore } from '../../store/useAuthStore.js'
 import { programVolume } from '../../lib/utils.js'
 import { PROGRAMS } from '../../lib/data.js'
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { ImportProgramSheet } from './ImportProgramSheet.js'
-import { createShare, importShare } from '../../lib/shareApi.js'
+import { createShare, importShare, listPublicPrograms, type PublicProgram } from '../../lib/shareApi.js'
 import {
   IconSearch, IconClock, IconTrendingUp, IconChevronRight, IconUpload, IconTrash,
   IconShare, IconCopy, IconLink, IconX, IconPlus,
@@ -24,7 +25,29 @@ export function ProgramsPage() {
   const navigate = useNavigate()
   const { startWorkout } = useAppStore()
   const { progress, customPrograms, removeCustomProgram, addCustomProgram } = useProgramStore()
+  const { isCoach, isAdmin } = useAuthStore()
+  const canCreate = isCoach || isAdmin
   const [showImport, setShowImport] = useState(false)
+
+  const [publicPrograms, setPublicPrograms] = useState<PublicProgram[]>([])
+  const [importingCode, setImportingCode] = useState<string | null>(null)
+
+  const loadPublic = useCallback(async () => {
+    try { setPublicPrograms(await listPublicPrograms()) } catch { /* ignore */ }
+  }, [])
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch-on-mount
+  useEffect(() => { void loadPublic() }, [loadPublic])
+
+  const handleImportPublic = async (p: PublicProgram) => {
+    setImportingCode(p.code)
+    try {
+      const program = await importShare(p.code)
+      addCustomProgram(program)
+      navigate(`/programs/${program.id}`)
+    } catch { /* ignore */ } finally {
+      setImportingCode(null)
+    }
+  }
 
   const [shareCode, setShareCode] = useState<string | null>(null)
   const [shareErr, setShareErr] = useState<string | null>(null)
@@ -81,9 +104,11 @@ export function ProgramsPage() {
           <h1>Programs</h1>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn-icon" onClick={() => navigate('/programs/new')} aria-label="Create program">
-            <IconPlus size={18} />
-          </button>
+          {canCreate && (
+            <button className="btn-icon" onClick={() => navigate('/programs/new')} aria-label="Create program">
+              <IconPlus size={18} />
+            </button>
+          )}
           <button className="btn-icon" onClick={() => setShowImportCode(true)} aria-label="Import program by share code">
             <IconLink size={18} />
           </button>
@@ -274,6 +299,38 @@ export function ProgramsPage() {
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Public Programs (Discover) ───────────────────────── */}
+      {publicPrograms.length > 0 && (
+        <div style={{ padding: '0 20px', marginBottom: 28 }}>
+          <div className="t-eyebrow" style={{ marginBottom: 12 }}>PUBLIC PROGRAMS</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {publicPrograms.map(p => (
+              <button key={p.code} onClick={() => void handleImportPublic(p)} disabled={importingCode === p.code}
+                style={{ all: 'unset', cursor: 'pointer', display: 'block' }}>
+                <div className="card card-tight" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{
+                    width: 44, alignSelf: 'stretch', minHeight: 52, flexShrink: 0,
+                    background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4ade80',
+                  }}>
+                    <IconTrendingUp size={20} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="t-display" style={{ fontSize: 16, marginBottom: 3 }}>{p.name}</div>
+                    <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
+                      {p.program.totalWeeks}W · {p.program.daysPerWeek} DAYS/WK · {p.program.focus}
+                    </div>
+                  </div>
+                  <span className="t-mono" style={{ fontSize: 10, color: 'var(--accent)', flexShrink: 0 }}>
+                    {importingCode === p.code ? '...' : 'GET →'}
+                  </span>
+                </div>
+              </button>
+            ))}
           </div>
         </div>
       )}
