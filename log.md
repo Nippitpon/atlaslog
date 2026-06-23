@@ -19,7 +19,13 @@
 - **ProgramsPage** — ปุ่ม **+** เฉพาะ coach/admin; section ใหม่ **PUBLIC PROGRAMS** (listPublicPrograms
   ตอน mount) → กด GET → importShare(code) → addCustomProgram → overview
 - **ผล:** `pnpm build` + `pnpm lint` ผ่าน
-- ⚠️ **ต้องรัน SQL 2g (`is_public`) ก่อน** public ถึงทำงาน — ไม่ต้อง redeploy edge fn (RLS ตรง ๆ)
+- ✅ **รัน SQL 2g แล้ว + e2e ผ่าน (Playwright 390px, 2026-06-23):**
+  - athlete.a: **ไม่มีปุ่ม +** · `/programs/new` ตรง ๆ → redirect `/programs` (guard)
+  - coach.test: สร้าง "Public PPL" (Public) → โผล่ใน **PUBLIC PROGRAMS**; สร้าง "Code PPL" (Code) →
+    ได้โค้ด `ZSC6YG`
+  - athlete.a: เห็น **Public PPL** แต่ **Code PPL ไม่ขึ้น** (is_public=false ถูกตัด) → กด GET → import
+    เข้า MY PROGRAMS + ไป overview · 0 console errors
+  - ไม่ต้อง redeploy edge fn (RLS ตรง ๆ)
 
 ---
 
