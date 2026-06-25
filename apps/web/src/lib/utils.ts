@@ -34,6 +34,22 @@ export function getExercise(id: string) {
     ?? { id, name: 'Exercise', group: '', equipment: '' }
 }
 
+// Absolute calendar date as DD-MM-YYYY (app-wide date format)
+export function formatDMY(input: string | Date) {
+  const d = input instanceof Date ? input : new Date(input)
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  return `${dd}-${mm}-${d.getFullYear()}`
+}
+
+// Short DD-MM (no year) — for compact ranges
+export function formatDM(input: string | Date) {
+  const d = input instanceof Date ? input : new Date(input)
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  return `${dd}-${mm}`
+}
+
 export function formatDate(iso: string) {
   const d = new Date(iso); d.setHours(0, 0, 0, 0)
   const now = new Date(); now.setHours(0, 0, 0, 0)
@@ -41,7 +57,7 @@ export function formatDate(iso: string) {
   if (diff === 0) return 'TODAY'
   if (diff === 1) return 'YESTERDAY'
   if (diff > 0 && diff < 7) return `${diff} DAYS AGO`
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase()
+  return formatDMY(d)
 }
 
 export function programVolume(prog: { exercises: { sets: { w: number; r: number }[] }[] }) {
@@ -68,7 +84,6 @@ export function formatPace(distanceKm: number, durationMin: number): string {
 
 export function getDayOfWeek() {
   const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
-  const months = ['January','February','March','April','May','June','July','August','September','October','November','December']
   const now = new Date()
-  return `${days[now.getDay()].toUpperCase()} · ${months[now.getMonth()].slice(0,3).toUpperCase()} ${now.getDate()}`
+  return `${days[now.getDay()].toUpperCase()} · ${formatDMY(now)}`
 }

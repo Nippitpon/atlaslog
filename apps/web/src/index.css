@@ -487,7 +487,7 @@ body {
   align-self: stretch;
 }
 
-.screen-enter { animation: slidein .25s ease both; }
+.screen-enter { animation: slidein .25s ease backwards; }
 
 .avatar {
   width: 56px;

@@ -2,8 +2,25 @@ import { useEffect, useState, useCallback } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import type { AthleteSummary } from '@atlaslog/shared'
 import { useAuthStore } from '../../store/useAuthStore.js'
-import { listAthletes, unlinkAthlete, addAthlete } from '../../lib/coachApi.js'
+import { listAthletes, unlinkAthlete, addAthlete, getAthleteSessions } from '../../lib/coachApi.js'
 import { IconChevronRight } from '../../components/icons/index.js'
+
+interface AthleteMetric { lastActiveDays: number | null; thisWeekCount: number; thisWeekVol: number }
+
+function summarize(sessions: { date: string; volume: number }[]): AthleteMetric {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const ws = new Date(today); ws.setDate(ws.getDate() - today.getDay())
+  const we = new Date(ws); we.setDate(we.getDate() + 7)
+  let lastActiveDays: number | null = null
+  let thisWeekCount = 0, thisWeekVol = 0
+  for (const s of sessions) {
+    const d = new Date(s.date); d.setHours(0, 0, 0, 0)
+    const days = Math.round((today.getTime() - d.getTime()) / 86400000)
+    if (lastActiveDays == null || days < lastActiveDays) lastActiveDays = days
+    if (d >= ws && d < we) { thisWeekCount++; thisWeekVol += s.volume }
+  }
+  return { lastActiveDays, thisWeekCount, thisWeekVol }
+}
 
 export function CoachPage() {
   const navigate = useNavigate()
@@ -11,6 +28,7 @@ export function CoachPage() {
   const canCoach = isCoach || isAdmin
 
   const [athletes, setAthletes] = useState<AthleteSummary[]>([])
+  const [metrics, setMetrics] = useState<Record<string, AthleteMetric>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -22,7 +40,14 @@ export function CoachPage() {
     setLoading(true)
     setError(null)
     try {
-      setAthletes(await listAthletes())
+      const list = await listAthletes()
+      setAthletes(list)
+      // Best-effort per-athlete summary (active links only — RLS blocks pending)
+      const pairs = await Promise.all(list.map(async a => {
+        try { return [a.id, summarize(await getAthleteSessions(a.id))] as const }
+        catch { return [a.id, null] as const }
+      }))
+      setMetrics(Object.fromEntries(pairs.filter(p => p[1])) as Record<string, AthleteMetric>)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -154,9 +179,23 @@ export function CoachPage() {
                     <div style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {a.email}
                     </div>
-                    <div className="t-mono" style={{ fontSize: 10, marginTop: 2, color: a.status === 'pending' ? '#f97316' : 'var(--muted)' }}>
-                      {a.status === 'pending' ? 'PENDING — awaiting accept' : 'ATHLETE'}
-                    </div>
+                    {a.status === 'pending' ? (
+                      <div className="t-mono" style={{ fontSize: 10, marginTop: 2, color: '#f97316' }}>
+                        PENDING — awaiting accept
+                      </div>
+                    ) : (() => {
+                      const m = metrics[a.id]
+                      const d = m?.lastActiveDays
+                      const stale = d != null && d > 7
+                      const activeText = d == null ? 'no workouts'
+                        : d === 0 ? 'active today' : d === 1 ? '1 day ago' : `${d} days ago`
+                      return (
+                        <div className="t-mono" style={{ fontSize: 10, marginTop: 2, color: stale ? '#f97316' : 'var(--muted)' }}>
+                          <span style={{ color: stale ? '#f97316' : '#4ade80' }}>●</span> {activeText}
+                          {m && m.thisWeekCount > 0 && ` · ${m.thisWeekCount} this wk · ${(m.thisWeekVol / 1000).toFixed(1)}k`}
+                        </div>
+                      )
+                    })()}
                   </div>
                   <IconChevronRight size={16} style={{ color: 'var(--muted)', flexShrink: 0 }} />
                 </button>

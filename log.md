@@ -1,8 +1,105 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-23 (รอบ 10: Profile reorder/1RM popup + program type general/powerlifting)
+> อัปเดตล่าสุด: 2026-06-25 (รอบ 11: BMR/TDEE + Coaching dashboard + date format — ✅ SQL 2h รันแล้ว + e2e ผ่าน + commit/deploy)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-06-24 — รอบ 11: BMR/TDEE + Coaching dashboard + date format (DD-MM-YYYY)
+
+> สถานะ: **โค้ดเสร็จ (build+lint ผ่าน, service_role ไม่หลุด dist) + ทดสอบ local ฝั่ง client ผ่านบางส่วน**
+> ⛔ **ยังไม่ได้รัน SQL section 2h + ยังไม่ได้ e2e coaching dashboard เต็ม + เจอ UI bug 1 จุด** (ดู "ต้องทำต่อ")
+
+### A. Date format → `DD-MM-YYYY` ทั้งระบบ
+- `utils.ts`: เพิ่ม `formatDMY()` (DD-MM-YYYY) + `formatDM()` (DD-MM, สำหรับ range); `formatDate()` คงป้ายสัมพัทธ์
+  (TODAY/YESTERDAY/N DAYS AGO) แต่ fallback วันที่จริง → DD-MM-YYYY; `getDayOfWeek()` header → `WEDNESDAY · 24-06-2026`
+- แก้ en-GB formatters → DD-MM-YYYY ใน `ProgramOverviewPage`, `ProgramSetupSheet`, `ImportProgramSheet`, `WeekDetailPage` (range ใช้ DD-MM)
+- คงไว้: HistoryPage section header (`JUNE 2026`) + calendar tile (เลขวัน+weekday) = label จัดกลุ่ม ไม่ใช่วันที่เต็ม
+
+### B. BMR / TDEE (Phase 1–3)
+- **types.ts:** `Sex`, `ActivityLevel` (6 ระดับ), `UserBio {sex,heightCm,birthDate,activityLevel}`, `EnergyResult`;
+  `ProgramStateSnapshot` += `bio?` + `personalOneRMs?`
+- **`lib/energy.ts` (ใหม่):** `calcLBM`, `calcAge` (จากวันเกิด), `calcBMR` (**Katch-McArdle ถ้ามี bodyFat / Mifflin-St Jeor fallback**),
+  `calcEnergy` (TDEE = BMR × multiplier), `ACTIVITY` map (6 ระดับ + label + ×1.2…1.9), `suggestActivityFromDays`
+- **Storage/sync:** `useAppStore` เพิ่ม `bio` + `setBio` (persist + เรียก `syncSettings`); `setPersonalOneRMs` ก็ sync ด้วยแล้ว;
+  `clearMetrics` reset bio+1RM (กัน leak ข้ามบัญชี); `useProgramStore.queueStateSync` รวม bio+1RM จาก useAppStore →
+  `program_state` row เดิม + action `syncSettings`; `syncQueue` upsert คอลัมน์ `bio`/`personal_one_rms`;
+  `useAuthStore.loadUserData` pull bio+1RM ตอน login
+- **ProfilePage:** section **ENERGY (BMR/TDEE)** = การ์ดโชว์ BMR/TDEE + method badge + เป้า CUT/MAINTAIN/BULK (−500/0/+500) +
+  ปุ่ม **Bio & Energy popup** (sex/height/วันเกิด `<input type=date>`/activity 6 ระดับพร้อม label; activity pre-fill จาก
+  daysPerWeek ของ program ที่ setup); น้ำหนัก/bodyFat ดึงจาก bodyMetrics ล่าสุดอัตโนมัติ
+
+### C. Excel `program_type` (Phase 4)
+- `excelImport.ts`: อ่าน optional Meta key `program_type` → `program.programType` (default `powerlifting` = back-compat)
+- อัปเดต `docs/excel-import-guide.md` + `CLAUDE.md` (Meta table) + regenerate `public/atlaslog-program-template.xlsx` (เพิ่มแถว program_type)
+
+### D. Coaching Dashboard (Phase 5)
+- `coachApi`: เพิ่ม `getAthleteBodyMetrics`, `getAthleteState` (อ่าน bio+1RM จาก program_state ผ่าน RLS)
+- `CoachPage` list: แต่ละแถวโชว์ **last active** (●เขียว/ส้มถ้า >7วัน) + **N workouts this wk · Xk** (fetch sessions ต่อ athlete)
+- `AthleteDetailPage`: 3 การ์ดใหม่ — **Adherence** (this week done/planned + weekly volume chart 6 สัปดาห์),
+  **Body & Energy** (น้ำหนัก/bodyFat trend + BMR/TDEE ลูกศิษย์), **Strength** (S/B/D + SBD total —
+  **โชว์เฉพาะ active program = powerlifting**, ซ่อนถ้า general ล้วน)
+- **SQL section 2h (ใหม่ ใน SUPABASE_SETUP.md):** ALTER `program_state` ADD `bio`/`personal_one_rms` +
+  policy `coach reads athlete body_metrics` + `coach reads athlete program_state`
+
+### ✅ ทดสอบ local (Playwright 390px) — ผ่านบางส่วน (client-only)
+- Date format: dashboard header = `WEDNESDAY · 24-06-2026` ✓
+- BMR/TDEE: Katch จาก bodyFat 17.7% → BMR **1744** (=370+21.6×LBM 63.6), TDEE **2093** (×1.2); เปลี่ยน activity →
+  ×1.465 → TDEE **2555** ✓; popup โชว์ 6 ระดับ + label + multiplier ครบ ✓
+
+### ✅ ปิดงานรอบ 11 — DONE 2026-06-25 (e2e Playwright 390px)
+1. **แก้ UI bug Save bio (root cause):** ไม่ใช่ z-index — `.screen-enter` ใช้ `animation: slidein … both`
+   → fill-mode `forwards` ค้าง `transform: translateY(0)` ถาวร → `.atlas-screen` กลายเป็น containing block
+   ของ `position:absolute/fixed` descendant → `.sheet-backdrop inset:0` ถูกจำกัดอยู่ในจอที่ scroll แทนที่จะคลุมทั้ง
+   `.atlas-app` (เลยเห็น bottom nav โผล่ใต้ปุ่ม). **แก้:** เปลี่ยนเป็น `… ease backwards;` (สถานะ rest เหมือนเดิม
+   เป๊ะ ไม่มี transform ค้าง) + เพิ่ม `maxHeight/overflowY` ใน bio sheet กันยาวเกินจอเตี้ย. verify: popup คลุมเต็มจอ,
+   Save อยู่ล่างสุด, nav ไม่โผล่
+2. ✅ **รัน SQL 2h แล้ว** (ผู้ใช้, "Success. No rows returned")
+3. ✅ **e2e ผ่าน:**
+   - **bio sync cross-device:** save → POST `program_state` **200** (ก่อนรัน SQL จะ 400) → reload pull จาก cloud →
+     TDEE อัปเดต 2555→2703 (activity ×1.465→×1.55) ✓ 0 console errors
+   - **date format:** History (header `JUNE 2026` + tile `23 TUE` = label จัดกลุ่ม คงเดิม) · ProgramOverview
+     START `10-06-2026` END `02-09-2026` + week range `10-06 – 16-06` · WeekDetail range DD-MM ✓
+   - **coach dashboard (coach.test เปิด athlete.a):** list row `● 2 days ago · 6 this wk · 15.9k` · Adherence (6/2 +
+     volume chart) · Body&Energy (น้ำหนัก/bodyFat + **BMR 1744/TDEE 2703**) · Strength (SBD **540**) —
+     **พิสูจน์ coach อ่าน bio/1RM ลูกศิษย์ผ่าน RLS policy ใหม่ของ SQL 2h ได้จริง**
+   - **Excel general import:** import โปรแกรม `program_type=general` → WeekDetail แสดงท่า **ไม่มี kg** (ไม่คำนวณน้ำหนัก) ✓
+   - **Strength-card gate:** show-path e2e ผ่าน; hide-branch (`programs.every general && !oneRMset`) code-verified
+4. ✅ **commit + deploy** (รอบนี้)
+
+### 🐛 bonus fix ที่เจอตอน e2e
+- **Setup Program (ImportProgramSheet + ProgramSetupSheet) บังคับกรอก 1RM แม้โปรแกรมเป็น general** →
+  ปุ่ม "เริ่มโปรแกรม" disabled, เริ่มไม่ได้ทั้งที่ general ไม่ใช้ 1RM. **แก้:** เช็ค `programType==='general'` →
+  ซ่อน 1RM inputs + เปลี่ยน copy + `isValid` ขอแค่ startDate + oneRMs fallback `|| 0`
+
+### ⚠️ ข้อจำกัด/หมายเหตุ e2e
+- **RLS isolation เต็มยังเทสไม่ได้** — athlete.b ไม่เคยถูกสร้าง (email rate limit, ดู TEST_ACCOUNTS.md). policy ใหม่
+  ใช้ subquery `status='active'` แบบเดียวกับ sessions/programs ที่ผ่าน isolation รอบ 6–7 มาแล้ว
+- **native `<input type=date>` ใน Setup โชว์ MM/DD/YYYY** ตาม browser locale (headless = en-US) — ควบคุมจาก
+  แอปไม่ได้ (อยู่นอกขอบเขต date-format text ของรอบนี้); ค่า END DATE ที่แอป render เองยังเป็น DD-MM-YYYY ถูกต้อง
+
+---
+
+## 2026-06-24 — Prod retest รอบ 8–10 + guard race audit
+
+> เก็บงานค้าง 2 ข้อจาก log: (#1) prod retest รอบ 5–10 (เดิม verify แค่ local), (#3) guard race fix `/coach`
+
+### #1 — Prod retest (Playwright 390px, https://atlaslog-web.vercel.app) ✅ ผ่าน
+ทดสอบรอบ 8–10 บน prod จริง (ก่อนหน้านี้ B1/B2 เป็นต้นมา verify แค่ local — MCP playwright หลุดตอน kill node):
+- **รอบ 9 (gating + visibility):** coach.test เห็นปุ่ม **Create program (+)** + section **PUBLIC PROGRAMS → Public PPL**;
+  athlete.a **ไม่มีปุ่ม +** (เหลือ import code/Excel/library) · `/programs/new` ตรง ๆ → **redirect `/programs` สะอาด** (ไม่ flash) · PUBLIC PROGRAMS เห็น Public PPL
+- **รอบ 10 (Profile + program type):** BODY COMPOSITION **อยู่เหนือ** 1RM · 1RM เป็น **ปุ่ม → popup** → save coach 200/120/220 → ปุ่มอัปเดตเป็น "200/120/220 →" ·
+  เปิด PL Squat → Week 1 **Back Squat 3×5 @8 → 155kg** (คำนวณจาก profile squat 200, **ไม่ต้อง Setup config**)
+- **รอบ 8 (custom exercises):** coach มีปุ่ม **Add exercise (+)** + Hack Squat tag CUSTOM + Delete (35 ท่า);
+  athlete.a **ไม่มีปุ่ม Add/Delete** แต่เห็นท่า custom ทั้งหมด (pull จาก cloud)
+- **console: 0 errors** (เหลือแต่ refresh_token 400 ปกติก่อน login)
+
+### #3 — Guard race fix: ✅ ถูกแก้ครบแล้ว (ไม่ต้องแก้โค้ดเพิ่ม)
+ตรวจพบว่า pattern `roleLoaded` (เดิมเพิ่มให้ AdminPage 2026-06-23) ถูกใช้ครบทุก role-gated route แล้ว:
+- `AdminPage` / `CoachPage` / `AthleteDetailPage` / `CreateProgramPage` — ทุกหน้า `if (!roleLoaded) return null` ก่อน `if (!canX) return <Navigate>`
+- `useAuthStore.roleLoaded`: init(มี user)=รอ role โหลดเสร็จ→true · init(ไม่มี user)=true ทันที · SIGNED_IN=reset false→true · SIGNED_OUT=true
+- prod test ยืนยัน: athlete เข้า `/programs/new` ตรง ๆ → redirect ไม่มี flash → **guard race หายแล้ว**
 
 ---
 
@@ -309,6 +406,8 @@
 | 8 | Custom exercises ใน Library (coach/admin เพิ่มท่า, cloud `custom_exercises`) | ✅ Done (2026-06-23) — e2e + deploy |
 | 9 | Create=coach/admin only + program visibility Private/Code/**Public** (Discover) | ✅ Done (2026-06-23) — e2e + deploy |
 | 10 | Profile: BODY เหนือ 1RM + 1RM เป็น popup · program type general/powerlifting (PL คำนวณจาก profile 1RM ไม่ต้อง setup) | ✅ Done (2026-06-23) — e2e + deploy |
+| — | **Prod retest รอบ 8–10** (Playwright 390px บน prod จริง) + ยืนยัน guard race fix ครบทุก role-gated route | ✅ Done (2026-06-24) — 0 console errors |
+| 11 | **BMR/TDEE** (Profile) + **Coaching dashboard** (adherence/body/strength gate) + **date DD-MM-YYYY** + Excel program_type | 🔄 โค้ดเสร็จ (build+lint ผ่าน) — ⛔ ค้าง: รัน SQL 2h + e2e เต็ม + แก้ z-index Save bio + commit |
 
 > **Supabase ที่ต้องมี (รันครบแล้ว):** SUPABASE_SETUP sections 2 / 2b / 2c (`program_state`) /
 > 2d (`body_metrics`,`runs`) / 2e (coach_athlete `pending`) / 2f (`custom_exercises`) /

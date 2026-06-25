@@ -5,6 +5,7 @@ import { STRUCTURED_PROGRAMS, dayToProgram } from '../../lib/twelveWeekProgram.j
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAppStore } from '../../store/useAppStore.js'
 import { calcWeight } from '../../lib/rpeTable.js'
+import { formatDM } from '../../lib/utils.js'
 import {
   IconChevronLeft, IconCheck, IconPlay, IconChevronRight, IconEdit,
 } from '../../components/icons/index.js'
@@ -286,7 +287,7 @@ export function WeekDetailPage() {
             end.setDate(end.getDate() + 6)
             return (
               <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
-                {start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – {end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                {formatDM(start)} – {formatDM(end)}
               </span>
             )
           })()}

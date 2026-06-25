@@ -1,4 +1,4 @@
-import type { AthleteSummary, Session, StructuredProgram } from '@atlaslog/shared'
+import type { AthleteSummary, Session, StructuredProgram, BodyMetricEntry, UserBio, ProgramOneRMs } from '@atlaslog/shared'
 import { supabase } from './supabase.js'
 
 async function call<T>(body: Record<string, unknown>): Promise<T> {
@@ -66,4 +66,35 @@ export async function getAthletePrograms(athleteId: string): Promise<StructuredP
   if (error) throw new Error(error.message)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data as any[]).map(r => r.program)
+}
+
+export async function getAthleteBodyMetrics(athleteId: string): Promise<BodyMetricEntry[]> {
+  const { data, error } = await supabase
+    .from('body_metrics')
+    .select('*')
+    .eq('user_id', athleteId)
+    .order('date', { ascending: false })
+  if (error) throw new Error(error.message)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data as any[]).map(r => ({
+    id: r.id,
+    date: r.date,
+    weightKg: r.weight_kg,
+    skeletalMuscleKg: r.skeletal_muscle_kg ?? undefined,
+    bodyFatPct: r.body_fat_pct ?? undefined,
+  }))
+}
+
+// Athlete bio + 1RM from their program_state row (coach-read via RLS).
+export async function getAthleteState(athleteId: string):
+  Promise<{ bio: UserBio; personalOneRMs: ProgramOneRMs | null }> {
+  const { data, error } = await supabase
+    .from('program_state')
+    .select('bio, personal_one_rms')
+    .eq('user_id', athleteId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const s = data as any
+  return { bio: s?.bio ?? {}, personalOneRMs: s?.personal_one_rms ?? null }
 }

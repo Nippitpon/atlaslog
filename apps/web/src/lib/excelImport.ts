@@ -36,13 +36,14 @@ export async function parseExcelFile(file: File): Promise<ImportResult> {
   if (!metaSheet) return { program: null, errors: ['ไม่พบ Sheet ชื่อ "Meta"'] }
 
   const metaData = XLSX.utils.sheet_to_json<string[]>(metaSheet, { header: 1 }) as unknown[][]
-  const meta = { name: '', description: '', focus: '' }
+  const meta = { name: '', description: '', focus: '', programType: '' }
   for (const row of metaData) {
     const key = String(row[0] ?? '').trim()
     const val = String(row[1] ?? '').trim()
     if (key === 'name') meta.name = val
     if (key === 'description') meta.description = val
     if (key === 'focus') meta.focus = val
+    if (key === 'program_type') meta.programType = val.toLowerCase()
   }
   if (!meta.name) errors.push('Sheet "Meta": ต้องมี row ที่มี key "name"')
 
@@ -171,6 +172,8 @@ export async function parseExcelFile(file: File): Promise<ImportResult> {
     weeks,
     isCustom: true,
     source: 'excel',
+    // Optional Meta key; default powerlifting (back-compat with older templates)
+    programType: meta.programType === 'general' ? 'general' : 'powerlifting',
   }
 
   return { program, errors: [] }

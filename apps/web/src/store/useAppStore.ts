@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Session, Workout, Program, BodyMetricEntry, RunEntry, Exercise } from '@atlaslog/shared'
+import type { Session, Workout, Program, BodyMetricEntry, RunEntry, Exercise, UserBio } from '@atlaslog/shared'
 import { makeSeedHistory, setCustomExercisesRegistry } from '../lib/data.js'
 import { useProgramStore } from './useProgramStore.js'
 import { syncSession, syncBodyMetric, syncBodyMetricDelete, syncRun, syncRunDelete, syncExercise, syncExerciseDelete } from '../lib/syncQueue.js'
@@ -14,6 +14,7 @@ interface AppStore {
   showPicker: boolean
   finishedSession: Session | null
   personalOneRMs: OneRMs
+  bio: UserBio
   bodyMetrics: BodyMetricEntry[]
   runs: RunEntry[]
   customExercises: Exercise[]
@@ -23,6 +24,7 @@ interface AppStore {
   setShowPicker: (v: boolean) => void
   setFinishedSession: (s: Session | null) => void
   setPersonalOneRMs: (v: OneRMs) => void
+  setBio: (v: UserBio) => void
   setHistory: (sessions: Session[]) => void
   clearHistory: () => void
   startWorkout: (program: Program) => void
@@ -52,6 +54,7 @@ export const useAppStore = create<AppStore>()(
       showPicker: false,
       finishedSession: null,
       personalOneRMs: { squat: 0, bench: 0, deadlift: 0 },
+      bio: {},
       bodyMetrics: [],
       runs: [],
       customExercises: [],
@@ -60,7 +63,14 @@ export const useAppStore = create<AppStore>()(
       setWorkout: (workout) => set({ workout }),
       setShowPicker: (showPicker) => set({ showPicker }),
       setFinishedSession: (finishedSession) => set({ finishedSession }),
-      setPersonalOneRMs: (personalOneRMs) => set({ personalOneRMs }),
+      setPersonalOneRMs: (personalOneRMs) => {
+        set({ personalOneRMs })
+        useProgramStore.getState().syncSettings()
+      },
+      setBio: (bio) => {
+        set({ bio })
+        useProgramStore.getState().syncSettings()
+      },
       setHistory: (history) => set({ history }),
       clearHistory: () => set({ history: [] }),
 
@@ -166,7 +176,10 @@ export const useAppStore = create<AppStore>()(
         set({ customExercises: list })
       },
 
-      clearMetrics: () => { setCustomExercisesRegistry([]); set({ bodyMetrics: [], runs: [], customExercises: [] }) },
+      clearMetrics: () => {
+        setCustomExercisesRegistry([])
+        set({ bodyMetrics: [], runs: [], customExercises: [], bio: {}, personalOneRMs: { squat: 0, bench: 0, deadlift: 0 } })
+      },
     }),
     {
       name: 'atlas:v2',
@@ -175,6 +188,7 @@ export const useAppStore = create<AppStore>()(
         history: state.history,
         workout: state.workout,
         personalOneRMs: state.personalOneRMs,
+        bio: state.bio,
         bodyMetrics: state.bodyMetrics,
         runs: state.runs,
         customExercises: state.customExercises,

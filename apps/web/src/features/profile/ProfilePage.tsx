@@ -1,9 +1,14 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import type { UserBio } from '@atlaslog/shared'
 import { useAppStore } from '../../store/useAppStore.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
+import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
+import { calcEnergy, ACTIVITY, ACTIVITY_ORDER, suggestActivityFromDays } from '../../lib/energy.js'
 import { IconBolt, IconUsers, IconScale, IconX } from '../../components/icons/index.js'
+
+const todayISO = new Date().toISOString().split('T')[0]
 
 const LIFTS: { key: 'squat' | 'bench' | 'deadlift'; label: string; short: string }[] = [
   { key: 'squat',    label: 'Squat',    short: 'S' },
@@ -13,8 +18,8 @@ const LIFTS: { key: 'squat' | 'bench' | 'deadlift'; label: string; short: string
 
 export function ProfilePage() {
   const navigate = useNavigate()
-  const { history, theme, setTheme, personalOneRMs, setPersonalOneRMs, clearHistory, bodyMetrics, addBodyMetric, clearMetrics } = useAppStore()
-  const { clearCustomPrograms, setProgramState } = useProgramStore()
+  const { history, theme, setTheme, personalOneRMs, setPersonalOneRMs, clearHistory, bodyMetrics, addBodyMetric, clearMetrics, bio, setBio } = useAppStore()
+  const { clearCustomPrograms, setProgramState, configs, customPrograms } = useProgramStore()
   const { user, isAdmin, isCoach, signOut } = useAuthStore()
 
   const handleSignOut = async () => {
@@ -74,6 +79,33 @@ export function ProfilePage() {
   const trendMin = Math.min(...trend.map(e => e.weightKg))
   const trendMax = Math.max(...trend.map(e => e.weightKg))
   const trendRange = Math.max(1, trendMax - trendMin)
+
+  // Bio & Energy (BMR / TDEE)
+  const energy = useMemo(() => calcEnergy(bio, latestBody), [bio, latestBody])
+  // Suggested activity from the highest days/week among set-up programs
+  const suggestedActivity = useMemo(() => {
+    const all = [...STRUCTURED_PROGRAMS, ...customPrograms]
+    let days = 0
+    for (const pid of Object.keys(configs)) {
+      const p = all.find(x => x.id === pid)
+      if (p) days = Math.max(days, p.daysPerWeek)
+    }
+    return suggestActivityFromDays(days)
+  }, [configs, customPrograms])
+  const [showBio, setShowBio] = useState(false)
+  const [bioDraft, setBioDraft] = useState<UserBio>(bio)
+  const [bioSaved, setBioSaved] = useState(false)
+
+  const openBio = () => {
+    setBioDraft({ ...bio, activityLevel: bio.activityLevel ?? suggestedActivity })
+    setShowBio(true)
+  }
+  const handleBioSave = () => {
+    setBio(bioDraft)
+    setBioSaved(true)
+    setTimeout(() => { setBioSaved(false); setShowBio(false) }, 900)
+  }
+  const hasBio = !!(bio.sex || bio.heightCm || bio.birthDate)
 
   return (
     <div className="atlas-screen screen-enter">
@@ -249,6 +281,53 @@ export function ProfilePage() {
         </div>
       </div>
 
+      {/* Energy — BMR / TDEE */}
+      <div style={{ padding: '0 20px 20px' }}>
+        <div className="t-eyebrow" style={{ marginBottom: 10 }}>ENERGY (BMR / TDEE)</div>
+        <div className="card">
+          {energy ? (
+            <>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <div style={{ flex: 1, textAlign: 'center', background: 'var(--surface-2)', borderRadius: 10, padding: '12px 8px' }}>
+                  <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 3 }}>BMR</div>
+                  <div className="t-mono tnum" style={{ fontSize: 20, fontWeight: 700 }}>
+                    {energy.bmr}<span style={{ fontSize: 9, color: 'var(--muted)', marginLeft: 2 }}>kcal</span>
+                  </div>
+                </div>
+                <div style={{ flex: 1, textAlign: 'center', background: 'var(--surface-2)', borderRadius: 10, padding: '12px 8px' }}>
+                  <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 3 }}>TDEE</div>
+                  <div className="t-mono tnum" style={{ fontSize: 20, fontWeight: 700, color: 'var(--accent)' }}>
+                    {energy.tdee}<span style={{ fontSize: 9, color: 'var(--muted)', marginLeft: 2 }}>kcal</span>
+                  </div>
+                </div>
+              </div>
+              <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 12 }}>
+                {energy.method === 'katch' ? 'Katch-McArdle · จาก % ไขมัน' : 'Mifflin-St Jeor'} · {ACTIVITY[bio.activityLevel ?? 'sedentary'].label}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[{ l: 'CUT', v: energy.tdee - 500 }, { l: 'MAINTAIN', v: energy.tdee }, { l: 'BULK', v: energy.tdee + 500 }].map(g => (
+                  <div key={g.l} style={{ flex: 1, textAlign: 'center' }}>
+                    <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>{g.l}</div>
+                    <div className="t-mono tnum" style={{ fontSize: 14, fontWeight: 600 }}>{g.v}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="t-mono" style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>
+              กรอก Bio (เพศ / ส่วนสูง / วันเกิด) หรือ log % ไขมันใน Body Composition เพื่อคำนวณ BMR / TDEE
+            </div>
+          )}
+          <button
+            className="btn btn-secondary"
+            style={{ width: '100%', marginTop: 14, height: 40, fontSize: 12 }}
+            onClick={openBio}
+          >
+            {hasBio ? 'Edit bio' : 'Set up bio'}
+          </button>
+        </div>
+      </div>
+
       {/* Personal 1RM — menu button → popup */}
       <div style={{ padding: '0 20px 20px' }}>
         <button
@@ -340,6 +419,91 @@ export function ProfilePage() {
               onClick={handleSave}
             >
               {saved ? 'Saved!' : 'Save 1RM'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bio & Energy popup */}
+      {showBio && (
+        <div className="sheet-backdrop" onClick={() => setShowBio(false)} style={{ zIndex: 100 }}>
+          <div className="sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '92%', overflowY: 'auto' }}>
+            <div className="sheet-handle" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <h3 className="t-display" style={{ margin: 0, fontSize: 20 }}>Bio & Energy</h3>
+              <button className="btn-icon" onClick={() => setShowBio(false)}><IconX size={18} /></button>
+            </div>
+            <p className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 16 }}>
+              ใช้คำนวณ BMR / TDEE · น้ำหนัก & % ไขมัน ดึงจาก Body Composition อัตโนมัติ
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Sex */}
+              <div>
+                <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 6 }}>SEX</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {(['male', 'female'] as const).map(s => (
+                    <button
+                      key={s}
+                      onClick={() => setBioDraft(d => ({ ...d, sex: s }))}
+                      className="btn"
+                      style={{ flex: 1, height: 40, fontSize: 12, textTransform: 'capitalize',
+                        background: bioDraft.sex === s ? 'var(--accent)' : 'var(--surface-2)',
+                        color: bioDraft.sex === s ? 'var(--accent-ink)' : 'var(--text-2)' }}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Height + birth date */}
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 6 }}>HEIGHT (cm)</div>
+                  <input className="input-num tnum" type="number" inputMode="decimal"
+                    value={bioDraft.heightCm ?? ''} placeholder="0"
+                    onChange={e => setBioDraft(d => ({ ...d, heightCm: Number(e.target.value) || undefined }))}
+                    onFocus={e => e.target.select()}
+                    style={{ width: '100%', textAlign: 'center' }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 6 }}>BIRTH DATE</div>
+                  <input className="input-num" type="date" max={todayISO}
+                    value={bioDraft.birthDate ?? ''}
+                    onChange={e => setBioDraft(d => ({ ...d, birthDate: e.target.value || undefined }))}
+                    style={{ width: '100%', textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12 }} />
+                </div>
+              </div>
+              {/* Activity level */}
+              <div>
+                <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 6 }}>ACTIVITY LEVEL</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {ACTIVITY_ORDER.map(lvl => {
+                    const active = (bioDraft.activityLevel ?? suggestedActivity) === lvl
+                    return (
+                      <button
+                        key={lvl}
+                        onClick={() => setBioDraft(d => ({ ...d, activityLevel: lvl }))}
+                        style={{ textAlign: 'left', padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
+                          border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                          background: active ? 'rgba(212,255,58,0.10)' : 'var(--surface-2)' }}
+                      >
+                        <div style={{ fontSize: 12, fontWeight: 600, color: active ? 'var(--accent)' : 'var(--text)' }}>
+                          {ACTIVITY[lvl].label}
+                        </div>
+                        <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', marginTop: 2 }}>×{ACTIVITY[lvl].multiplier}</div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+            <button
+              className="btn btn-primary"
+              style={{ width: '100%', marginTop: 18, height: 44, fontSize: 13,
+                background: bioSaved ? '#4ade80' : undefined, color: bioSaved ? '#000' : undefined }}
+              onClick={handleBioSave}
+            >
+              {bioSaved ? 'Saved!' : 'Save bio'}
             </button>
           </div>
         </div>

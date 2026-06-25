@@ -72,6 +72,8 @@ async function runOp(op: SyncOp, userId: string): Promise<void> {
       progress: op.payload.progress,
       configs: op.payload.configs,
       custom_accessories: op.payload.customAccessories,
+      bio: op.payload.bio ?? {},
+      personal_one_rms: op.payload.personalOneRMs ?? null,
       updated_at: new Date().toISOString(),
     })
     if (error) throw error

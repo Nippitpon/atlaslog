@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { DayStatus, ProgramProgressState, ProgramConfig, StructuredExercise, StructuredProgram, ProgramStateSnapshot } from '@atlaslog/shared'
 import { syncProgramUpsert, syncProgramDelete, syncProgramState } from '../lib/syncQueue.js'
+import { useAppStore } from './useAppStore.js'
 
 type CustomAccessories = {
   [programId: string]: {
@@ -33,6 +34,7 @@ interface ProgramStore {
   setCustomPrograms: (programs: StructuredProgram[]) => void
   clearCustomPrograms: () => void
   setProgramState: (snapshot: ProgramStateSnapshot) => void
+  syncSettings: () => void
 }
 
 // Debounce cloud sync of the full program-state blob; coalesces rapid edits
@@ -41,7 +43,9 @@ function queueStateSync(get: () => ProgramStore) {
   if (stateSyncTimer) clearTimeout(stateSyncTimer)
   stateSyncTimer = setTimeout(() => {
     const { progress, configs, customAccessories } = get()
-    void syncProgramState({ progress, configs, customAccessories })
+    // User settings (bio + 1RM) live in useAppStore but share this 1-row blob.
+    const { bio, personalOneRMs } = useAppStore.getState()
+    void syncProgramState({ progress, configs, customAccessories, bio, personalOneRMs })
   }, 800)
 }
 
@@ -162,6 +166,9 @@ export const useProgramStore = create<ProgramStore>()(
         configs: snapshot.configs ?? {},
         customAccessories: snapshot.customAccessories ?? {},
       }),
+
+      // Trigger a debounced cloud sync when user settings (bio/1RM) change
+      syncSettings: () => queueStateSync(get),
     }),
     {
       name: 'atlas:v1:program-progress',

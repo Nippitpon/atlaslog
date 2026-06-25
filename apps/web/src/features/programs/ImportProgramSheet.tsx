@@ -66,11 +66,17 @@ export function ImportProgramSheet({ onClose }: Props) {
     return d.toISOString().split('T')[0]
   }, [startDate, program, todayISO])
 
-  const formatDate = (iso: string) =>
-    new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  const formatDate = (iso: string) => {
+    const d = new Date(iso)
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    return `${dd}-${mm}-${d.getFullYear()}`
+  }
 
-  const isSetupValid = squatRM && benchRM && deadliftRM &&
-    Number(squatRM) > 0 && Number(benchRM) > 0 && Number(deadliftRM) > 0
+  const isGeneral = program?.programType === 'general'
+  const has1RMs = !!(squatRM && benchRM && deadliftRM &&
+    Number(squatRM) > 0 && Number(benchRM) > 0 && Number(deadliftRM) > 0)
+  const isSetupValid = isGeneral ? !!startDate : has1RMs
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -103,9 +109,9 @@ export function ImportProgramSheet({ onClose }: Props) {
       startDate,
       endDate,
       oneRMs: {
-        squat: Number(squatRM),
-        bench: Number(benchRM),
-        deadlift: Number(deadliftRM),
+        squat: Number(squatRM) || 0,
+        bench: Number(benchRM) || 0,
+        deadlift: Number(deadliftRM) || 0,
       },
     }
     addCustomProgram(program)
@@ -279,15 +285,21 @@ export function ImportProgramSheet({ onClose }: Props) {
         {step === 'setup' && program && (
           <>
             <p style={{ margin: '0 0 20px', color: 'var(--text-2)', fontSize: 13, lineHeight: 1.5 }}>
-              กรอก 1RM และวันเริ่มต้น เพื่อให้ระบบคำนวณน้ำหนักแต่ละเซ็ต
+              {isGeneral
+                ? 'เลือกวันเริ่มต้นโปรแกรม — โปรแกรมแบบ General ไม่คำนวณน้ำหนักจาก 1RM (บันทึกน้ำหนักเองตอนเทรน)'
+                : 'กรอก 1RM และวันเริ่มต้น เพื่อให้ระบบคำนวณน้ำหนักแต่ละเซ็ต'}
             </p>
 
-            <div className="t-eyebrow" style={{ marginBottom: 10, fontSize: 10 }}>1 REP MAX</div>
-            <div style={{ display: 'flex', gap: 10, marginBottom: 28 }}>
-              <NumInput label="SQUAT" value={squatRM} onChange={setSquatRM} placeholder="เช่น 180" />
-              <NumInput label="BENCH" value={benchRM} onChange={setBenchRM} placeholder="เช่น 120" />
-              <NumInput label="DEADLIFT" value={deadliftRM} onChange={setDeadliftRM} placeholder="เช่น 220" />
-            </div>
+            {!isGeneral && (
+              <>
+                <div className="t-eyebrow" style={{ marginBottom: 10, fontSize: 10 }}>1 REP MAX</div>
+                <div style={{ display: 'flex', gap: 10, marginBottom: 28 }}>
+                  <NumInput label="SQUAT" value={squatRM} onChange={setSquatRM} placeholder="เช่น 180" />
+                  <NumInput label="BENCH" value={benchRM} onChange={setBenchRM} placeholder="เช่น 120" />
+                  <NumInput label="DEADLIFT" value={deadliftRM} onChange={setDeadliftRM} placeholder="เช่น 220" />
+                </div>
+              </>
+            )}
 
             <div className="t-eyebrow" style={{ marginBottom: 6, fontSize: 10 }}>START DATE</div>
             <input

@@ -63,19 +63,23 @@ export function ProgramSetupSheet({ program, onClose }: Props) {
 
   const formatDate = (iso: string) => {
     const d = new Date(iso)
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    return `${dd}-${mm}-${d.getFullYear()}`
   }
 
-  const isValid = squatRM && benchRM && deadliftRM && Number(squatRM) > 0 && Number(benchRM) > 0 && Number(deadliftRM) > 0
+  const isGeneral = program.programType === 'general'
+  const has1RMs = !!(squatRM && benchRM && deadliftRM && Number(squatRM) > 0 && Number(benchRM) > 0 && Number(deadliftRM) > 0)
+  const isValid = isGeneral ? !!startDate : has1RMs
 
   const handleConfirm = () => {
     const config: ProgramConfig = {
       startDate,
       endDate,
       oneRMs: {
-        squat: Number(squatRM),
-        bench: Number(benchRM),
-        deadlift: Number(deadliftRM),
+        squat: Number(squatRM) || 0,
+        bench: Number(benchRM) || 0,
+        deadlift: Number(deadliftRM) || 0,
       },
     }
     setConfig(program.id, config)
@@ -92,16 +96,22 @@ export function ProgramSetupSheet({ program, onClose }: Props) {
           <button className="btn-icon" onClick={onClose}><IconX size={18} /></button>
         </div>
         <p style={{ margin: '0 0 24px', color: 'var(--text-2)', fontSize: 13, lineHeight: 1.5 }}>
-          กรอกค่า 1RM และวันเริ่มต้น เพื่อให้โปรแกรมคำนวณน้ำหนักแต่ละเซ็ตจากตาราง RPE
+          {isGeneral
+            ? 'เลือกวันเริ่มต้นโปรแกรม — โปรแกรมแบบ General ไม่คำนวณน้ำหนักจาก 1RM (บันทึกน้ำหนักเองตอนเทรน)'
+            : 'กรอกค่า 1RM และวันเริ่มต้น เพื่อให้โปรแกรมคำนวณน้ำหนักแต่ละเซ็ตจากตาราง RPE'}
         </p>
 
-        {/* 1RM Inputs */}
-        <div className="t-eyebrow" style={{ marginBottom: 10, fontSize: 10 }}>1 REP MAX</div>
-        <div style={{ display: 'flex', gap: 10, marginBottom: 28 }}>
-          <NumInput label="SQUAT" value={squatRM} onChange={setSquatRM} placeholder="e.g. 180" />
-          <NumInput label="BENCH" value={benchRM} onChange={setBenchRM} placeholder="e.g. 120" />
-          <NumInput label="DEADLIFT" value={deadliftRM} onChange={setDeadliftRM} placeholder="e.g. 220" />
-        </div>
+        {/* 1RM Inputs (powerlifting only — general programs don't calculate weight) */}
+        {!isGeneral && (
+          <>
+            <div className="t-eyebrow" style={{ marginBottom: 10, fontSize: 10 }}>1 REP MAX</div>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 28 }}>
+              <NumInput label="SQUAT" value={squatRM} onChange={setSquatRM} placeholder="e.g. 180" />
+              <NumInput label="BENCH" value={benchRM} onChange={setBenchRM} placeholder="e.g. 120" />
+              <NumInput label="DEADLIFT" value={deadliftRM} onChange={setDeadliftRM} placeholder="e.g. 220" />
+            </div>
+          </>
+        )}
 
         {/* Start Date */}
         <div className="t-eyebrow" style={{ marginBottom: 6, fontSize: 10 }}>START DATE</div>

@@ -109,6 +109,7 @@ packages/shared/src/
 | `name` | My 8 Week Program |
 | `description` | สำหรับ intermediate lifter |
 | `focus` | Squat · Bench · Deadlift |
+| `program_type` *(optional)* | `powerlifting` (default) หรือ `general` (ไม่คำนวณน้ำหนัก) |
 
 ### Import UI Flow
 

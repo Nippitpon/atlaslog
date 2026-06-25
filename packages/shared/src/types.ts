@@ -75,6 +75,26 @@ export interface BodyMetricEntry {
   bodyFatPct?: number
 }
 
+// User bio for BMR/TDEE. Weight/bodyFat come from latest BodyMetricEntry —
+// these are the slow-changing fields entered once.
+export type Sex = 'male' | 'female'
+export type ActivityLevel =
+  | 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active' | 'extra_active'
+
+export interface UserBio {
+  sex?: Sex
+  heightCm?: number
+  birthDate?: string        // ISO 'YYYY-MM-DD'; age derived at calc time
+  activityLevel?: ActivityLevel
+}
+
+// Result of an energy (calorie) computation.
+export interface EnergyResult {
+  bmr: number
+  tdee: number
+  method: 'katch' | 'mifflin'
+}
+
 // Running / cardio session. Pace is derived (durationMin / distanceKm), not stored.
 export interface RunEntry {
   id: string
@@ -162,6 +182,9 @@ export interface ProgramStateSnapshot {
   progress: ProgramProgressState
   configs: { [programId: string]: ProgramConfig }
   customAccessories: ProgramCustomAccessories
+  // User settings synced in the same 1-row/user blob (optional for back-compat).
+  bio?: UserBio
+  personalOneRMs?: ProgramOneRMs
 }
 
 // ─── Phase 4 — Social (Coach-Athlete / Sharing / Notifications) ────────────────

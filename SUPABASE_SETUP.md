@@ -201,6 +201,27 @@ create policy "delete own exercise" on public.custom_exercises for delete using 
 alter table public.shared_programs add column if not exists is_public boolean not null default false;
 ```
 
+## 2h. BMR/TDEE bio + coach dashboard reads (2026-06-24)
+
+> (1) เก็บ `bio` (เพศ/ส่วนสูง/วันเกิด/activity) + `personal_one_rms` ใน program_state row เดิม
+> (sync cross-device) (2) ให้โค้ชอ่าน body_metrics + bio/1RM ของลูกศิษย์ active เพื่อโชว์ใน dashboard
+
+```sql
+-- 1) เพิ่มคอลัมน์ user settings ใน program_state (sync พร้อม progress)
+alter table public.program_state add column if not exists bio jsonb not null default '{}';
+alter table public.program_state add column if not exists personal_one_rms jsonb;
+
+-- 2) โค้ชอ่าน body_metrics + program_state (bio/1RM) ของลูกศิษย์ active
+create policy "coach reads athlete body metrics" on public.body_metrics for select using (
+  user_id in (select athlete_id from public.coach_athlete
+              where coach_id = auth.uid() and status = 'active'));
+create policy "coach reads athlete program state" on public.program_state for select using (
+  user_id in (select athlete_id from public.coach_athlete
+              where coach_id = auth.uid() and status = 'active'));
+```
+
+> หมายเหตุ: ไม่ต้อง redeploy edge function — ทั้งหมดผ่าน RLS ตรง ๆ
+
 ### Deploy Edge Function `coach`
 
 เหมือน `admin-users` — Supabase inject `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` ให้อัตโนมัติ

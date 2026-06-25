@@ -77,6 +77,8 @@ async function loadUserData(userId: string) {
       configs: s.configs ?? {},
       customAccessories: s.custom_accessories ?? {},
     })
+    if (s.bio) useAppStore.setState({ bio: s.bio })
+    if (s.personal_one_rms) useAppStore.setState({ personalOneRMs: s.personal_one_rms })
   }
   if (bodyRes.data) {
     useAppStore.getState().setBodyMetrics(

@@ -52,7 +52,9 @@ export function ProgramOverviewPage() {
 
   const formatDate = (iso: string) => {
     const d = new Date(iso)
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    return `${dd}-${mm}-${d.getFullYear()}`
   }
 
   return (
@@ -166,7 +168,8 @@ export function ProgramOverviewPage() {
               start.setDate(start.getDate() + (week.weekNumber - 1) * 7)
               const end = new Date(start)
               end.setDate(end.getDate() + 6)
-              weekDates = `${start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+              const dm = (d: Date) => `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}`
+              weekDates = `${dm(start)} – ${dm(end)}`
             }
 
             return (
