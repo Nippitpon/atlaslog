@@ -6,6 +6,51 @@
 
 ---
 
+## 2026-06-25 — ปิดงานรอบ 11: SQL 2h + e2e เต็ม + commit/deploy (`3632ef8`)
+
+> เก็บงานค้าง 4 ข้อของรอบ 11 จนจบ → push `main` → Vercel auto-deploy
+
+### 1. แก้ UI bug "Save bio popup โดน bottom nav บัง" — เจอ root cause จริง (ไม่ใช่ z-index)
+`.screen-enter` ใช้ `animation: slidein .25s ease both` → fill-mode `forwards` ทำให้ค้าง
+`transform: translateY(0)` ถาวร → ทุก element ที่มี non-`none` transform จะกลายเป็น **containing block**
+ของ `position:absolute/fixed` descendant → `.sheet-backdrop { inset:0 }` เลยอ้างอิงกับ `.atlas-screen`
+(ตัวที่ scroll) แทน `.atlas-app` → backdrop ถูกจำกัดอยู่แค่ส่วนจอที่เห็น ไม่คลุมทั้งแอป → bottom nav โผล่ใต้ปุ่ม
+- **แก้:** `index.css` เปลี่ยน `.screen-enter` เป็น `… ease backwards;` (สถานะ rest = translateY(0)/opacity 1
+  เหมือนเดิมเป๊ะ แต่ไม่ค้าง transform หลัง animation จบ) + เพิ่ม `maxHeight: '92%'` + `overflowY: auto`
+  ใน bio sheet กันยาวเกินจอเตี้ย
+- verify (Playwright 390px): ทั้ง 1RM popup และ bio popup คลุมเต็มจอ, ปุ่ม Save อยู่ล่างสุด, nav ไม่โผล่
+
+### 2. รัน SQL section 2h — ✅ ผู้ใช้รันใน Supabase (`rhilcsfhibymgyoaltem`, "Success. No rows returned")
+
+### 3. e2e เต็ม (Playwright 390px) — ✅ ผ่าน
+- **bio sync cross-device:** save bio → POST `program_state` **200** (ก่อนรัน SQL = 400) → reload pull จาก cloud
+  → TDEE 2555→2703 (activity ×1.465→×1.55) · 0 console errors
+- **date format:** History (`JUNE 2026` + tile `23 TUE` = label จัดกลุ่ม คงเดิมตามดีไซน์) · ProgramOverview
+  START `10-06-2026` / END `02-09-2026` + week range `10-06 – 16-06` · WeekDetail range DD-MM
+- **coach dashboard (coach.test เปิด athlete.a):** list row `● 2 days ago · 6 this wk · 15.9k` · Adherence (6/2 +
+  6-week volume chart) · Body&Energy (น้ำหนัก/bodyFat + **BMR 1744 / TDEE 2703**) · Strength (**SBD 540**)
+  → **พิสูจน์ว่า coach อ่าน bio/1RM ของลูกศิษย์ผ่าน RLS policy ใหม่ของ SQL 2h ได้จริง**
+- **Excel general import:** สร้างไฟล์ทดสอบ `program_type=general` → import → WeekDetail แสดงท่า **ไม่มี kg** (ไม่คำนวณน้ำหนัก)
+- **Strength-card gate:** show-path e2e ผ่าน; hide-branch (`programs.every general && !oneRMset`) code-verified
+
+### 4. 🐛 bonus fix ที่เจอตอน e2e
+**Setup Program (ImportProgramSheet + ProgramSetupSheet) บังคับกรอก 1RM แม้โปรแกรมเป็น general** →
+ปุ่ม "เริ่มโปรแกรม" disabled, เริ่มไม่ได้ทั้งที่ general ไม่ใช้ 1RM. **แก้:** เช็ค `programType==='general'`
+→ ซ่อน 1RM inputs + เปลี่ยน copy เป็น "เลือกวันเริ่มต้น…" + `isValid` ขอแค่ `startDate` + `oneRMs` fallback `|| 0`
+
+### 5. commit + deploy — ✅
+- `pnpm build` ผ่าน · `pnpm lint` สะอาด · `grep -ri service_role apps/web/dist` = 0
+- commit `3632ef8` บน `main` (22 files, +787/−58, ไฟล์ใหม่ `lib/energy.ts`) → push → Vercel auto-deploy
+
+### ⚠️ ข้อจำกัด/หมายเหตุ
+- **RLS isolation เต็มยังเทสไม่ได้** — `athlete.b` ไม่เคยถูกสร้าง (email rate limit, ดู TEST_ACCOUNTS.md).
+  policy ใหม่ใช้ subquery `status='active'` แบบเดียวกับ sessions/programs ที่ผ่าน isolation รอบ 6–7 มาแล้ว
+- **native `<input type=date>` ใน Setup โชว์ MM/DD/YYYY** ตาม browser locale (headless = en-US) — คุมจากแอปไม่ได้
+  (อยู่นอกขอบเขต date-format text ของรอบนี้); ค่า END DATE ที่แอป render เองยังเป็น DD-MM-YYYY ถูกต้อง
+- **prod retest บน Vercel ยังไม่ได้ทำ** (deploy เพิ่ง trigger) — งานค้างข้อเดียวถ้าต้องการ
+
+---
+
 ## 2026-06-24 — รอบ 11: BMR/TDEE + Coaching dashboard + date format (DD-MM-YYYY)
 
 > สถานะ: **โค้ดเสร็จ (build+lint ผ่าน, service_role ไม่หลุด dist) + ทดสอบ local ฝั่ง client ผ่านบางส่วน**
