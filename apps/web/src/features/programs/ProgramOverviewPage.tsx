@@ -5,6 +5,7 @@ import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { IconChevronLeft, IconChevronRight, IconCheck, IconSettings } from '../../components/icons/index.js'
 import { ProgramSetupSheet } from './ProgramSetupSheet.js'
+import { formatDMY } from '../../lib/utils.js'
 
 const STATUS_CONFIG: Record<DayStatus, { label: string; bg: string; border: string; color: string }> = {
   not_started: { label: 'Not started', bg: 'var(--surface-2)', border: 'var(--border)', color: 'var(--muted)' },
@@ -50,12 +51,7 @@ export function ProgramOverviewPage() {
 
   const config = getConfig(program.id)
 
-  const formatDate = (iso: string) => {
-    const d = new Date(iso)
-    const dd = String(d.getDate()).padStart(2, '0')
-    const mm = String(d.getMonth() + 1).padStart(2, '0')
-    return `${dd}-${mm}-${d.getFullYear()}`
-  }
+  const formatDate = formatDMY
 
   return (
     <div className="atlas-screen screen-enter">
@@ -109,7 +105,8 @@ export function ProgramOverviewPage() {
                 </div>
               </div>
 
-              {/* 1RM column */}
+              {/* 1RM column — powerlifting only (general programs don't use 1RM) */}
+              {program.programType !== 'general' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
                 <div className="t-eyebrow" style={{ fontSize: 8, color: 'var(--muted)', marginBottom: 2 }}>1RM</div>
                 <div style={{ display: 'flex', gap: 14, alignItems: 'baseline' }}>
@@ -126,6 +123,7 @@ export function ProgramOverviewPage() {
                   ))}
                 </div>
               </div>
+              )}
             </div>
           </div>
         </div>

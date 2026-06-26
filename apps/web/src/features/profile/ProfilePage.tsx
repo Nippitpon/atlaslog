@@ -248,15 +248,15 @@ export function ProfilePage() {
           {/* Inputs */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
             {[
-              { ph: 'Weight', unit: 'kg', val: bw, set: setBw },
-              { ph: 'Muscle', unit: 'kg', val: smm, set: setSmm },
-              { ph: 'Fat', unit: '%', val: bf, set: setBf },
-            ].map(({ ph, unit, val, set }) => (
+              { ph: 'Weight', unit: 'kg', val: bw, set: setBw, min: 0, max: 500 },
+              { ph: 'Muscle', unit: 'kg', val: smm, set: setSmm, min: 0, max: 200 },
+              { ph: 'Fat', unit: '%', val: bf, set: setBf, min: 0, max: 100 },
+            ].map(({ ph, unit, val, set, min, max }) => (
               <div key={ph}>
                 <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>{ph.toUpperCase()} ({unit})</div>
                 <input
                   className="input-num tnum"
-                  type="number" inputMode="decimal"
+                  type="number" inputMode="decimal" min={min} max={max}
                   value={val} placeholder="0"
                   onChange={e => set(e.target.value)}
                   onFocus={e => e.target.select()}
@@ -400,9 +400,9 @@ export function ProfilePage() {
                   }}>{short}</div>
                   <div style={{ flex: 1, fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 15 }}>{label}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <input className="input-num tnum" type="number" inputMode="decimal"
+                    <input className="input-num tnum" type="number" inputMode="decimal" min={0} max={1000}
                       value={draft[key] || ''} placeholder="0"
-                      onChange={e => setDraft(d => ({ ...d, [key]: Number(e.target.value) || 0 }))}
+                      onChange={e => setDraft(d => ({ ...d, [key]: Math.max(0, Number(e.target.value) || 0) }))}
                       onFocus={e => e.target.select()}
                       style={{ width: 116, textAlign: 'right', paddingRight: 12 }} />
                     <span className="t-mono" style={{ fontSize: 11, color: 'var(--muted)' }}>kg</span>
@@ -459,7 +459,7 @@ export function ProfilePage() {
               <div style={{ display: 'flex', gap: 12 }}>
                 <div style={{ flex: 1 }}>
                   <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 6 }}>HEIGHT (cm)</div>
-                  <input className="input-num tnum" type="number" inputMode="decimal"
+                  <input className="input-num tnum" type="number" inputMode="decimal" min={0} max={300}
                     value={bioDraft.heightCm ?? ''} placeholder="0"
                     onChange={e => setBioDraft(d => ({ ...d, heightCm: Number(e.target.value) || undefined }))}
                     onFocus={e => e.target.select()}

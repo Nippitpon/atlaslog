@@ -34,20 +34,20 @@ export function getExercise(id: string) {
     ?? { id, name: 'Exercise', group: '', equipment: '' }
 }
 
-// Absolute calendar date as DD-MM-YYYY (app-wide date format)
+// Absolute calendar date as DD/MM/YYYY — app-wide format. Year is C.E. (ค.ศ.).
 export function formatDMY(input: string | Date) {
   const d = input instanceof Date ? input : new Date(input)
   const dd = String(d.getDate()).padStart(2, '0')
   const mm = String(d.getMonth() + 1).padStart(2, '0')
-  return `${dd}-${mm}-${d.getFullYear()}`
+  return `${dd}/${mm}/${d.getFullYear()}`
 }
 
-// Short DD-MM (no year) — for compact ranges
+// Short DD/MM (no year) — for compact ranges
 export function formatDM(input: string | Date) {
   const d = input instanceof Date ? input : new Date(input)
   const dd = String(d.getDate()).padStart(2, '0')
   const mm = String(d.getMonth() + 1).padStart(2, '0')
-  return `${dd}-${mm}`
+  return `${dd}/${mm}`
 }
 
 export function formatDate(iso: string) {
