@@ -12,3 +12,6 @@ Atlaslog.html
 TEST_ACCOUNTS.md
 test-run.mjs
 test-screenshots/
+
+# Supabase CLI local artifacts
+supabase/.temp/
