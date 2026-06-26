@@ -6,6 +6,7 @@ import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAppStore } from '../../store/useAppStore.js'
 import { IconX, IconUpload, IconCheck } from '../../components/icons/index.js'
 import { formatDMY } from '../../lib/utils.js'
+import { DateField } from '../../components/DateField.js'
 
 type Step = 'upload' | 'preview' | 'setup'
 
@@ -299,18 +300,9 @@ export function ImportProgramSheet({ onClose }: Props) {
             )}
 
             <div className="t-eyebrow" style={{ marginBottom: 6, fontSize: 10 }}>START DATE</div>
-            <input
-              type="date"
-              value={startDate}
-              onChange={e => setStartDate(e.target.value)}
-              style={{
-                width: '100%', height: 48,
-                background: 'var(--surface-2)', border: '1px solid var(--border)',
-                borderRadius: 12, color: 'var(--text)',
-                fontFamily: 'var(--font-mono)', fontSize: 14,
-                padding: '0 14px', outline: 'none', boxSizing: 'border-box', marginBottom: 16,
-              }}
-            />
+            <div style={{ marginBottom: 16 }}>
+              <DateField value={startDate} onChange={iso => iso && setStartDate(iso)} />
+            </div>
 
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',

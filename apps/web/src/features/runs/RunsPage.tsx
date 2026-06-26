@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore.js'
 import { formatDate, formatPace } from '../../lib/utils.js'
+import { DateField } from '../../components/DateField.js'
 import { IconChevronLeft, IconRun, IconTrash } from '../../components/icons/index.js'
 import type { RunEntry } from '@atlaslog/shared'
 
@@ -86,11 +87,7 @@ export function RunsPage() {
         <div className="card">
           <div style={{ marginBottom: 8 }}>
             <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>DATE</div>
-            <input
-              className="input-num" type="date"
-              value={date} max={todayStr} onChange={e => setDate(e.target.value || todayStr)}
-              style={{ width: '100%', textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 14 }}
-            />
+            <DateField value={date} max={todayStr} onChange={iso => setDate(iso || todayStr)} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div>

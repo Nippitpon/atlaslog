@@ -25,6 +25,12 @@
 4. **endDate off-by-one (timezone)** — ProgramSetupSheet/ImportProgramSheet parse `YYYY-MM-DD` เป็น UTC
    แล้ว format กลับผ่าน UTC → คลาดวันใน TZ บางโซน (UTC+7 ไม่กระทบ) → คำนวณด้วย local date components
 
+### C. Native date picker → custom DateField (dd/mm/yyyy ค.ศ.)
+- ปัญหา: `<input type=date>` แสดงตาม locale browser (en-US = mm/dd/yyyy) override ไม่ได้
+- สร้าง `components/DateField.tsx` — 3 dropdown (วัน/เดือน/ปี) เรียง DD/MM/YYYY เสมอ, ปี ค.ศ., รองรับ min/max + clamp วันตามเดือน
+- แทนทุกจุด: RunsPage (LOG A RUN), ProfilePage (BIRTH DATE — แยกเต็มแถว), ProgramSetupSheet + ImportProgramSheet (START DATE)
+- e2e (Playwright 390px athlete.a): Runs DATE = 26/06/2026, Bio BIRTH DATE = 15/03/1995 เรียง dd/mm/yyyy ถูกต้อง, 0 console errors
+
 ### รายงานบั๊กที่ "ไม่แก้รอบนี้" (ต้อง e2e เต็มก่อน — เสี่ยง)
 - sync queue ไม่ผูก user-id → ถ้าสลับบัญชีบนเครื่องเดียวตอน offline อาจ sync ข้ามบัญชี (architectural)
 - index-based React keys ใน LoggerPage/AccessoryEditSheet (กระทบเฉพาะตอน reorder)

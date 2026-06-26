@@ -4,6 +4,7 @@ import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAppStore } from '../../store/useAppStore.js'
 import { IconX } from '../../components/icons/index.js'
 import { formatDMY } from '../../lib/utils.js'
+import { DateField } from '../../components/DateField.js'
 
 interface Props {
   program: StructuredProgram
@@ -112,25 +113,9 @@ export function ProgramSetupSheet({ program, onClose }: Props) {
 
         {/* Start Date */}
         <div className="t-eyebrow" style={{ marginBottom: 6, fontSize: 10 }}>START DATE</div>
-        <input
-          type="date"
-          value={startDate}
-          onChange={e => setStartDate(e.target.value)}
-          style={{
-            width: '100%',
-            height: 48,
-            background: 'var(--surface-2)',
-            border: '1px solid var(--border)',
-            borderRadius: 12,
-            color: 'var(--text)',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 14,
-            padding: '0 14px',
-            outline: 'none',
-            boxSizing: 'border-box',
-            marginBottom: 16,
-          }}
-        />
+        <div style={{ marginBottom: 16 }}>
+          <DateField value={startDate} onChange={iso => iso && setStartDate(iso)} />
+        </div>
 
         {/* End Date (read only) */}
         <div style={{

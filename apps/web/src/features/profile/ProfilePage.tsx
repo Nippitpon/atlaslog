@@ -7,6 +7,7 @@ import { useAuthStore } from '../../store/useAuthStore.js'
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { calcEnergy, ACTIVITY, ACTIVITY_ORDER, suggestActivityFromDays } from '../../lib/energy.js'
 import { IconBolt, IconUsers, IconScale, IconX } from '../../components/icons/index.js'
+import { DateField } from '../../components/DateField.js'
 
 const todayISO = new Date().toISOString().split('T')[0]
 
@@ -455,23 +456,20 @@ export function ProfilePage() {
                   ))}
                 </div>
               </div>
-              {/* Height + birth date */}
-              <div style={{ display: 'flex', gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 6 }}>HEIGHT (cm)</div>
-                  <input className="input-num tnum" type="number" inputMode="decimal" min={0} max={300}
-                    value={bioDraft.heightCm ?? ''} placeholder="0"
-                    onChange={e => setBioDraft(d => ({ ...d, heightCm: Number(e.target.value) || undefined }))}
-                    onFocus={e => e.target.select()}
-                    style={{ width: '100%', textAlign: 'center' }} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 6 }}>BIRTH DATE</div>
-                  <input className="input-num" type="date" max={todayISO}
-                    value={bioDraft.birthDate ?? ''}
-                    onChange={e => setBioDraft(d => ({ ...d, birthDate: e.target.value || undefined }))}
-                    style={{ width: '100%', textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12 }} />
-                </div>
+              {/* Height */}
+              <div>
+                <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 6 }}>HEIGHT (cm)</div>
+                <input className="input-num tnum" type="number" inputMode="decimal" min={0} max={300}
+                  value={bioDraft.heightCm ?? ''} placeholder="0"
+                  onChange={e => setBioDraft(d => ({ ...d, heightCm: Number(e.target.value) || undefined }))}
+                  onFocus={e => e.target.select()}
+                  style={{ width: '100%', textAlign: 'center' }} />
+              </div>
+              {/* Birth date */}
+              <div>
+                <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 6 }}>BIRTH DATE</div>
+                <DateField value={bioDraft.birthDate ?? ''} max={todayISO}
+                  onChange={iso => setBioDraft(d => ({ ...d, birthDate: iso || undefined }))} />
               </div>
               {/* Activity level */}
               <div>
