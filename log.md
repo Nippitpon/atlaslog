@@ -22,6 +22,15 @@
 **ทดสอบ:** build+lint ผ่าน + logic test 9/9 (scratchpad: migration, cross-account guard,
 rightful-owner flush, unowned→current, per-user dedup) — Playwright e2e ทำไม่ได้รอบนี้ (MCP หลุด)
 
+## 2026-06-26 — ปิด gap: Coach RLS isolation e2e (athlete.b ตัวจริง) ✅ 8/8
+
+ค้างจาก Phase 4: เคยทดสอบ RLS isolation ด้วยวิธี unlink เพราะสร้าง athlete.b ไม่ได้ (email rate limit)
+- สร้าง athlete.b ผ่าน signup REST endpoint (rate limit รีเซ็ตแล้ว) → admin (owner) confirm ใน /admin
+- **ทดสอบแบบ API-level ล้วน** (`scratchpad/rls-test.mjs`, node + REST + edge fn `coach`) — ไม่ต้องใช้ browser:
+  athlete.b insert session → ISOLATION (coach อ่านไม่ได้ 0 rows) → resolve-link → LINKED (coach อ่านได้ 1 row)
+  → unlink → RE-ISOLATION (0 rows) → cleanup. ผ่านครบ 8/8
+- พิสูจน์ policy `coach reads athlete sessions` (user_id IN active coach_athlete) ทำงานถูกทั้งเปิด/ปิด access
+
 ---
 
 ## 2026-06-26 — รอบ 12: date `DD/MM/YYYY` (ค.ศ.) ทั้งแอป + bug fixes
