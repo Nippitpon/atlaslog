@@ -12,6 +12,7 @@
 //   { action: 'list-athletes' }            coach lists their athletes (+email, +status)
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { sendPushToUser } from '../_shared/push.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -73,6 +74,7 @@ Deno.serve(async (req) => {
         type: 'coach_linked',
         data: { athlete_id: caller.id, athlete_email: caller.email ?? '' },
       })
+      try { await sendPushToUser(admin, coach.id, { title: 'New athlete linked', body: `${caller.email ?? 'An athlete'} connected to you`, url: '/coach', tag: 'coach' }) } catch { /* push must not break the link */ }
       return json({ ok: true, coachEmail: coach.email ?? '' })
     }
 
@@ -100,6 +102,7 @@ Deno.serve(async (req) => {
         type: 'coach_request',
         data: { coach_id: caller.id, coach_email: caller.email ?? '' },
       })
+      try { await sendPushToUser(admin, target.id, { title: 'Coach request', body: `${caller.email ?? 'A coach'} wants to coach you — tap to accept`, url: '/', tag: 'coach' }) } catch { /* push must not break the request */ }
       return json({ ok: true, athleteEmail: target.email ?? '', status: 'pending' })
     }
 
@@ -120,6 +123,7 @@ Deno.serve(async (req) => {
           type: 'coach_linked',
           data: { athlete_id: caller.id, athlete_email: caller.email ?? '' },
         })
+        try { await sendPushToUser(admin, coachId, { title: 'Request accepted', body: `${caller.email ?? 'An athlete'} accepted your coach request`, url: '/coach', tag: 'coach' }) } catch { /* non-fatal */ }
       } else {
         const { error } = await admin.from('coach_athlete')
           .delete().eq('coach_id', coachId).eq('athlete_id', caller.id)

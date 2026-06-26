@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { UserBio } from '@atlaslog/shared'
 import { useAppStore } from '../../store/useAppStore.js'
@@ -6,8 +6,9 @@ import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { calcEnergy, ACTIVITY, ACTIVITY_ORDER, suggestActivityFromDays } from '../../lib/energy.js'
-import { IconBolt, IconUsers, IconScale, IconX } from '../../components/icons/index.js'
+import { IconBolt, IconUsers, IconScale, IconX, IconBell } from '../../components/icons/index.js'
 import { DateField } from '../../components/DateField.js'
+import { isPushSupported, isIosNeedsInstall, getPermission, isSubscribed, subscribeToPush, unsubscribeFromPush } from '../../lib/pushApi.js'
 
 const todayISO = new Date().toISOString().split('T')[0]
 
@@ -34,6 +35,28 @@ export function ProfilePage() {
   const totalVol = history.reduce((s, h) => s + h.volume, 0)
   const totalSessions = history.length
   const totalMin = history.reduce((s, h) => s + h.duration, 0)
+
+  // Push notifications
+  const pushSupported = isPushSupported()
+  const iosNeedsInstall = pushSupported && isIosNeedsInstall()
+  const [pushOn, setPushOn] = useState(false)
+  const [pushBusy, setPushBusy] = useState(false)
+  const [permDenied, setPermDenied] = useState(pushSupported && getPermission() === 'denied')
+  useEffect(() => { if (pushSupported) isSubscribed().then(setPushOn) }, [pushSupported])
+
+  const togglePush = async () => {
+    if (!user || pushBusy) return
+    setPushBusy(true)
+    if (pushOn) {
+      await unsubscribeFromPush(user.id)
+      setPushOn(false)
+    } else {
+      const err = await subscribeToPush(user.id)
+      if (!err) setPushOn(true)
+      else if (err === 'permission-denied') setPermDenied(true)
+    }
+    setPushBusy(false)
+  }
 
   const [draft, setDraft] = useState(personalOneRMs)
   const [saved, setSaved] = useState(false)
@@ -374,6 +397,49 @@ export function ProfilePage() {
                 }}>{t}</span>
               ))}
             </button>
+          </div>
+
+          {/* Push reminders */}
+          <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, borderTop: '1px solid var(--border)' }}>
+            <IconBell size={20} style={{ color: 'var(--muted)' }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15 }}>Push reminders</div>
+              {!pushSupported && (
+                <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                  เบราว์เซอร์นี้ไม่รองรับ
+                </div>
+              )}
+              {iosNeedsInstall && (
+                <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2, lineHeight: 1.4 }}>
+                  iPhone/iPad: แตะ Share → Add to Home Screen แล้วเปิดจากไอคอน
+                </div>
+              )}
+              {pushSupported && !iosNeedsInstall && permDenied && (
+                <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                  ถูกบล็อก — เปิดสิทธิ์แจ้งเตือนใน browser settings
+                </div>
+              )}
+            </div>
+            {pushSupported && !iosNeedsInstall && !permDenied && (
+              <button
+                onClick={togglePush}
+                disabled={pushBusy}
+                style={{
+                  width: 46, height: 28, borderRadius: 999, border: '1px solid var(--border)',
+                  background: pushOn ? 'var(--accent)' : 'var(--surface-2)',
+                  position: 'relative', cursor: pushBusy ? 'default' : 'pointer',
+                  opacity: pushBusy ? 0.6 : 1, flexShrink: 0, transition: 'background 0.15s',
+                }}
+                aria-pressed={pushOn}
+              >
+                <span style={{
+                  position: 'absolute', top: 2, left: pushOn ? 20 : 2,
+                  width: 22, height: 22, borderRadius: '50%',
+                  background: pushOn ? 'var(--accent-ink)' : 'var(--muted)',
+                  transition: 'left 0.15s',
+                }} />
+              </button>
+            )}
           </div>
         </div>
       </div>

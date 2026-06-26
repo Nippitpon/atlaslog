@@ -1,8 +1,35 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-26 (รอบ 14: stable React keys (Logger/Accessory) + DateField คืนปฏิทิน native — build+lint ผ่าน)
+> อัปเดตล่าสุด: 2026-06-26 (รอบ 15: Phase 5 Part A — Web Push foundation + event push — build+lint ผ่าน, รอ deploy ฝั่ง dashboard)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-06-26 — รอบ 15: Phase 5 Part A — Web Push (VAPID) foundation + event push
+
+ทำเฉพาะ Part A (PWA + push พื้นฐาน + event push, ไม่ใช้ cron) — Part B (เตือนวันซ้อม scheduled) รอบหน้า
+
+### โค้ด (build+lint ผ่าน)
+- **PWA:** `public/manifest.webmanifest`, ไอคอน PNG (192/512/maskable + apple-touch-icon) gen จาก favicon.svg
+  ด้วย `scripts/gen-icons.mjs` (sharp, devDep), แก้ `index.html` head (manifest/theme-color/apple-touch/apple-meta)
+- **Service worker:** `public/sw.js` (push + notificationclick), register ใน `main.tsx`
+- **VAPID:** gen P-256 ด้วย Node Web Crypto → public key ใน `apps/web/.env.local` (`VITE_VAPID_PUBLIC_KEY`),
+  private/keypair ใน `vapid-secret.local` (gitignored) ไว้ set เป็น edge secret `VAPID_JSON`
+- **DB:** `push_subscriptions` table + `program_state.reminder_opt_in` (SQL section 2i ใน SUPABASE_SETUP.md)
+- **Client:** `lib/pushApi.ts` (subscribe/unsubscribe/support+iOS detection) + toggle "Push reminders" ใน Profile PREFERENCES
+  (states: unsupported / iOS-ต้อง-install / permission-denied / on-off)
+- **Edge:** `_shared/push.ts` (sendPushToUser ผ่าน `jsr:@negrel/webpush`, prune 404/410) + `send-push` fn
+  + ผูก push เข้า 3 จุดใน `coach/index.ts` (resolve-link/add-athlete/respond-link accept)
+
+### ⛔ ค้าง — เจ้าของต้องทำใน dashboard (ดู SUPABASE_SETUP.md §2i)
+1. รัน SQL section 2i ใน Supabase
+2. `supabase secrets set VAPID_JSON='<vapid-secret.local>'` + `CRON_SECRET='<สุ่ม>'`
+3. `supabase functions deploy send-push` + `supabase functions deploy coach`
+4. เพิ่ม `VITE_VAPID_PUBLIC_KEY` ใน Vercel env → redeploy
+5. ทดสอบ push บน Chrome (DevTools Push) / Android / iOS (ต้อง Add to Home Screen ก่อน)
+
+> Playwright MCP หลุด session นี้ → ทดสอบแค่ build/lint, ยังไม่ได้ verify push บน browser จริง
 
 ---
 

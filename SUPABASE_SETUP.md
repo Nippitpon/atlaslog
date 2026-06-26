@@ -222,6 +222,44 @@ create policy "coach reads athlete program state" on public.program_state for se
 
 > หมายเหตุ: ไม่ต้อง redeploy edge function — ทั้งหมดผ่าน RLS ตรง ๆ
 
+## 2i. Web Push (Phase 5 Part A) — push_subscriptions + reminder opt-in (2026-06-26)
+
+> เก็บ Web Push subscription ต่อ device + flag เปิด/ปิด reminder ใน program_state
+
+```sql
+create table public.push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  endpoint text not null unique,        -- 1 row ต่อ browser/device endpoint
+  subscription jsonb not null,          -- PushSubscription.toJSON() เต็ม
+  user_agent text,
+  created_at timestamptz default now()
+);
+alter table public.push_subscriptions enable row level security;
+create policy "own push subs" on public.push_subscriptions
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create index push_subscriptions_user_idx on public.push_subscriptions(user_id);
+
+alter table public.program_state add column if not exists reminder_opt_in boolean not null default false;
+```
+
+### Deploy Edge Functions `send-push` (+ redeploy `coach`)
+
+1. ตั้ง secret (private VAPID key — อยู่ในไฟล์ `vapid-secret.local` ที่ generate ไว้, gitignored):
+   ```
+   supabase secrets set VAPID_JSON='<เนื้อหาใน vapid-secret.local>'
+   supabase secrets set CRON_SECRET='<สุ่มสตริงยาว ๆ>'
+   ```
+   (`SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` Supabase inject ให้อัตโนมัติ)
+2. Deploy:
+   ```
+   supabase functions deploy send-push
+   supabase functions deploy coach     # redeploy: เพิ่มยิง push ตอนมี coach event
+   ```
+3. เพิ่ม `VITE_VAPID_PUBLIC_KEY` (public key จาก `apps/web/.env.local`) ใน Vercel env ด้วย
+
+> Part B (เตือนวันซ้อม scheduled) = อีก function `send-reminders` + Supabase Cron — ทำรอบถัดไป
+
 ### Deploy Edge Function `coach`
 
 เหมือน `admin-users` — Supabase inject `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` ให้อัตโนมัติ
@@ -246,6 +284,7 @@ supabase functions deploy coach
 |------|-------|
 | `VITE_SUPABASE_URL` | `https://xxxx.supabase.co` |
 | `VITE_SUPABASE_ANON_KEY` | `eyJ...` |
+| `VITE_VAPID_PUBLIC_KEY` | `B...` (Web Push public key — จาก `apps/web/.env.local`) |
 
 จากนั้น **Redeploy** เพื่อให้ค่าใหม่มีผล
 
