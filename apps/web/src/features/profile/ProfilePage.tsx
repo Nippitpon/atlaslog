@@ -37,8 +37,11 @@ export function ProfilePage() {
   const totalMin = history.reduce((s, h) => s + h.duration, 0)
 
   // Push notifications
-  const pushSupported = isPushSupported()
-  const iosNeedsInstall = pushSupported && isIosNeedsInstall()
+  // On iOS the push APIs are absent until the PWA is installed, so detect the
+  // "needs install" case independently of isPushSupported (else iOS Safari would
+  // fall through to the generic "unsupported" message instead of the hint).
+  const iosNeedsInstall = isIosNeedsInstall()
+  const pushSupported = !iosNeedsInstall && isPushSupported()
   const [pushOn, setPushOn] = useState(false)
   const [pushBusy, setPushBusy] = useState(false)
   const [permDenied, setPermDenied] = useState(pushSupported && getPermission() === 'denied')
@@ -404,7 +407,7 @@ export function ProfilePage() {
             <IconBell size={20} style={{ color: 'var(--muted)' }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 15 }}>Push reminders</div>
-              {!pushSupported && (
+              {!pushSupported && !iosNeedsInstall && (
                 <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
                   เบราว์เซอร์นี้ไม่รองรับ
                 </div>
