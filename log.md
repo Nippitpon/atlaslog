@@ -1,8 +1,26 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-26 (รอบ 12: date format `DD/MM/YYYY` (ค.ศ.) ทั้งแอป + แก้บั๊ก 4 จุด — build+lint ผ่าน)
+> อัปเดตล่าสุด: 2026-06-26 (รอบ 13: sync queue ผูก user-id (กันเขียนข้ามบัญชี) — build+lint+logic test ผ่าน)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-06-26 — รอบ 13: sync queue ผูก user-id (กันเขียนข้ามบัญชีบนเครื่องร่วม)
+
+**บั๊ก:** `QUEUE_KEY` เป็น global ไม่ผูก user → A enqueue op ตอน offline, sign out, B login → `flushQueue`
+เขียน op ของ A ลงบัญชี B (ข้อมูล corrupt)
+
+**แก้ (`lib/syncQueue.ts`):**
+- เปลี่ยน queue จาก `SyncOp[]` → `QueueEntry[]` = `{ userId: string|null; op: SyncOp }`
+- `enqueue(op, userId)` ติด userId ทุก op (จาก `attempt()` ที่รู้ id, หรือ `null` ตอนไม่มี session)
+- `flushQueue`: เขียนเฉพาะ entry ที่ `userId === currentId` หรือ `userId === null` (legacy/unowned = ของ user ปัจจุบัน);
+  entry ของ user อื่น **เก็บไว้ในคิว ไม่ทิ้ง** → เจ้าของ login มาเองค่อย flush
+- program-state dedup เป็น per-user (A/B มี snapshot แยกกันได้)
+- migration: queue เก่า (bare `SyncOp` ไม่มี `.op`) → map เป็น `{ userId: null, op }` อัตโนมัติ
+
+**ทดสอบ:** build+lint ผ่าน + logic test 9/9 (scratchpad: migration, cross-account guard,
+rightful-owner flush, unowned→current, per-user dedup) — Playwright e2e ทำไม่ได้รอบนี้ (MCP หลุด)
 
 ---
 

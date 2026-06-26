@@ -16,30 +16,45 @@ type SyncOp =
   | { kind: 'exercise-upsert'; payload: Exercise }
   | { kind: 'exercise-delete'; payload: { id: string } }
 
-function readQueue(): SyncOp[] {
+// Each entry remembers WHO queued it. At flush time we only write entries that
+// belong to the currently signed-in user, so switching accounts on a shared
+// device can never sync one user's pending ops under another user's account.
+type QueueEntry = { userId: string | null; op: SyncOp }
+
+function readQueue(): QueueEntry[] {
   try {
     const raw = localStorage.getItem(QUEUE_KEY)
-    return raw ? (JSON.parse(raw) as SyncOp[]) : []
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as unknown[]
+    return parsed.map(e =>
+      // migrate legacy bare-op entries (pre user-scoping) → unknown owner
+      e && typeof e === 'object' && 'op' in (e as object)
+        ? (e as QueueEntry)
+        : { userId: null, op: e as SyncOp }
+    )
   } catch {
     return []
   }
 }
 
-function writeQueue(ops: SyncOp[]) {
+function writeQueue(entries: QueueEntry[]) {
   try {
-    localStorage.setItem(QUEUE_KEY, JSON.stringify(ops))
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(entries))
   } catch {
     // ignore quota / serialization errors
   }
 }
 
-function enqueue(op: SyncOp) {
+function enqueue(op: SyncOp, userId: string | null) {
   const q = readQueue()
-  // Program state is a full snapshot — only the latest matters, drop stale ones
+  // Program state is a full snapshot — only the latest per user matters
   if (op.kind === 'program-state-upsert') {
-    writeQueue([...q.filter(o => o.kind !== 'program-state-upsert'), op])
+    writeQueue([
+      ...q.filter(e => !(e.op.kind === 'program-state-upsert' && e.userId === userId)),
+      { userId, op },
+    ])
   } else {
-    writeQueue([...q, op])
+    writeQueue([...q, { userId, op }])
   }
 }
 
@@ -125,67 +140,67 @@ async function attempt(op: SyncOp, userId: string): Promise<void> {
   try {
     await runOp(op, userId)
   } catch {
-    enqueue(op)
+    enqueue(op, userId)
   }
 }
 
 export async function syncSession(session: Session) {
   const { data } = await supabase.auth.getUser()
-  if (!data.user) return enqueue({ kind: 'session-upsert', payload: session })
+  if (!data.user) return enqueue({ kind: 'session-upsert', payload: session }, null)
   await attempt({ kind: 'session-upsert', payload: session }, data.user.id)
 }
 
 export async function syncProgramUpsert(program: StructuredProgram) {
   const { data } = await supabase.auth.getUser()
-  if (!data.user) return enqueue({ kind: 'program-upsert', payload: program })
+  if (!data.user) return enqueue({ kind: 'program-upsert', payload: program }, null)
   await attempt({ kind: 'program-upsert', payload: program }, data.user.id)
 }
 
 export async function syncProgramDelete(id: string) {
   const { data } = await supabase.auth.getUser()
-  if (!data.user) return enqueue({ kind: 'program-delete', payload: { id } })
+  if (!data.user) return enqueue({ kind: 'program-delete', payload: { id } }, null)
   await attempt({ kind: 'program-delete', payload: { id } }, data.user.id)
 }
 
 export async function syncProgramState(snapshot: ProgramStateSnapshot) {
   const { data } = await supabase.auth.getUser()
-  if (!data.user) return enqueue({ kind: 'program-state-upsert', payload: snapshot })
+  if (!data.user) return enqueue({ kind: 'program-state-upsert', payload: snapshot }, null)
   await attempt({ kind: 'program-state-upsert', payload: snapshot }, data.user.id)
 }
 
 export async function syncBodyMetric(entry: BodyMetricEntry) {
   const { data } = await supabase.auth.getUser()
-  if (!data.user) return enqueue({ kind: 'body-metric-upsert', payload: entry })
+  if (!data.user) return enqueue({ kind: 'body-metric-upsert', payload: entry }, null)
   await attempt({ kind: 'body-metric-upsert', payload: entry }, data.user.id)
 }
 
 export async function syncBodyMetricDelete(id: string) {
   const { data } = await supabase.auth.getUser()
-  if (!data.user) return enqueue({ kind: 'body-metric-delete', payload: { id } })
+  if (!data.user) return enqueue({ kind: 'body-metric-delete', payload: { id } }, null)
   await attempt({ kind: 'body-metric-delete', payload: { id } }, data.user.id)
 }
 
 export async function syncRun(entry: RunEntry) {
   const { data } = await supabase.auth.getUser()
-  if (!data.user) return enqueue({ kind: 'run-upsert', payload: entry })
+  if (!data.user) return enqueue({ kind: 'run-upsert', payload: entry }, null)
   await attempt({ kind: 'run-upsert', payload: entry }, data.user.id)
 }
 
 export async function syncRunDelete(id: string) {
   const { data } = await supabase.auth.getUser()
-  if (!data.user) return enqueue({ kind: 'run-delete', payload: { id } })
+  if (!data.user) return enqueue({ kind: 'run-delete', payload: { id } }, null)
   await attempt({ kind: 'run-delete', payload: { id } }, data.user.id)
 }
 
 export async function syncExercise(ex: Exercise) {
   const { data } = await supabase.auth.getUser()
-  if (!data.user) return enqueue({ kind: 'exercise-upsert', payload: ex })
+  if (!data.user) return enqueue({ kind: 'exercise-upsert', payload: ex }, null)
   await attempt({ kind: 'exercise-upsert', payload: ex }, data.user.id)
 }
 
 export async function syncExerciseDelete(id: string) {
   const { data } = await supabase.auth.getUser()
-  if (!data.user) return enqueue({ kind: 'exercise-delete', payload: { id } })
+  if (!data.user) return enqueue({ kind: 'exercise-delete', payload: { id } }, null)
   await attempt({ kind: 'exercise-delete', payload: { id } }, data.user.id)
 }
 
@@ -199,14 +214,22 @@ export async function flushQueue() {
   const { data }: { data: { user: User | null } } = await supabase.auth.getUser()
   if (!data.user) return
 
+  const currentId = data.user.id
   flushing = true
-  const remaining: SyncOp[] = []
+  const remaining: QueueEntry[] = []
   try {
-    for (const op of queued) {
+    for (const entry of queued) {
+      // Never write another user's queued op under the current account —
+      // keep it so the rightful owner can flush it when they sign in here.
+      // Legacy/unowned entries (userId null) belong to the active user.
+      if (entry.userId && entry.userId !== currentId) {
+        remaining.push(entry)
+        continue
+      }
       try {
-        await runOp(op, data.user.id)
+        await runOp(entry.op, currentId)
       } catch {
-        remaining.push(op)
+        remaining.push(entry)
       }
     }
   } finally {
