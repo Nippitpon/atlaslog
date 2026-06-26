@@ -1,8 +1,34 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-25 (รอบ 11: BMR/TDEE + Coaching dashboard + date format — ✅ SQL 2h รันแล้ว + e2e ผ่าน + commit/deploy)
+> อัปเดตล่าสุด: 2026-06-26 (รอบ 12: date format `DD/MM/YYYY` (ค.ศ.) ทั้งแอป + แก้บั๊ก 4 จุด — build+lint ผ่าน)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-06-26 — รอบ 12: date `DD/MM/YYYY` (ค.ศ.) ทั้งแอป + bug fixes
+
+ปี = **ค.ศ.** (Gregorian, `getFullYear()`) — ไม่แปลงเป็น พ.ศ. ตามที่ผู้ใช้เลือก
+
+### A. Date format `-` → `/` (DD/MM/YYYY) ทั้งระบบ
+- `utils.ts`: `formatDMY()` → `DD/MM/YYYY`, `formatDM()` → `DD/MM` (เปลี่ยน separator `-` → `/`)
+- ยุบ `formatDate()` ที่เขียนซ้ำใน `ProgramOverviewPage`, `ProgramSetupSheet`, `ImportProgramSheet`
+  → ใช้ `formatDMY` ตัวกลางแทน (DRY)
+- History card คงดีไซน์เลขวันใหญ่ + weekday + หัวข้อกลุ่ม "MONTH YEAR" (เป็น idiom ปฏิทิน ไม่ใช่ date-text)
+
+### B. Bug fixes (จาก audit 3 agent: date/time, store/sync, UI flows)
+1. **BMR เพี้ยน** — `energy.ts` calcBMR ใช้ Katch-McArdle แม้ %ไขมัน >100/<0 → lean mass ติดลบ
+   → gate `bodyFat > 0 && bodyFat < 100` (ไม่งั้น fall through ไป Mifflin)
+2. **General program โชว์ 1RM ปลอม** — ProgramOverviewPage banner โชว์ `S0 B0 D0` สำหรับโปรแกรม general
+   → ซ่อนคอลัมน์ 1RM เมื่อ `programType === 'general'`
+3. **input ไม่มีขอบเขต** — เพิ่ม min/max: Fat 0–100, Weight 0–500, Muscle 0–200, height 0–300, 1RM 0–1000 (+clamp ≥0)
+4. **endDate off-by-one (timezone)** — ProgramSetupSheet/ImportProgramSheet parse `YYYY-MM-DD` เป็น UTC
+   แล้ว format กลับผ่าน UTC → คลาดวันใน TZ บางโซน (UTC+7 ไม่กระทบ) → คำนวณด้วย local date components
+
+### รายงานบั๊กที่ "ไม่แก้รอบนี้" (ต้อง e2e เต็มก่อน — เสี่ยง)
+- sync queue ไม่ผูก user-id → ถ้าสลับบัญชีบนเครื่องเดียวตอน offline อาจ sync ข้ามบัญชี (architectural)
+- index-based React keys ใน LoggerPage/AccessoryEditSheet (กระทบเฉพาะตอน reorder)
+- false positives ที่เช็คแล้วไม่ใช่บั๊ก: trend NaN (มี guard `length>=2`), RPE/sets-reps มี fallback guard
 
 ---
 

@@ -49,7 +49,9 @@ export function calcBMR(bio: UserBio, latest?: BodyMetricEntry):
   const weight = latest?.weightKg
   const bodyFat = latest?.bodyFatPct
 
-  if (weight && bodyFat != null) {
+  // Katch-McArdle only when body fat is a sane percentage — out-of-range values
+  // (e.g. >100) yield negative lean mass and a garbage BMR; fall through instead.
+  if (weight && bodyFat != null && bodyFat > 0 && bodyFat < 100) {
     const lbm = calcLBM(weight, bodyFat)
     return { bmr: 370 + 21.6 * lbm, method: 'katch' }
   }
