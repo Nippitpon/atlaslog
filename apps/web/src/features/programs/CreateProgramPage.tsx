@@ -5,6 +5,7 @@ import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
 import { createShare } from '../../lib/shareApi.js'
 import { allExercises } from '../../lib/data.js'
+import { getExercise, muscleColor } from '../../lib/utils.js'
 import { IconChevronLeft, IconPlus, IconX, IconCheck, IconSearch, IconCopy } from '../../components/icons/index.js'
 
 type Visibility = 'private' | 'code' | 'public'
@@ -196,7 +197,12 @@ export function CreateProgramPage() {
                   {day.exercises.map((ex, ei) => (
                     <div key={ei} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span className="pill" style={{ fontSize: 8, flexShrink: 0 }}>{ex.type === 'main' ? 'MAIN' : 'ACC'}</span>
-                      <span style={{ flex: 1, minWidth: 0, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.name}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.name}</div>
+                        {getExercise(ex.exerciseId)?.group && (
+                          <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)' }}>{getExercise(ex.exerciseId).group}</div>
+                        )}
+                      </div>
                       <span className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>
                         {ex.sets}×{ex.reps}{ex.rpe !== undefined ? ` @${ex.rpe}` : ''}
                       </span>
@@ -304,14 +310,26 @@ export function CreateProgramPage() {
 
 function ExercisePicker({ onPick, onClose }: { onPick: (ex: StructuredExercise) => void; onClose: () => void }) {
   const [search, setSearch] = useState('')
+  const [groupFilter, setGroupFilter] = useState('All')
   const [pickedId, setPickedId] = useState('')
   const [type, setType] = useState<'main' | 'accessory'>('accessory')
   const [sets, setSets] = useState('3')
   const [reps, setReps] = useState('10')
   const [rpe, setRpe] = useState('')
 
+  const groups = ['All', ...Array.from(new Set(allExercises().map(e => e.group)))]
+
   const filtered = allExercises().filter(e =>
-    e.name.toLowerCase().includes(search.toLowerCase()) || e.group.toLowerCase().includes(search.toLowerCase()))
+    (e.name.toLowerCase().includes(search.toLowerCase()) || e.group.toLowerCase().includes(search.toLowerCase()))
+    && (groupFilter === 'All' || e.group === groupFilter))
+
+  // Group the filtered exercises by muscle group, preserving encounter order.
+  const groupedList = filtered.reduce<{ group: string; items: typeof filtered }[]>((acc, ex) => {
+    const bucket = acc.find(b => b.group === ex.group)
+    if (bucket) bucket.items.push(ex)
+    else acc.push({ group: ex.group, items: [ex] })
+    return acc
+  }, [])
 
   const confirm = () => {
     const ex = allExercises().find(e => e.id === pickedId)
@@ -335,25 +353,56 @@ function ExercisePicker({ onPick, onClose }: { onPick: (ex: StructuredExercise) 
           <button className="btn-icon" onClick={onClose}><IconX size={18} /></button>
         </div>
 
-        <div className="search-bar" style={{ marginBottom: 12 }}>
+        <div className="search-bar" style={{ marginBottom: 10 }}>
           <IconSearch size={18} style={{ color: 'var(--muted)' }} />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search exercises…" />
         </div>
 
+        {/* Muscle group filter chips */}
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 12, paddingBottom: 2, flexShrink: 0 }}>
+          {groups.map(g => {
+            const active = groupFilter === g
+            const color = g === 'All' ? 'var(--accent)' : muscleColor(g)
+            return (
+              <button key={g} onClick={() => setGroupFilter(g)}
+                style={{
+                  flexShrink: 0, padding: '5px 12px', borderRadius: 999, cursor: 'pointer',
+                  fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
+                  border: `1px solid ${active ? color : 'var(--border)'}`,
+                  background: active ? color : 'var(--surface-2)',
+                  color: active ? '#0a0a0a' : 'var(--text-2)',
+                }}>
+                {g}
+              </button>
+            )
+          })}
+        </div>
+
         <div style={{ flex: 1, overflowY: 'auto', marginBottom: 12, minHeight: 80 }}>
-          {filtered.map(ex => (
-            <button key={ex.id} onClick={() => setPickedId(ex.id)}
-              style={{
-                all: 'unset', display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                padding: '10px 4px', cursor: 'pointer', borderBottom: '1px solid var(--border)',
-                background: pickedId === ex.id ? 'rgba(212,255,58,0.08)' : 'transparent', boxSizing: 'border-box',
+          {groupedList.map(({ group, items }) => (
+            <div key={group}>
+              <div className="t-eyebrow" style={{
+                display: 'flex', alignItems: 'center', gap: 6, fontSize: 9, color: 'var(--muted)',
+                padding: '8px 4px 4px', position: 'sticky', top: 0, background: 'var(--surface-1)',
               }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 14 }}>{ex.name}</div>
-                <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>{ex.group} · {ex.equipment}</div>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: muscleColor(group), flexShrink: 0 }} />
+                {group}
               </div>
-              {pickedId === ex.id && <IconCheck size={16} style={{ color: 'var(--accent)' }} />}
-            </button>
+              {items.map(ex => (
+                <button key={ex.id} onClick={() => setPickedId(ex.id)}
+                  style={{
+                    all: 'unset', display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                    padding: '10px 4px', cursor: 'pointer', borderBottom: '1px solid var(--border)',
+                    background: pickedId === ex.id ? 'rgba(212,255,58,0.08)' : 'transparent', boxSizing: 'border-box',
+                  }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 14 }}>{ex.name}</div>
+                    <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>{ex.group} · {ex.equipment}</div>
+                  </div>
+                  {pickedId === ex.id && <IconCheck size={16} style={{ color: 'var(--accent)' }} />}
+                </button>
+              ))}
+            </div>
           ))}
         </div>
 

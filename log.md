@@ -1,8 +1,19 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-26 (รอบ 15: Phase 5 Part A — Web Push foundation + event push — build+lint ผ่าน, รอ deploy ฝั่ง dashboard)
+> อัปเดตล่าสุด: 2026-06-26 (รอบ 16: muscle group ในหน้า Create Program (chips กรอง + จัดกลุ่ม list + โชว์ใน day rows) — build+lint ผ่าน)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-06-26 — รอบ 16: muscle group ในหน้า Create Program (Add Exercise)
+
+แก้ไฟล์เดียว `apps/web/src/features/programs/CreateProgramPage.tsx` (ใช้ helper เดิม getExercise/muscleColor/allExercises)
+1. **chips กรองตามกล้ามเนื้อ** ([All][Chest][Back][Legs][Shoulders][Arms][Core]) ใต้ search bar — chip ที่เลือกใช้สี `muscleColor`
+2. **จัดกลุ่ม list ตามกล้ามเนื้อ** ใน picker — หัวข้อ sticky + จุดสี, จัดกลุ่มจาก filtered คงลำดับ
+3. **โชว์ muscle group ในแถวท่าที่เพิ่มลงวัน** (WEEK TEMPLATE) ใต้ชื่อท่า — ดึงสดจาก `getExercise(exerciseId).group` (ไม่แก้ data model)
+- ไม่แตะ `AccessoryEditSheet` (picker คล้ายกัน — ทำให้เหมือนกันทีหลังได้)
+- Playwright หลุด session นี้ → ทดสอบแค่ build/lint
 
 ---
 
