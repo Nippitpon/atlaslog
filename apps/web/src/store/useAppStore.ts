@@ -80,10 +80,11 @@ export const useAppStore = create<AppStore>()(
           name: program.name,
           startTime: Date.now(),
           currentIdx: 0,
-          exercises: program.exercises.map(e => ({
+          exercises: program.exercises.map((e, i) => ({
+            id: `we${Date.now()}-${i}`,
             exerciseId: e.exerciseId,
             isMain: e.isMain,
-            sets: e.sets.map(s => ({ w: s.w, r: s.r, done: false })),
+            sets: e.sets.map((s, si) => ({ id: `ws${Date.now()}-${i}-${si}`, w: s.w, r: s.r, done: false })),
           })),
         }
         set({ workout: w, showPicker: false })
@@ -95,7 +96,7 @@ export const useAppStore = create<AppStore>()(
         if (!state.workout) return {}
         const exercises = [
           ...state.workout.exercises,
-          { exerciseId, isMain: false, sets: [{ w: 0, r: 8, done: false }] },
+          { id: `we${Date.now()}`, exerciseId, isMain: false, sets: [{ id: `ws${Date.now()}`, w: 0, r: 8, done: false }] },
         ]
         return { workout: { ...state.workout, exercises, currentIdx: exercises.length - 1 } }
       }),

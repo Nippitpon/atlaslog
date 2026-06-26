@@ -57,7 +57,7 @@ export function LoggerPage() {
     const lastSet = cur.sets[cur.sets.length - 1] ?? { w: 0, r: 8 }
     const next: Workout = { ...workout }
     next.exercises = next.exercises.map((e, i) => i !== workout.currentIdx ? e : {
-      ...e, sets: [...e.sets, { w: lastSet.w, r: lastSet.r, done: false }],
+      ...e, sets: [...e.sets, { id: `ws${Date.now()}`, w: lastSet.w, r: lastSet.r, done: false }],
     })
     updateWorkout(next)
   }
@@ -115,7 +115,7 @@ export function LoggerPage() {
           const active = i === workout.currentIdx
           const complete = done === total && total > 0
           return (
-            <button key={i} onClick={() => goToExercise(i)}
+            <button key={e.id ?? i} onClick={() => goToExercise(i)}
               style={{
                 flexShrink: 0, scrollSnapAlign: 'start',
                 background: active ? 'var(--surface-3)' : 'var(--surface-1)',
@@ -182,7 +182,7 @@ export function LoggerPage() {
         {cur.sets.map((s, i) => {
           const prev = prevSets?.[i]
           return (
-            <div key={i} className={`set-row ${s.done ? 'complete' : ''}`}>
+            <div key={s.id ?? i} className={`set-row ${s.done ? 'complete' : ''}`}>
               <div className="set-num tnum">{i + 1}</div>
               <div>
                 {prev && (

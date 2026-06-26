@@ -1,8 +1,27 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-26 (รอบ 13: sync queue ผูก user-id (กันเขียนข้ามบัญชี) — build+lint+logic test ผ่าน)
+> อัปเดตล่าสุด: 2026-06-26 (รอบ 14: stable React keys (Logger/Accessory) + DateField คืนปฏิทิน native — build+lint ผ่าน)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-06-26 — รอบ 14: stable React keys + DateField คืนปฏิทิน (คง dd/mm/yyyy)
+
+### A. Stable React keys (กัน element จับคู่ผิดตอนลบ/สลับกลางลิสต์)
+- เพิ่ม `id?: string` (optional, backward-compat) ใน `WorkoutSet`/`WorkoutExercise`/`StructuredExercise` (`packages/shared/src/types.ts`)
+- generate id ตาม convention เดิม `'<prefix>'+Date.now()` (+index กันชนใน map): `useAppStore` startWorkout (`we…`/`ws…`),
+  addExerciseToWorkout, LoggerPage `addSet` (`ws…`), AccessoryEditSheet `addExercise` (`ax…`)
+- เปลี่ยน key: LoggerPage exercise chips `key={e.id??i}`, set rows `key={s.id??i}`; AccessoryEditSheet `key={ex.id??i}`
+- **บั๊กจริง = AccessoryEditSheet** (มี `remove(idx)` ลบกลางลิสต์); Logger เป็น defensive (ปัจจุบัน append อย่างเดียว)
+- WeekDetailPage (read-only) ไม่แก้ (นอกขอบเขต)
+
+### B. DateField คืนปฏิทิน native + คง dd/mm/yyyy
+- เขียน `components/DateField.tsx` ใหม่ (Props เดิม → caller 4 จุดไม่ต้องแก้): native `<input type=date>` opacity:0 ทับด้านบน
+  (tap → เปิดปฏิทิน OS เหมือนเดิม) + ชั้นข้อความ `formatDMY` โชว์ dd/mm/yyyy ด้านหลัง + `IconCalendar` (เพิ่มใหม่ใน icons)
+- `showPicker()` ใน onClick (try/catch) เป็นของแถมเดสก์ท็อป; `colorScheme:'dark'` ให้ปฏิทินเข้าธีม
+- ทิ้ง dropdown 3 ช่องเดิม (select/pad/daysInMonth/years/emit/useMemo)
+- ทดสอบ: build+lint ผ่าน (Playwright MCP หลุด session นี้ → manual/device verify ตอนใช้งานจริง)
 
 ---
 

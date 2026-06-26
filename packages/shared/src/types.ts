@@ -33,12 +33,14 @@ export interface Program {
 }
 
 export interface WorkoutSet {
+  id?: string
   w: number
   r: number
   done: boolean
 }
 
 export interface WorkoutExercise {
+  id?: string
   exerciseId: string
   sets: WorkoutSet[]
   isMain?: boolean
@@ -110,6 +112,7 @@ export type DayStatus = 'not_started' | 'in_progress' | 'done'
 export type ProgramPhase = 'Accumulation' | 'Intensification' | 'Peaking' | 'Taper'
 
 export interface StructuredExercise {
+  id?: string
   exerciseId: string
   name: string
   type: 'main' | 'accessory'

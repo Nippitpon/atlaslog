@@ -27,6 +27,7 @@ export function AccessoryEditSheet({ accessories, onSave, onClose }: Props) {
     const ex = allExercises().find(e => e.id === pickedId)
     if (!ex) return
     const newEx: StructuredExercise = {
+      id: `ax${Date.now()}`,
       exerciseId: ex.id,
       name: ex.name,
       type: 'accessory',
@@ -66,7 +67,7 @@ export function AccessoryEditSheet({ accessories, onSave, onClose }: Props) {
                 </div>
               )}
               {list.map((ex, i) => (
-                <div key={i} style={{
+                <div key={ex.id ?? i} style={{
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '10px 0',
                   borderBottom: '1px solid var(--border)',

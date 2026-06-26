@@ -39,6 +39,10 @@ export const IconPlay = (p: IconProps) => <Icon {...p} fill="currentColor" strok
 export const IconPlus = (p: IconProps) => <Icon {...p} d={<><path d="M12 5v14"/><path d="M5 12h14"/></>} />
 export const IconCheck = (p: IconProps) => <Icon {...p} stroke={p.stroke ?? 3} d="M4 12l5 5L20 6" />
 export const IconX = (p: IconProps) => <Icon {...p} d={<><path d="M6 6l12 12"/><path d="M18 6L6 18"/></>} />
+export const IconCalendar = (p: IconProps) => <Icon {...p} d={<>
+  <rect x="3" y="4" width="18" height="17" rx="2"/>
+  <path d="M3 9h18"/><path d="M8 2v4"/><path d="M16 2v4"/>
+</>} />
 export const IconChevronRight = (p: IconProps) => <Icon {...p} d="M9 6l6 6-6 6" />
 export const IconChevronLeft = (p: IconProps) => <Icon {...p} d="M15 6l-6 6 6 6" />
 export const IconSearch = (p: IconProps) => <Icon {...p} d={<><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.5-4.5"/></>} />
