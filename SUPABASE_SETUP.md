@@ -297,8 +297,12 @@ create policy "authed read exercises" on public.exercises
   for select to authenticated using (true);
 ```
 
-**ขั้นที่ 2 — seed 1,324 แถว:** เปิดไฟล์ `supabase/seed/exercises.seed.sql` (auto-gen จาก
-`scripts/build-exercises.mjs`) → paste ทั้งหมดใน SQL Editor แล้ว Run (7 batch, `on conflict do nothing`)
+**ขั้นที่ 2 — seed 1,324 แถว (paste ทีละไฟล์):** เปิดไฟล์ `supabase/seed/exercises.seed.part01.sql`
+… ถึง `part07.sql` (auto-gen จาก `scripts/build-exercises.mjs`, ~120KB/ไฟล์) → paste **ทีละไฟล์**
+ใน SQL Editor แล้ว Run จนครบ 7 ไฟล์ (`on conflict do nothing` → รันซ้ำได้)
+
+> ⚠️ **อย่า paste ไฟล์รวม `exercises.seed.sql` (818KB) รวดเดียว** — SQL Editor ตัด string กลางแถว
+> ทำให้ขึ้น error `relation "…" does not exist`. ใช้ไฟล์ part แทน (หรือรันผ่าน `psql`/CLI ถ้าถนัด)
 
 **ขั้นที่ 3 — verify:**
 
