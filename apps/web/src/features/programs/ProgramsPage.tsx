@@ -239,7 +239,7 @@ export function ProgramsPage() {
                               </div>
                               <span className="pill" style={{ fontSize: 8, background: 'rgba(167,139,250,0.15)',
                                 borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }}>
-                                {sp.source === 'manual' ? 'CUSTOM' : 'EXCEL'}
+                                {sp.source === 'coach' ? 'FROM COACH' : sp.source === 'manual' ? 'CUSTOM' : 'EXCEL'}
                               </span>
                             </div>
                             <div style={{ fontSize: 12, color: 'var(--text-2)' }}>{sp.focus}</div>

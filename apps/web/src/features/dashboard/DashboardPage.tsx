@@ -28,6 +28,11 @@ function notificationText(n: { type: string; data: Record<string, unknown> | nul
     const name = (n.data?.program_name as string) || 'A program'
     return `${name} was shared with you`
   }
+  if (n.type === 'program_assigned') {
+    const coach = (n.data?.coach_email as string) || 'โค้ช'
+    const name = (n.data?.program_name as string) || 'a program'
+    return `${coach} ส่งโปรแกรม "${name}" ให้คุณ`
+  }
   return n.type
 }
 

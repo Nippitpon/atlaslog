@@ -1,8 +1,57 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-07-01 (รอบ 17 — ✅ SHIPPED: EXERCISES Library 1,324 ท่า + steps จาก ExerciseDB, deploy main แล้ว. GIF เลื่อน (CDN ตาย))
+> อัปเดตล่าสุด: 2026-07-01 (รอบ 18 — PLANNED: Web Push deploy/verify Part A + Part B cron เตือนวันซ้อม 08:00 ICT · ยังไม่ลงมือ)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-07-01 — รอบ 18 (PLANNED, ยังไม่ลงมือ): Web Push — deploy/verify Part A + Part B (cron เตือนวันซ้อม)
+
+รอบ 15 เขียน **Web Push Part A** ครบ (build ผ่าน) แต่ยังไม่ deploy/verify; **Part B (เตือนวันซ้อมอัตโนมัติ) ยังไม่ทำ**
+
+> 📝 แก้ความเข้าใจเดิม: โน้ตเก่าเขียน "free tier ไม่มี cron" — **ไม่จริง** Supabase มี **pg_cron + pg_net** ใช้ได้ทุก tier → Part B ทำได้
+
+### Part A — Deploy + Verify (push เมื่อมี event: coach link/accept)
+**A1. เจ้าของทำใน dashboard (checklist §2i):**
+1. รัน SQL §2i (สร้าง `push_subscriptions` + RLS own-row + index + `program_state.reminder_opt_in`)
+2. `supabase secrets set VAPID_JSON='<vapid-secret.local>'` + `CRON_SECRET='<สุ่มยาว>'`
+3. `supabase functions deploy send-push` + `supabase functions deploy coach`
+4. เพิ่ม `VITE_VAPID_PUBLIC_KEY` (จาก `apps/web/.env.local`) ใน Vercel → redeploy
+   (`vapid-secret.local` repo root มี keypair แล้ว, public key อยู่ใน .env.local แล้ว)
+
+**A2. Verify (หลัง A1):** subscribe บน Chrome → มี row ใน `push_subscriptions` + `reminder_opt_in=true`;
+event push จาก coach (add-athlete/accept) ระหว่าง 2 บัญชี เด้งจริง (title/body/คลิกเปิด url); manual
+`POST /send-push` (header `x-cron-secret`) เด้ง; iOS ต้อง Add-to-Home-Screen ก่อน; unsubscribe→row หาย, endpoint ตาย→auto-prune(404/410)
+
+### Part B — Cron เตือนวันซ้อม (โค้ดใหม่ + owner enable)
+**แนวคิดหลัก:** โครงสร้างโปรแกรม built-in (12-week) อยู่ใน JS ฝั่ง client เท่านั้น (edge/Deno เข้าไม่ถึง) →
+ให้ **client คำนวณวันซ้อม** เก็บเป็น weekday-set ใน `program_state`, edge แค่เช็ค "วันนี้ตรงไหม" (ครอบคลุม built-in+custom)
+
+- **B1. Client** — DB: `alter table program_state add column reminder_days text[] default '{}';` (เช่น `{Mon,Tue,Thu,Sat}`).
+  reuse logic `DashboardPage.tsx:140` (`todayReminder`) + `activeProgramInfo` (`:118-137`) → helper `activeTrainingWeekdays()`
+  (distinct `day.dayOfWeek` ของ current week). upsert `{user_id, reminder_days}` (แพตเทิร์น `setReminderOptIn` `pushApi.ts:53`,
+  ไม่ชน column อื่น) เมื่อเปิด toggle / active program/progress เปลี่ยน
+- **B2. Edge** `supabase/functions/send-reminders/index.ts` — auth `x-cron-secret` + service_role (แพตเทิร์น `send-push`);
+  logic: `today` = weekday ICT (UTC+7) → `program_state.select(user_id,reminder_days).eq(reminder_opt_in,true)` →
+  ถ้า `today ∈ reminder_days` → `sendPushToUser(admin, user_id, {title:'ถึงเวลาซ้อม 💪', url:'/', tag:'reminder'})`
+  (reuse `_shared/push.ts` มี prune แล้ว)
+- **B3. Cron (เจ้าของ enable, เพิ่มใน §2i)** — เปิด `pg_cron`+`pg_net` → job รายวัน **01:00 UTC = 08:00 ICT**:
+  `select cron.schedule('daily-training-reminders','0 1 * * *', $$ select net.http_post(url:='<proj>.supabase.co/functions/v1/send-reminders', headers:=jsonb_build_object('x-cron-secret','<CRON_SECRET>','Content-Type','application/json'), body:='{}'::jsonb); $$);`
+
+### ไฟล์ (Part B)
+ใหม่ `supabase/functions/send-reminders/index.ts`; แก้ `apps/web/src/lib/pushApi.ts` (หรือ `lib/reminderSchedule.ts` ใหม่),
+`features/dashboard/DashboardPage.tsx` หรือ `store/useProgramStore.ts` (trigger sync reminder_days), `SUPABASE_SETUP.md` §2i (column + cron).
+reuse: `_shared/push.ts`, `send-push/index.ts` (แพตเทิร์น auth/client), DashboardPage activeProgramInfo/todayReminder
+
+### Verify (Part B)
+1. build+lint ผ่าน 2. เปิด toggle → `program_state.reminder_days` ตรงวันซ้อม active program 3. ยิง `POST /send-reminders`
+ตรงๆ วันซ้อม→ได้ push, วันพัก→ไม่ได้ 4. ตั้ง cron → เช็ค `cron.job_run_details` + push เช้าถัดไป 5. opt-in=false / ไม่มี active program → ไม่ push
+
+### ข้อควรระวัง
+- Timezone สมมติทุกคน ICT (UTC+7) — cron ยิงเวลาเดียว; ถ้ามี user ต่าง tz ต้องเก็บ tz ต่อ user (นอก scope)
+- ไม่เช็ค "ซ้อมเสร็จยัง" (nudge ตอนเช้าก่อนซ้อม); weekday-set ไม่ผูก week-specific/done-state
+- Part A ต้อง deploy ก่อน Part B ถึง verify push ได้ (ใช้ pipeline push เดียวกัน)
 
 ---
 
