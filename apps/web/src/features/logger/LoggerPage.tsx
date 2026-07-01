@@ -4,6 +4,7 @@ import { useAppStore } from '../../store/useAppStore.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { getExercise, muscleColor } from '../../lib/utils.js'
 import { SwapSheet } from './SwapSheet.js'
+import { FinishReview } from './FinishReview.js'
 import {
   IconX, IconCheck, IconPlus, IconChevronLeft, IconChevronRight, IconSwap,
 } from '../../components/icons/index.js'
@@ -15,6 +16,7 @@ export function LoggerPage() {
   const [showSwap, setShowSwap] = useState(false)
   const [showAddExercise, setShowAddExercise] = useState(false)
   const [showCancel, setShowCancel] = useState(false)
+  const [reviewNow, setReviewNow] = useState<number | null>(null)
 
   // all hooks must be called before any early return
   const cur = workout?.exercises[workout.currentIdx]
@@ -26,7 +28,7 @@ export function LoggerPage() {
     return e ? e.sets : null
   }, [history, workout, cur])
 
-  if (!workout || !cur) return null  // AppShell handles FinishSummary modal
+  if (!workout || !cur) return null
 
   const exMeta = getExercise(cur.exerciseId)
 
@@ -64,7 +66,7 @@ export function LoggerPage() {
 
   const goToExercise = (idx: number) => updateWorkout({ ...workout, currentIdx: idx })
 
-  const handleFinish = () => { finishWorkout() }
+  const handleFinish = () => { setReviewNow(Date.now()) }
 
   const handleCancel = () => {
     cancelWorkout()
@@ -280,6 +282,15 @@ export function LoggerPage() {
             setShowAddExercise(false)
           }}
           onClose={() => setShowAddExercise(false)}
+        />
+      )}
+
+      {reviewNow !== null && (
+        <FinishReview
+          workout={workout}
+          now={reviewNow}
+          onCancel={() => setReviewNow(null)}
+          onConfirm={() => { finishWorkout(); navigate('/') }}
         />
       )}
 

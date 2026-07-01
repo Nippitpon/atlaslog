@@ -3,7 +3,6 @@ import { useLocation, Outlet, useNavigate, Navigate } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
 import { BottomNav } from './BottomNav.js'
-import { FinishSummary } from '../../features/logger/FinishSummary.js'
 import { PROGRAMS } from '../../lib/data.js'
 import { IconX, IconChevronRight } from '../icons/index.js'
 import { isSupabaseConfigured } from '../../lib/supabase.js'
@@ -11,7 +10,7 @@ import { isSupabaseConfigured } from '../../lib/supabase.js'
 export function AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { theme, showPicker, setShowPicker, startWorkout, finishedSession, setFinishedSession } = useAppStore()
+  const { theme, showPicker, setShowPicker, startWorkout } = useAppStore()
   const { user, initialized, init } = useAuthStore()
 
   useEffect(() => { if (isSupabaseConfigured) init() }, [init])
@@ -92,13 +91,6 @@ export function AppShell() {
             </div>
           </div>
         </div>
-      )}
-
-      {finishedSession && (
-        <FinishSummary
-          session={finishedSession}
-          onDone={() => { setFinishedSession(null); navigate('/') }}
-        />
       )}
 
       <div className="home-indicator">

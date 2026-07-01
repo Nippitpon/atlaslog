@@ -12,7 +12,6 @@ interface AppStore {
   history: Session[]
   workout: Workout | null
   showPicker: boolean
-  finishedSession: Session | null
   personalOneRMs: OneRMs
   bio: UserBio
   bodyMetrics: BodyMetricEntry[]
@@ -22,7 +21,6 @@ interface AppStore {
   setTheme: (t: 'dark' | 'light') => void
   setWorkout: (w: Workout | null) => void
   setShowPicker: (v: boolean) => void
-  setFinishedSession: (s: Session | null) => void
   setPersonalOneRMs: (v: OneRMs) => void
   setBio: (v: UserBio) => void
   setHistory: (sessions: Session[]) => void
@@ -52,7 +50,6 @@ export const useAppStore = create<AppStore>()(
       history: makeSeedHistory(),
       workout: null,
       showPicker: false,
-      finishedSession: null,
       personalOneRMs: { squat: 0, bench: 0, deadlift: 0 },
       bio: {},
       bodyMetrics: [],
@@ -62,7 +59,6 @@ export const useAppStore = create<AppStore>()(
       setTheme: (theme) => set({ theme }),
       setWorkout: (workout) => set({ workout }),
       setShowPicker: (showPicker) => set({ showPicker }),
-      setFinishedSession: (finishedSession) => set({ finishedSession }),
       setPersonalOneRMs: (personalOneRMs) => {
         set({ personalOneRMs })
         useProgramStore.getState().syncSettings()
@@ -118,7 +114,7 @@ export const useAppStore = create<AppStore>()(
           setCount,
           exercises: workout.exercises,
         }
-        set({ history: [session, ...history], workout: null, finishedSession: session })
+        set({ history: [session, ...history], workout: null })
 
         // Sync to cloud; queues for retry if offline / not signed in
         void syncSession(session)
