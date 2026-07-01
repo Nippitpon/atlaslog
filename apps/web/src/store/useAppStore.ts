@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Session, Workout, Program, BodyMetricEntry, RunEntry, Exercise, UserBio } from '@atlaslog/shared'
-import { makeSeedHistory, setCustomExercisesRegistry } from '../lib/data.js'
+import { makeSeedHistory, setCustomExercisesRegistry, setDbExercisesRegistry } from '../lib/data.js'
 import { useProgramStore } from './useProgramStore.js'
 import { syncSession, syncBodyMetric, syncBodyMetricDelete, syncRun, syncRunDelete, syncExercise, syncExerciseDelete } from '../lib/syncQueue.js'
 
@@ -17,6 +17,7 @@ interface AppStore {
   bodyMetrics: BodyMetricEntry[]
   runs: RunEntry[]
   customExercises: Exercise[]
+  dbExercises: Exercise[]
 
   setTheme: (t: 'dark' | 'light') => void
   setWorkout: (w: Workout | null) => void
@@ -40,6 +41,7 @@ interface AppStore {
   addCustomExercise: (ex: Exercise) => void
   removeCustomExercise: (id: string) => void
   setCustomExercises: (list: Exercise[]) => void
+  setDbExercises: (list: Exercise[]) => void
   clearMetrics: () => void
 }
 
@@ -55,6 +57,7 @@ export const useAppStore = create<AppStore>()(
       bodyMetrics: [],
       runs: [],
       customExercises: [],
+      dbExercises: [],
 
       setTheme: (theme) => set({ theme }),
       setWorkout: (workout) => set({ workout }),
@@ -171,6 +174,10 @@ export const useAppStore = create<AppStore>()(
       setCustomExercises: (list) => {
         setCustomExercisesRegistry(list)
         set({ customExercises: list })
+      },
+      setDbExercises: (list) => {
+        setDbExercisesRegistry(list)
+        set({ dbExercises: list })
       },
 
       clearMetrics: () => {

@@ -1,38 +1,73 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Exercise } from '@atlaslog/shared'
 import { EXERCISES, MUSCLE_GROUPS, EXERCISE_GROUPS, EQUIPMENT_OPTIONS, makeExerciseId } from '../../lib/data.js'
-import { muscleColor } from '../../lib/utils.js'
+import { muscleColor, exerciseGifUrl } from '../../lib/utils.js'
 import { useAppStore } from '../../store/useAppStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
 import { IconSearch, IconX, IconDumbbell, IconChevronRight, IconPlus, IconTrash, IconCheck } from '../../components/icons/index.js'
 
-const BUILTIN_IDS = new Set(EXERCISES.map(e => e.id))
+const PAGE = 50
+
+// GIF thumbnail with graceful fallback to the dumbbell icon (offline / missing media).
+function ExThumb({ ex, size }: { ex: Exercise; size: number }) {
+  const [err, setErr] = useState(false)
+  const url = exerciseGifUrl(ex.gifPath)
+  const color = muscleColor(ex.group)
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: 12, flexShrink: 0, overflow: 'hidden',
+      background: `${color}18`, border: `1px solid ${color}40`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', color,
+    }}>
+      {url && !err
+        ? <img src={url} alt="" loading="lazy" onError={() => setErr(true)}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        : <IconDumbbell size={Math.round(size * 0.45)} />}
+    </div>
+  )
+}
 
 export function LibraryPage() {
   const navigate = useNavigate()
-  const { workout, addExerciseToWorkout, customExercises, addCustomExercise, removeCustomExercise } = useAppStore()
+  const { customExercises, dbExercises, addCustomExercise, removeCustomExercise } = useAppStore()
   const { isCoach, isAdmin } = useAuthStore()
   const canManage = isCoach || isAdmin
 
   const [q, setQ] = useState('')
   const [group, setGroup] = useState('All')
-  const [selected, setSelected] = useState<Exercise | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+  const [visible, setVisible] = useState(PAGE)
 
-  const allExercises = useMemo(() => [...EXERCISES, ...customExercises], [customExercises])
-  const filtered = allExercises.filter(e => {
+  const allEx = useMemo(() => [...EXERCISES, ...dbExercises, ...customExercises], [dbExercises, customExercises])
+  const customIds = useMemo(() => new Set(customExercises.map(e => e.id)), [customExercises])
+  const filtered = useMemo(() => allEx.filter(e => {
     const okG = group === 'All' || e.group === group
     const okQ = e.name.toLowerCase().includes(q.toLowerCase())
     return okG && okQ
-  })
+  }), [allEx, group, q])
 
-  const handleAddToWorkout = () => {
-    if (!selected) return
-    addExerciseToWorkout(selected.id)
-    setSelected(null)
-    navigate('/workout')
+  // Reset incremental window when the filter changes (adjust-state-during-render).
+  const filterKey = `${q}|${group}`
+  const [prevKey, setPrevKey] = useState(filterKey)
+  if (filterKey !== prevKey) {
+    setPrevKey(filterKey)
+    setVisible(PAGE)
   }
+
+  // Load more as the sentinel scrolls into view.
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const io = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) setVisible(v => Math.min(v + PAGE, filtered.length))
+    }, { rootMargin: '400px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [filtered.length])
+
+  const shown = filtered.slice(0, visible)
 
   const handleDelete = (ex: Exercise) => {
     if (window.confirm(`Delete "${ex.name}" from the library?`)) removeCustomExercise(ex.id)
@@ -42,7 +77,7 @@ export function LibraryPage() {
     <div className="atlas-screen screen-enter">
       <div className="scr-header">
         <div>
-          <div className="sub">{allExercises.length} EXERCISES</div>
+          <div className="sub">{allEx.length} EXERCISES</div>
           <h1>Library</h1>
         </div>
         {canManage && (
@@ -77,27 +112,19 @@ export function LibraryPage() {
           <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted)', fontSize: 13 }}>No matches.</div>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {filtered.map(ex => {
-            const custom = !BUILTIN_IDS.has(ex.id)
+          {shown.map(ex => {
+            const custom = customIds.has(ex.id)
             return (
               <div key={ex.id} style={{
                 display: 'flex', alignItems: 'center', gap: 14,
                 padding: 12, background: 'var(--surface-1)',
                 border: '1px solid var(--border)', borderRadius: 14,
               }}>
-                <button onClick={() => setSelected(ex)} style={{
+                <button onClick={() => navigate(`/library/${ex.id}`)} style={{
                   all: 'unset', cursor: 'pointer', flex: 1, minWidth: 0,
                   display: 'flex', alignItems: 'center', gap: 14,
                 }}>
-                  <div style={{
-                    width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-                    background: `${muscleColor(ex.group)}18`,
-                    border: `1px solid ${muscleColor(ex.group)}40`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: muscleColor(ex.group),
-                  }}>
-                    <IconDumbbell size={20} />
-                  </div>
+                  <ExThumb ex={ex} size={44} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 15 }}>{ex.name}</span>
@@ -120,51 +147,18 @@ export function LibraryPage() {
             )
           })}
         </div>
+        {visible < filtered.length && (
+          <div ref={sentinelRef} style={{ height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 11 }}>
+            Loading more…
+          </div>
+        )}
+        <div style={{ textAlign: 'center', padding: '24px 0 8px', color: 'var(--muted)', fontSize: 10, lineHeight: 1.5 }}>
+          Exercise data &amp; media: ExerciseDB / AscendAPI
+        </div>
       </div>
 
-      {/* Exercise action sheet */}
-      {selected && (
-        <div className="sheet-backdrop" onClick={() => setSelected(null)}>
-          <div className="sheet" onClick={e => e.stopPropagation()}>
-            <div className="sheet-handle" />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
-              <div style={{
-                width: 48, height: 48, borderRadius: 14,
-                background: `${muscleColor(selected.group)}18`,
-                border: `1px solid ${muscleColor(selected.group)}40`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: muscleColor(selected.group), flexShrink: 0,
-              }}>
-                <IconDumbbell size={22} />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18 }}>{selected.name}</div>
-                <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2, textTransform: 'uppercase' }}>
-                  {selected.group}{selected.equipment ? ` · ${selected.equipment}` : ''}
-                </div>
-              </div>
-            </div>
-
-            {workout ? (
-              <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleAddToWorkout}>
-                <IconPlus size={18} stroke={2.5} /> Add to current workout
-              </button>
-            ) : (
-              <>
-                <p style={{ margin: '0 0 12px', color: 'var(--text-2)', fontSize: 13, lineHeight: 1.5 }}>
-                  เริ่มซ้อมก่อนเพื่อเพิ่มท่านี้เข้าเซสชัน (จะถูกบันทึกใน History) หรือเพิ่มล่วงหน้าในวันซ้อมผ่านหน้า Programs
-                </p>
-                <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => { setSelected(null); navigate('/programs') }}>
-                  Go to Programs
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
       {showCreate && <CreateExerciseSheet
-        takenIds={new Set(allExercises.map(e => e.id))}
+        takenIds={new Set(allEx.map(e => e.id))}
         onCreate={ex => { addCustomExercise(ex); setShowCreate(false) }}
         onClose={() => setShowCreate(false)}
       />}

@@ -3,6 +3,12 @@ export interface Exercise {
   name: string
   group: string
   equipment: string
+  // Extended fields from the ExerciseDB dataset (Phase 6). All optional so the
+  // 19 builtin + custom exercises stay valid.
+  target?: string
+  secondaryMuscles?: string[]
+  instructions?: string[]
+  gifPath?: string
 }
 
 export interface AdminUser {

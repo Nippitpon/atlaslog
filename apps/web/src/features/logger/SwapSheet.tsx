@@ -12,7 +12,9 @@ interface SwapSheetProps {
 
 export function SwapSheet({ current, title = 'Swap Exercise', onPick, onClose }: SwapSheetProps) {
   const [q, setQ] = useState('')
-  const filtered = allExercises().filter(e => e.name.toLowerCase().includes(q.toLowerCase()))
+  const CAP = 80
+  const matches = allExercises().filter(e => e.name.toLowerCase().includes(q.toLowerCase()))
+  const filtered = matches.slice(0, CAP)
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
@@ -55,6 +57,11 @@ export function SwapSheet({ current, title = 'Swap Exercise', onPick, onClose }:
               </div>
             </button>
           ))}
+          {matches.length > CAP && (
+            <div style={{ textAlign: 'center', padding: '12px 20px', color: 'var(--muted)', fontSize: 11 }}>
+              +{matches.length - CAP} more — refine your search
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -40,13 +40,16 @@ async function loadIsCoach(userId: string, role: string): Promise<boolean> {
 }
 
 async function loadUserData(userId: string) {
-  const [sessionsRes, programsRes, stateRes, bodyRes, runsRes, exRes] = await Promise.all([
+  const [sessionsRes, programsRes, stateRes, bodyRes, runsRes, exRes, dbExRes] = await Promise.all([
     supabase.from('sessions').select('*').eq('user_id', userId).order('date', { ascending: false }),
     supabase.from('custom_programs').select('*').eq('user_id', userId),
     supabase.from('program_state').select('*').eq('user_id', userId).maybeSingle(),
     supabase.from('body_metrics').select('*').eq('user_id', userId).order('date', { ascending: false }),
     supabase.from('runs').select('*').eq('user_id', userId).order('date', { ascending: false }),
     supabase.from('custom_exercises').select('*').order('created_at', { ascending: true }),
+    // Library dataset (Phase 6): lightweight columns only — instructions/secondary
+    // are fetched on-demand in the exercise detail page.
+    supabase.from('exercises').select('id,name,muscle_group,equipment,target,gif_path'),
   ])
   if (sessionsRes.data) {
     useAppStore.getState().setHistory(
@@ -112,6 +115,19 @@ async function loadUserData(userId: string) {
         name: r.name,
         group: r.muscle_group,
         equipment: r.equipment ?? '',
+      }))
+    )
+  }
+  if (dbExRes.data) {
+    useAppStore.getState().setDbExercises(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (dbExRes.data as any[]).map(r => ({
+        id: r.id,
+        name: r.name,
+        group: r.muscle_group,
+        equipment: r.equipment ?? '',
+        target: r.target ?? undefined,
+        gifPath: r.gif_path ?? undefined,
       }))
     )
   }

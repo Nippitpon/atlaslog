@@ -319,9 +319,11 @@ function ExercisePicker({ onPick, onClose }: { onPick: (ex: StructuredExercise) 
 
   const groups = ['All', ...Array.from(new Set(allExercises().map(e => e.group)))]
 
-  const filtered = allExercises().filter(e =>
+  const CAP = 80
+  const matches = allExercises().filter(e =>
     (e.name.toLowerCase().includes(search.toLowerCase()) || e.group.toLowerCase().includes(search.toLowerCase()))
     && (groupFilter === 'All' || e.group === groupFilter))
+  const filtered = matches.slice(0, CAP)
 
   // Group the filtered exercises by muscle group, preserving encounter order.
   const groupedList = filtered.reduce<{ group: string; items: typeof filtered }[]>((acc, ex) => {
@@ -404,6 +406,11 @@ function ExercisePicker({ onPick, onClose }: { onPick: (ex: StructuredExercise) 
               ))}
             </div>
           ))}
+          {matches.length > CAP && (
+            <div style={{ textAlign: 'center', padding: '12px 4px', color: 'var(--muted)', fontSize: 11 }}>
+              +{matches.length - CAP} more — refine your search
+            </div>
+          )}
         </div>
 
         {pickedId && (

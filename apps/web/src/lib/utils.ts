@@ -1,5 +1,5 @@
 import type { Session } from '@atlaslog/shared'
-import { EXERCISES, CUSTOM_EXERCISES } from './data.js'
+import { EXERCISES, CUSTOM_EXERCISES, DB_EXERCISES } from './data.js'
 
 export function weeklyVolume(history: Session[]) {
   const today = new Date()
@@ -30,8 +30,15 @@ export function weeklyVolume(history: Session[]) {
 
 export function getExercise(id: string) {
   return EXERCISES.find(e => e.id === id)
+    ?? DB_EXERCISES.find(e => e.id === id)
     ?? CUSTOM_EXERCISES.find(e => e.id === id)
     ?? { id, name: 'Exercise', group: '', equipment: '' }
+}
+
+// ExerciseDB media CDN. gifPath is the record's media_id (e.g. "2gPfomN").
+// Single place that builds the URL so we can swap host later.
+export function exerciseGifUrl(gifPath?: string): string | null {
+  return gifPath ? `https://static.exercisedb.dev/media/${gifPath}.gif` : null
 }
 
 // Absolute calendar date as DD/MM/YYYY — app-wide format. Year is C.E. (ค.ศ.).
@@ -68,7 +75,7 @@ export function programVolume(prog: { exercises: { sets: { w: number; r: number 
 export function muscleColor(group: string) {
   const map: Record<string, string> = {
     Chest: '#ff6b6b', Back: '#4ecdc4', Legs: '#ffd93d',
-    Shoulders: '#a78bfa', Arms: '#3aaaff', Core: '#ff9b3a',
+    Shoulders: '#a78bfa', Arms: '#3aaaff', Core: '#ff9b3a', Other: '#7a8a99',
   }
   return map[group] ?? '#888'
 }
