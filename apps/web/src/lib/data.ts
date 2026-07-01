@@ -22,7 +22,7 @@ export const EXERCISES: Exercise[] = [
   { id: 'cable-crunch', name: 'Cable Crunch', group: 'Core', equipment: 'Cable' },
 ]
 
-export const MUSCLE_GROUPS = ['All', 'Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core']
+export const MUSCLE_GROUPS = ['All', 'Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Other']
 
 // Groups selectable when creating an exercise (no "All")
 export const EXERCISE_GROUPS = MUSCLE_GROUPS.filter(g => g !== 'All')
@@ -33,7 +33,13 @@ export const EQUIPMENT_OPTIONS = ['Barbell', 'Dumbbell', 'Cable', 'Machine', 'Bo
 // here as a live binding so non-React helpers (getExercise) resolve them too.
 export let CUSTOM_EXERCISES: Exercise[] = []
 export function setCustomExercisesRegistry(list: Exercise[]) { CUSTOM_EXERCISES = list }
-export function allExercises(): Exercise[] { return [...EXERCISES, ...CUSTOM_EXERCISES] }
+
+// ExerciseDB dataset (Phase 6), fetched from Supabase on auth init. Same live-binding
+// pattern as CUSTOM_EXERCISES so getExercise() resolves db-* ids synchronously.
+export let DB_EXERCISES: Exercise[] = []
+export function setDbExercisesRegistry(list: Exercise[]) { DB_EXERCISES = list }
+
+export function allExercises(): Exercise[] { return [...EXERCISES, ...DB_EXERCISES, ...CUSTOM_EXERCISES] }
 
 // Build a unique kebab-case id from a name, avoiding ids already taken
 export function makeExerciseId(name: string, taken: Set<string>): string {

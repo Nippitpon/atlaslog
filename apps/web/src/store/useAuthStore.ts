@@ -39,14 +39,34 @@ async function loadIsCoach(userId: string, role: string): Promise<boolean> {
   return (count ?? 0) > 0
 }
 
+// PostgREST returns at most 1000 rows/request — page through the whole table.
+async function fetchAllExercises() {
+  const PAGE = 1000
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const all: any[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('exercises')
+      .select('id,name,muscle_group,equipment,target,gif_path')
+      .order('id', { ascending: true })
+      .range(from, from + PAGE - 1)
+    if (error || !data || data.length === 0) break
+    all.push(...data)
+    if (data.length < PAGE) break
+  }
+  return all
+}
+
 async function loadUserData(userId: string) {
-  const [sessionsRes, programsRes, stateRes, bodyRes, runsRes, exRes] = await Promise.all([
+  const [sessionsRes, programsRes, stateRes, bodyRes, runsRes, exRes, dbExRes] = await Promise.all([
     supabase.from('sessions').select('*').eq('user_id', userId).order('date', { ascending: false }),
     supabase.from('custom_programs').select('*').eq('user_id', userId),
     supabase.from('program_state').select('*').eq('user_id', userId).maybeSingle(),
     supabase.from('body_metrics').select('*').eq('user_id', userId).order('date', { ascending: false }),
     supabase.from('runs').select('*').eq('user_id', userId).order('date', { ascending: false }),
     supabase.from('custom_exercises').select('*').order('created_at', { ascending: true }),
+    // Library dataset (Phase 6): paginated (PostgREST caps at 1000 rows/request).
+    fetchAllExercises(),
   ])
   if (sessionsRes.data) {
     useAppStore.getState().setHistory(
@@ -112,6 +132,19 @@ async function loadUserData(userId: string) {
         name: r.name,
         group: r.muscle_group,
         equipment: r.equipment ?? '',
+      }))
+    )
+  }
+  if (dbExRes.length) {
+    useAppStore.getState().setDbExercises(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (dbExRes as any[]).map(r => ({
+        id: r.id,
+        name: r.name,
+        group: r.muscle_group,
+        equipment: r.equipment ?? '',
+        target: r.target ?? undefined,
+        gifPath: r.gif_path ?? undefined,
       }))
     )
   }

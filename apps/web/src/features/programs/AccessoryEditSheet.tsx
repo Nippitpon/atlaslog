@@ -40,10 +40,12 @@ export function AccessoryEditSheet({ accessories, onSave, onClose }: Props) {
     setSearch('')
   }
 
-  const filtered = allExercises().filter(e =>
+  const CAP = 80
+  const matches = allExercises().filter(e =>
     e.name.toLowerCase().includes(search.toLowerCase()) ||
     e.group.toLowerCase().includes(search.toLowerCase())
   )
+  const filtered = matches.slice(0, CAP)
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
@@ -148,6 +150,11 @@ export function AccessoryEditSheet({ accessories, onSave, onClose }: Props) {
                   {pickedId === ex.id && <IconCheck size={16} style={{ color: 'var(--accent)' }} />}
                 </button>
               ))}
+              {matches.length > CAP && (
+                <div style={{ textAlign: 'center', padding: '12px 4px', color: 'var(--muted)', fontSize: 11 }}>
+                  +{matches.length - CAP} more — refine your search
+                </div>
+              )}
             </div>
 
             {pickedId && (

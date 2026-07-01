@@ -270,6 +270,51 @@ alter table public.program_state add column if not exists reminder_opt_in boolea
 supabase functions deploy coach
 ```
 
+## 2j. Exercises Library dataset (Phase 6 / รอบ 17) — 1,324 ท่า + GIF (2026-07-01)
+
+> ขยาย Library เป็น 1,324 ท่าจาก ExerciseDB (`hasaneyldrm/exercises-dataset`) เก็บใน cloud,
+> ทุกคน (authenticated) อ่านได้ (read-only, ไม่มี write policy). 19 ท่า builtin เดิมยังอยู่ local
+> ใน `data.ts` (ไม่ต้อง seed ซ้ำ) → ตารางนี้เก็บเฉพาะ 1,324 ท่า namespace `db-<id>` กันชน ID เดิม.
+> Media (GIF) ไม่เก็บในตาราง — เก็บ `gif_path` = ExerciseDB `media_id` แล้วประกอบ URL
+> `static.exercisedb.dev/media/{gif_path}.gif` ฝั่ง client (`exerciseGifUrl()`). License: non-commercial.
+
+**ขั้นที่ 1 — สร้างตาราง + RLS (SQL Editor):**
+
+```sql
+create table public.exercises (
+  id text primary key,
+  name text not null,
+  muscle_group text not null,
+  equipment text,
+  target text,
+  secondary_muscles text[],
+  instructions text[],
+  gif_path text,
+  created_at timestamptz default now()
+);
+alter table public.exercises enable row level security;
+create policy "authed read exercises" on public.exercises
+  for select to authenticated using (true);
+```
+
+**ขั้นที่ 2 — seed 1,324 แถว (paste ทีละไฟล์):** เปิดไฟล์ `supabase/seed/exercises.seed.part01.sql`
+… ถึง `part14.sql` (auto-gen จาก `scripts/build-exercises.mjs`, ~62KB/ไฟล์ = 100 แถว) → paste
+**ทีละไฟล์** ใน SQL Editor แล้ว Run จนครบ 14 ไฟล์ (`on conflict do nothing` → รันซ้ำได้)
+
+> ⚠️ **อย่า paste ไฟล์รวม `exercises.seed.sql` (818KB) รวดเดียว** — SQL Editor มีลิมิตความยาว paste
+> (~120KB) → ตัด string กลางแถว → error `relation "…" does not exist`. ไฟล์ part ทำมาเล็กกว่าลิมิต
+> (แต่ละไฟล์รันเดี่ยวได้). ถ้าถนัด `psql`/CLI จะรันไฟล์รวมทีเดียวก็ได้
+
+**ขั้นที่ 3 — verify:**
+
+```sql
+select count(*) from public.exercises;                -- = 1324
+select muscle_group, count(*) from public.exercises group by 1 order by 2 desc;
+```
+
+> ถ้าต้อง re-gen seed หลัง dataset อัปเดต: clone `hasaneyldrm/exercises-dataset` แล้ว
+> `node scripts/build-exercises.mjs <path/to/data/exercises.json>` → commit ไฟล์ seed ใหม่
+
 ## 3. Get API Keys
 
 ไปที่ **Settings → API**:
