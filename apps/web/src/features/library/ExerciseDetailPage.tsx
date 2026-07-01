@@ -6,6 +6,10 @@ import { useAppStore } from '../../store/useAppStore.js'
 import { IconChevronLeft, IconDumbbell, IconPlus } from '../../components/icons/index.js'
 
 interface FullRow {
+  name?: string
+  group?: string
+  equipment?: string
+  gifPath?: string
   instructions?: string[]
   secondaryMuscles?: string[]
   target?: string
@@ -16,10 +20,9 @@ export function ExerciseDetailPage() {
   const navigate = useNavigate()
   const { workout, addExerciseToWorkout } = useAppStore()
 
+  // Registry lookup is instant when arriving from the list; the full-row fetch
+  // below makes the page self-sufficient on a direct/hard load too.
   const meta = getExercise(exerciseId)
-  const color = muscleColor(meta.group)
-  const gif = exerciseGifUrl(meta.gifPath)
-
   const [full, setFull] = useState<FullRow | null>(null)
   const [gifErr, setGifErr] = useState(false)
 
@@ -28,13 +31,17 @@ export function ExerciseDetailPage() {
     void (async () => {
       const { data } = await supabase
         .from('exercises')
-        .select('instructions,secondary_muscles,target')
+        .select('*')
         .eq('id', exerciseId)
         .maybeSingle()
       if (!active || !data) return
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const r = data as any
       setFull({
+        name: r.name ?? undefined,
+        group: r.muscle_group ?? undefined,
+        equipment: r.equipment ?? undefined,
+        gifPath: r.gif_path ?? undefined,
         instructions: r.instructions ?? undefined,
         secondaryMuscles: r.secondary_muscles ?? undefined,
         target: r.target ?? undefined,
@@ -43,6 +50,11 @@ export function ExerciseDetailPage() {
     return () => { active = false }
   }, [exerciseId])
 
+  const name = full?.name ?? meta.name
+  const group = full?.group ?? meta.group
+  const equipment = full?.equipment ?? meta.equipment
+  const color = muscleColor(group)
+  const gif = exerciseGifUrl(full?.gifPath ?? meta.gifPath)
   const target = full?.target ?? meta.target
   const secondary = full?.secondaryMuscles ?? meta.secondaryMuscles ?? []
   const steps = full?.instructions ?? meta.instructions ?? []
@@ -69,17 +81,17 @@ export function ExerciseDetailPage() {
           marginBottom: 18,
         }}>
           {gif && !gifErr
-            ? <img src={gif} alt={meta.name} loading="lazy" onError={() => setGifErr(true)}
+            ? <img src={gif} alt={name} loading="lazy" onError={() => setGifErr(true)}
                 style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             : <IconDumbbell size={72} />}
         </div>
 
-        <h1 className="t-display" style={{ fontSize: 24, margin: '0 0 8px', letterSpacing: '-0.02em' }}>{meta.name}</h1>
+        <h1 className="t-display" style={{ fontSize: 24, margin: '0 0 8px', letterSpacing: '-0.02em' }}>{name}</h1>
 
         {/* Tags */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
-          <span className="pill pill-active" style={{ background: color, borderColor: color, color: '#0a0a0a' }}>{meta.group}</span>
-          {meta.equipment && <span className="pill">{meta.equipment}</span>}
+          {group && <span className="pill pill-active" style={{ background: color, borderColor: color, color: '#0a0a0a' }}>{group}</span>}
+          {equipment && <span className="pill">{equipment}</span>}
           {target && <span className="pill">🎯 {target}</span>}
         </div>
 

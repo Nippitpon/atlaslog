@@ -36,9 +36,13 @@ export function getExercise(id: string) {
 }
 
 // ExerciseDB media CDN. gifPath is the record's media_id (e.g. "2gPfomN").
-// Single place that builds the URL so we can swap host later.
+// NOTE: the documented host static.exercisedb.dev is currently NXDOMAIN (dead) —
+// the free ExerciseDB GIF CDN is no longer publicly resolvable. Media is disabled
+// until a working host is available; gif_path is still stored so we can flip this
+// on later by returning the URL. Single place that builds the URL.
+const MEDIA_HOST = '' // e.g. 'https://static.exercisedb.dev/media' once a host works
 export function exerciseGifUrl(gifPath?: string): string | null {
-  return gifPath ? `https://static.exercisedb.dev/media/${gifPath}.gif` : null
+  return MEDIA_HOST && gifPath ? `${MEDIA_HOST}/${gifPath}.gif` : null
 }
 
 // Absolute calendar date as DD/MM/YYYY — app-wide format. Year is C.E. (ค.ศ.).
