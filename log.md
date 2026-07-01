@@ -1,65 +1,52 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-30 (รอบ 17 — PLANNED: EXERCISES Library dataset migration 1,324 ท่า + GIF จาก ExerciseDB ยังไม่ลงมือ)
+> อัปเดตล่าสุด: 2026-07-01 (รอบ 17 — ✅ SHIPPED: EXERCISES Library 1,324 ท่า + steps จาก ExerciseDB, deploy main แล้ว. GIF เลื่อน (CDN ตาย))
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
 
 ---
 
-## 2026-06-30 — รอบ 17 (PLANNED, ยังไม่ลงมือ): EXERCISES Library dataset migration
+## 2026-07-01 — รอบ 17 (✅ SHIPPED, merge main `a5a3fb7` → Vercel): EXERCISES Library dataset migration
 
-นำ `hasaneyldrm/exercises-dataset` (ต้นฉบับ ExerciseDB v1, **1,324 ท่า** + GIF/รูปทุกท่า + คำอธิบาย 6 ภาษา)
-มาแทน Library เดิม (23 ท่า hardcode ใน `data.ts`, type แค่ `{id,name,group,equipment}`)
+ขยาย Library จาก **19 ท่า** hardcode (`data.ts`) → **19 builtin (local) + 1,324 ExerciseDB (`db-<id>`) + custom**
+เก็บใน Supabase table `exercises` พร้อมคำอธิบายทีละขั้น (steps). ต้นทาง `hasaneyldrm/exercises-dataset` (ExerciseDB v1).
 
-### dataset มีอะไร
-- ฟิลด์/record: `id` ("0001"), `name`, `category`/`body_part`, `equipment`, `target`, `muscle_group`,
-  `secondary_muscles[]`, `instructions` + `instruction_steps` (en/es/it/tr/ru/zh — **ไม่มีไทย**), `image`, `gif_url`, `created_at`
-- สื่อ: รูป+GIF 1,324 คู่ และมี CDN `static.exercisedb.dev/media/{id}.gif` (hotlink ได้ ไม่ต้อง host เอง)
-- License: **educational / non-commercial เท่านั้น** (สื่อเป็นลิขสิทธิ์ ExerciseDB/AscendAPI)
+### ทำจริง (4 phase A→B→C→D)
+- **A. ETL** `scripts/build-exercises.mjs`: อ่าน `data/exercises.json` (clone มาไว้ scratchpad) → เขียน
+  `supabase/seed/exercises.seed.sql` + `exercises.seed.part01..14.sql`. map `body_part`→กลุ่ม (+`Other`),
+  Title-Case equipment, `db-<id>`, ใช้ `instruction_steps.en`, `media_id`→`gif_path`.
+- **B. DB** `SUPABASE_SETUP.md §2j`: table `exercises` (id,name,muscle_group,equipment,target,
+  secondary_muscles[],instructions[],gif_path) + RLS `select to authenticated using(true)`. เจ้าของรัน SQL +
+  seed 14 ไฟล์ใน SQL Editor. **ไม่ seed 19 builtin** (อยู่ local แล้ว) → table = 1,324 แถวล้วน.
+- **C. Types/data** ขยาย `Exercise` (target/secondaryMuscles/instructions/gifPath optional); เพิ่ม `'Other'`
+  ใน MUSCLE_GROUPS + สีใน muscleColor; **`DB_EXERCISES` registry** (คู่ขนาน CUSTOM_EXERCISES) + `exerciseGifUrl()`;
+  `getExercise`/`allExercises` รวม db; fetch ใน `loadUserData` (paginate).
+- **D. UI** LibraryPage: incremental render (50/หน้า + IntersectionObserver) + GIF thumbnail (fallback icon) +
+  คลิก→ route `/library/:exerciseId` (`ExerciseDetailPage` ใหม่: GIF/steps/target/secondary, fetch full-row เอง);
+  SwapSheet/AccessoryEditSheet/CreateProgramPage ได้ชุดเต็มผ่าน `allExercises()` + cap 80 + hint; attribution.
 
-### การตัดสินใจ (ยืนยันกับเจ้าของแล้ว)
-- Storage = ตาราง Supabase `exercises` + TanStack Query (ไม่ bundle ใน JS); 23 ท่าเดิม = local fallback
-- Fields = ขยายเต็ม: เพิ่ม `target`, `secondaryMuscles`, `instructions`(en), `gifPath` (optional ทั้งหมด)
-- Media = ExerciseDB CDN ตรง; เก็บ `gif_path` relative, ประกอบ URL ด้วย helper จุดเดียว (ย้าย host ภายหลังได้)
-- การใช้งาน = ส่วนตัว/ทดลอง/non-commercial → CDN ได้ + ใส่ attribution
+### ต่างจากแผนเดิม (+เหตุผล)
+- fetch ใช้ **load-on-init + Zustand registry** ไม่ใช่ TanStack Query — `getExercise()` เป็น sync ใช้ทั่วแอป
+  ต้องมี registry พร้อมก่อน render (loadUserData await ก่อน initialized).
+- list ใช้ **incremental render** ไม่เพิ่ม react-window.
+- table เก็บเฉพาะ 1,324 (ไม่ seed builtin ซ้ำ).
 
-### ⚠️ ข้อห้าม
-- **ห้ามเปลี่ยน ID ของ 23 ท่าเดิม** (`squat`/`bench`/`deadlift` ฯลฯ) — programs ในตัว, `SBD_IDS` ใน
-  `WeekDetailPage.tsx`, history ทั้งหมดผูกกับ ID พวกนี้ → dataset ใช้ namespace `db-<id>` กันชน
-- group dataset (`waist`/`upper arms`/`upper legs`/`lower legs`/`lower arms`/`neck`/`cardio`) → map เป็น
-  `Chest/Back/Legs/Shoulders/Arms/Core` + เพิ่มกลุ่มใหม่ `Other` (neck/cardio)
-- equipment dataset lowercase → normalize Title Case ให้ตรง `EQUIPMENT_OPTIONS`
+### 🐛 bug/ข้อจำกัดที่เจอตอน verify (แก้แล้ว)
+- **PostgREST cap 1000 แถว/req** → `.select()` ได้แค่ 1000 → `fetchAllExercises()` (useAuthStore) วน `.range()` ดึงครบ.
+- **SQL Editor paste limit ~120KB** → seed แตกเป็น 14 ไฟล์ (100 แถว/ไฟล์). ไฟล์รวมไว้ใช้ psql/CLI. (error `relation "a"` = paste ถูกตัดกลางแถว)
+- **ExerciseDetailPage** ต้อง fetch full-row (`select *`) เอง เพื่อให้ hard-load ทำงาน (registry ยังไม่ warm).
 
-### ขั้นตอน (4 phase)
-- **A. ETL** — `scripts/build-exercises.mjs` (ไม่ ship): `data/exercises.json` → `exercises.seed.json`
-  map group/equipment, เก็บ `instruction_steps.en` เป็น `string[]`, ตัดภาษาอื่น 5 ภาษา + `created_at` + `image`
-- **B. DB** — migration `supabase/migrations/<ts>_exercises.sql`: ตาราง `exercises`
-  (`id, name, muscle_group, equipment, target, secondary_muscles[], instructions[], gif_path, is_builtin`)
-  + RLS `select to authenticated using (true)` (แพตเทิร์นเดียวกับ fix `shared_programs`); seed 23 builtin (id เดิม) + 1,324 (`db-xxxx`)
-  คง `custom_exercises` เดิมไว้
-- **C. Types/data** — ขยาย `Exercise` ใน `packages/shared/src/types.ts` (ฟิลด์ใหม่ optional);
-  เพิ่ม `'Other'` ใน `MUSCLE_GROUPS`; `exerciseGifUrl(gifPath)` + hook `useExercises()`
-  (`apps/web/src/lib/queries/useExercises.ts`, cache ยาว, merge custom, fallback 23 local); ปรับ `getExercise`/registry
-- **D. UI** — `LibraryPage`: ใช้ `useExercises()`, GIF thumbnail (`loading="lazy"`), pagination/virtualized (1,300+ ท่า),
-  group `Other`, detail page (GIF ใหญ่ + steps + target/secondary); SwapSheet/AccessoryEditSheet/CreateProgramPage ใช้ชุดเต็ม;
-  ใส่ attribution "Exercise data & media: ExerciseDB / AscendAPI"
+### ⚠️ GIF ปิดไว้ (deferred)
+CDN `static.exercisedb.dev` = **NXDOMAIN ทั้งโลก** (host ฟรีของ ExerciseDB ตายแล้ว; แม้แต่ API `oss.exercisedb.dev`
+ก็คืน URL ที่ชี้ไป host ตาย; cloudfront เก่าก็ตาย). `exerciseGifUrl()` คืน null ผ่าน `const MEDIA_HOST = ''` ใน `utils.ts`
+— แก้สตริงนี้เพื่อเปิดกลับถ้าเจอ host ที่ใช้ได้. `gif_path` (=media_id) เก็บใน table/registry พร้อมแล้ว. UI fallback ไอคอน.
 
-### ไฟล์ที่จะแตะ
-`scripts/build-exercises.mjs`(ใหม่), `supabase/migrations/<ts>_exercises.sql`(ใหม่),
-`packages/shared/src/types.ts`, `apps/web/src/lib/data.ts`, `apps/web/src/lib/utils.ts`,
-`apps/web/src/lib/queries/useExercises.ts`(ใหม่), `features/library/LibraryPage.tsx`,
-`features/logger/SwapSheet.tsx`, `features/programs/AccessoryEditSheet.tsx`, `features/programs/CreateProgramPage.tsx`
-
-### verify
-1. `pnpm build` + `pnpm lint` ผ่าน
-2. รัน migration → นับได้ ~1,347 แถว (23 + 1,324)
-3. `pnpm dev` → Library: filter ทุกกลุ่ม (รวม Other), ค้นหา, GIF โหลดจาก CDN, detail page โชว์ steps
-4. **Regression**: program 12-week + program ที่ import → ชื่อท่า resolve ถูก, SBD 1RM คำนวณน้ำหนักได้ (ไม่ทับ 23 ID เดิม)
-5. offline/Supabase ล่ม → fallback 23 ท่า local ไม่ crash
-6. ทดสอบ 390px (mobile-first)
+### verify (390px, Playwright) — ผ่าน, 0 console errors
+Library 1363, filter ทุกกลุ่ม (รวม Other 31), incremental scroll, detail page `db-0001` โชว์ steps/target/secondary,
+regression 12-week SBD (Back Squat 137.5 / Bench 90 / Deadlift 150 คำนวณจาก 1RM ถูก, ไม่ทับ ID เดิม). build+lint ผ่าน.
 
 ### ไม่ทำรอบนี้
-- ไม่แปล instructions เป็นไทย / ไม่ host รูปเอง / ไม่รวม 23 ท่าเดิมเข้ากับ dataset (ยอมให้ซ้ำเชิง concept)
+- GIF (host ตาย), ไม่แปล instructions เป็นไทย, ไม่ host รูปเอง, ไม่รวม 19 ท่าเดิมเข้า dataset
 
 ---
 
