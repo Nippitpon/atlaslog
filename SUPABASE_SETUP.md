@@ -298,11 +298,12 @@ create policy "authed read exercises" on public.exercises
 ```
 
 **ขั้นที่ 2 — seed 1,324 แถว (paste ทีละไฟล์):** เปิดไฟล์ `supabase/seed/exercises.seed.part01.sql`
-… ถึง `part07.sql` (auto-gen จาก `scripts/build-exercises.mjs`, ~120KB/ไฟล์) → paste **ทีละไฟล์**
-ใน SQL Editor แล้ว Run จนครบ 7 ไฟล์ (`on conflict do nothing` → รันซ้ำได้)
+… ถึง `part14.sql` (auto-gen จาก `scripts/build-exercises.mjs`, ~62KB/ไฟล์ = 100 แถว) → paste
+**ทีละไฟล์** ใน SQL Editor แล้ว Run จนครบ 14 ไฟล์ (`on conflict do nothing` → รันซ้ำได้)
 
-> ⚠️ **อย่า paste ไฟล์รวม `exercises.seed.sql` (818KB) รวดเดียว** — SQL Editor ตัด string กลางแถว
-> ทำให้ขึ้น error `relation "…" does not exist`. ใช้ไฟล์ part แทน (หรือรันผ่าน `psql`/CLI ถ้าถนัด)
+> ⚠️ **อย่า paste ไฟล์รวม `exercises.seed.sql` (818KB) รวดเดียว** — SQL Editor มีลิมิตความยาว paste
+> (~120KB) → ตัด string กลางแถว → error `relation "…" does not exist`. ไฟล์ part ทำมาเล็กกว่าลิมิต
+> (แต่ละไฟล์รันเดี่ยวได้). ถ้าถนัด `psql`/CLI จะรันไฟล์รวมทีเดียวก็ได้
 
 **ขั้นที่ 3 — verify:**
 

@@ -21,7 +21,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const INPUT = process.argv[2]
   ?? resolve(__dirname, '../exercises-dataset/data/exercises.json')
 const OUTPUT = resolve(__dirname, '../supabase/seed/exercises.seed.sql')
-const BATCH = 200
+const BATCH = 100
 
 const GROUP_MAP = {
   waist: 'Core',
