@@ -181,6 +181,35 @@ pnpm lint         # ESLint
 | 3.5 | Admin-confirms-users (signup approval gate) — done | Yes |
 | 4 | Social: coach-athlete + program sharing + in-app reminder | Yes |
 | 5 | Push notifications (Web Push / VAPID) — deferred | Yes |
+| 6 | EXERCISES Library dataset migration (1,324 ท่า + GIF) — planned | Yes |
+
+---
+
+## Phase 6 — EXERCISES Library Dataset Migration (planned)
+
+ขยาย Library จาก 23 ท่า (hardcode ใน `data.ts`) → ฐานข้อมูลจริง 1,324 ท่า จาก
+`hasaneyldrm/exercises-dataset` (ต้นฉบับ ExerciseDB v1) พร้อม GIF สาธิต + คำอธิบายทีละขั้น
+
+**การตัดสินใจที่ยืนยันแล้ว**
+- Storage: ตาราง Supabase `exercises` + ดึงผ่าน TanStack Query (ไม่ bundle ใน JS); 23 ท่าเดิมเป็น local fallback
+- Fields: ขยาย `Exercise` type เพิ่ม `target`, `secondaryMuscles`, `instructions` (en), `gifPath` (optional ทั้งหมด)
+- Media: ExerciseDB CDN ตรง (`static.exercisedb.dev/media/{id}.gif`) — เก็บ path relative, ประกอบ URL ด้วย `exerciseGifUrl()` จุดเดียว
+- License: non-commercial เท่านั้น → ใส่ attribution + ห้ามนำไปใช้เชิงพาณิชย์
+
+**ข้อห้าม / ข้อควรระวัง**
+- ⚠️ ห้ามเปลี่ยน ID ของ 23 ท่าเดิม (`squat`/`bench`/`deadlift` ฯลฯ) — programs, `SBD_IDS`, history ผูกอยู่
+  → dataset ใช้ namespace `db-<id>` กันชน
+- กลุ่มกล้ามเนื้อ dataset (`waist`/`upper arms`/`lower legs`/`neck`/`cardio` ฯลฯ) ต้อง map → `Chest/Back/Legs/Shoulders/Arms/Core/Other` (เพิ่มกลุ่ม `Other`)
+- equipment dataset เป็น lowercase → normalize เป็น Title Case ให้ตรง `EQUIPMENT_OPTIONS`
+- ไม่มีภาษาไทย → ใช้ instructions ภาษา en
+
+**ขั้นตอน**
+- A. ETL: `scripts/build-exercises.mjs` แปลง `data/exercises.json` → `exercises.seed.json` (map group/equipment, เก็บ `instruction_steps.en`, ตัดภาษาอื่น/created_at)
+- B. DB: migration `supabase/migrations/<ts>_exercises.sql` — ตาราง `exercises` (id, name, muscle_group, equipment, target, secondary_muscles[], instructions[], gif_path, is_builtin) + RLS `select to authenticated using (true)`; seed 23 builtin + 1,324
+- C. Types/data: ขยาย `Exercise` ใน `packages/shared/src/types.ts`; เพิ่ม `exerciseGifUrl()` + hook `useExercises()` (TanStack Query, fallback local 23); ปรับ `getExercise`/registry
+- D. UI: `LibraryPage` แสดง GIF thumbnail + pagination/virtualized + กลุ่ม `Other` + detail page (GIF ใหญ่ + steps); SwapSheet/AccessoryEditSheet/CreateProgramPage ใช้ชุดเต็ม; ใส่ attribution
+
+> รายละเอียดเต็ม + checklist verify อยู่ใน log.md (รอบ 17 — planned)
 
 > หมายเหตุ: "Phase 4" เดิมรวม push notifications ไว้ด้วย แต่ push ถูกแยกเป็น Phase 5 (ROI ต่ำ:
 > iOS ต้องติดตั้ง PWA ก่อน + free tier ไม่มี cron). Phase 4 ใช้ in-app reminder แทน (ฟรี)

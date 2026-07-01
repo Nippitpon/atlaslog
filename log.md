@@ -1,8 +1,65 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-06-26 (รอบ 16: muscle group ในหน้า Create Program (chips กรอง + จัดกลุ่ม list + โชว์ใน day rows) — build+lint ผ่าน)
+> อัปเดตล่าสุด: 2026-06-30 (รอบ 17 — PLANNED: EXERCISES Library dataset migration 1,324 ท่า + GIF จาก ExerciseDB ยังไม่ลงมือ)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-06-30 — รอบ 17 (PLANNED, ยังไม่ลงมือ): EXERCISES Library dataset migration
+
+นำ `hasaneyldrm/exercises-dataset` (ต้นฉบับ ExerciseDB v1, **1,324 ท่า** + GIF/รูปทุกท่า + คำอธิบาย 6 ภาษา)
+มาแทน Library เดิม (23 ท่า hardcode ใน `data.ts`, type แค่ `{id,name,group,equipment}`)
+
+### dataset มีอะไร
+- ฟิลด์/record: `id` ("0001"), `name`, `category`/`body_part`, `equipment`, `target`, `muscle_group`,
+  `secondary_muscles[]`, `instructions` + `instruction_steps` (en/es/it/tr/ru/zh — **ไม่มีไทย**), `image`, `gif_url`, `created_at`
+- สื่อ: รูป+GIF 1,324 คู่ และมี CDN `static.exercisedb.dev/media/{id}.gif` (hotlink ได้ ไม่ต้อง host เอง)
+- License: **educational / non-commercial เท่านั้น** (สื่อเป็นลิขสิทธิ์ ExerciseDB/AscendAPI)
+
+### การตัดสินใจ (ยืนยันกับเจ้าของแล้ว)
+- Storage = ตาราง Supabase `exercises` + TanStack Query (ไม่ bundle ใน JS); 23 ท่าเดิม = local fallback
+- Fields = ขยายเต็ม: เพิ่ม `target`, `secondaryMuscles`, `instructions`(en), `gifPath` (optional ทั้งหมด)
+- Media = ExerciseDB CDN ตรง; เก็บ `gif_path` relative, ประกอบ URL ด้วย helper จุดเดียว (ย้าย host ภายหลังได้)
+- การใช้งาน = ส่วนตัว/ทดลอง/non-commercial → CDN ได้ + ใส่ attribution
+
+### ⚠️ ข้อห้าม
+- **ห้ามเปลี่ยน ID ของ 23 ท่าเดิม** (`squat`/`bench`/`deadlift` ฯลฯ) — programs ในตัว, `SBD_IDS` ใน
+  `WeekDetailPage.tsx`, history ทั้งหมดผูกกับ ID พวกนี้ → dataset ใช้ namespace `db-<id>` กันชน
+- group dataset (`waist`/`upper arms`/`upper legs`/`lower legs`/`lower arms`/`neck`/`cardio`) → map เป็น
+  `Chest/Back/Legs/Shoulders/Arms/Core` + เพิ่มกลุ่มใหม่ `Other` (neck/cardio)
+- equipment dataset lowercase → normalize Title Case ให้ตรง `EQUIPMENT_OPTIONS`
+
+### ขั้นตอน (4 phase)
+- **A. ETL** — `scripts/build-exercises.mjs` (ไม่ ship): `data/exercises.json` → `exercises.seed.json`
+  map group/equipment, เก็บ `instruction_steps.en` เป็น `string[]`, ตัดภาษาอื่น 5 ภาษา + `created_at` + `image`
+- **B. DB** — migration `supabase/migrations/<ts>_exercises.sql`: ตาราง `exercises`
+  (`id, name, muscle_group, equipment, target, secondary_muscles[], instructions[], gif_path, is_builtin`)
+  + RLS `select to authenticated using (true)` (แพตเทิร์นเดียวกับ fix `shared_programs`); seed 23 builtin (id เดิม) + 1,324 (`db-xxxx`)
+  คง `custom_exercises` เดิมไว้
+- **C. Types/data** — ขยาย `Exercise` ใน `packages/shared/src/types.ts` (ฟิลด์ใหม่ optional);
+  เพิ่ม `'Other'` ใน `MUSCLE_GROUPS`; `exerciseGifUrl(gifPath)` + hook `useExercises()`
+  (`apps/web/src/lib/queries/useExercises.ts`, cache ยาว, merge custom, fallback 23 local); ปรับ `getExercise`/registry
+- **D. UI** — `LibraryPage`: ใช้ `useExercises()`, GIF thumbnail (`loading="lazy"`), pagination/virtualized (1,300+ ท่า),
+  group `Other`, detail page (GIF ใหญ่ + steps + target/secondary); SwapSheet/AccessoryEditSheet/CreateProgramPage ใช้ชุดเต็ม;
+  ใส่ attribution "Exercise data & media: ExerciseDB / AscendAPI"
+
+### ไฟล์ที่จะแตะ
+`scripts/build-exercises.mjs`(ใหม่), `supabase/migrations/<ts>_exercises.sql`(ใหม่),
+`packages/shared/src/types.ts`, `apps/web/src/lib/data.ts`, `apps/web/src/lib/utils.ts`,
+`apps/web/src/lib/queries/useExercises.ts`(ใหม่), `features/library/LibraryPage.tsx`,
+`features/logger/SwapSheet.tsx`, `features/programs/AccessoryEditSheet.tsx`, `features/programs/CreateProgramPage.tsx`
+
+### verify
+1. `pnpm build` + `pnpm lint` ผ่าน
+2. รัน migration → นับได้ ~1,347 แถว (23 + 1,324)
+3. `pnpm dev` → Library: filter ทุกกลุ่ม (รวม Other), ค้นหา, GIF โหลดจาก CDN, detail page โชว์ steps
+4. **Regression**: program 12-week + program ที่ import → ชื่อท่า resolve ถูก, SBD 1RM คำนวณน้ำหนักได้ (ไม่ทับ 23 ID เดิม)
+5. offline/Supabase ล่ม → fallback 23 ท่า local ไม่ crash
+6. ทดสอบ 390px (mobile-first)
+
+### ไม่ทำรอบนี้
+- ไม่แปล instructions เป็นไทย / ไม่ host รูปเอง / ไม่รวม 23 ท่าเดิมเข้ากับ dataset (ยอมให้ซ้ำเชิง concept)
 
 ---
 
