@@ -152,7 +152,10 @@ export interface StructuredProgram {
   focus: string
   weeks: StructuredWeek[]
   isCustom?: boolean
-  source?: 'builtin' | 'excel' | 'manual'
+  source?: 'builtin' | 'excel' | 'manual' | 'coach'
+  // Set when a coach assigns this program to an athlete (source === 'coach').
+  assignedBy?: string
+  assignedByEmail?: string
   // 'powerlifting' → working weights computed from 1RM (profile or config);
   // 'general' → no 1RM calc, log weights manually. Undefined = powerlifting (legacy).
   programType?: 'general' | 'powerlifting'

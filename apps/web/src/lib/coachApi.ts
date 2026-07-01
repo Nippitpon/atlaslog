@@ -26,6 +26,10 @@ export function listAthletes(): Promise<AthleteSummary[]> {
   return call<{ athletes: AthleteSummary[] }>({ action: 'list-athletes' }).then(r => r.athletes)
 }
 
+export function assignProgram(athleteId: string, program: StructuredProgram): Promise<void> {
+  return call<{ ok: true }>({ action: 'assign-program', athleteId, program }).then(() => undefined)
+}
+
 export async function unlinkAthlete(athleteId: string): Promise<void> {
   const { data } = await supabase.auth.getUser()
   if (!data.user) throw new Error('Not signed in')

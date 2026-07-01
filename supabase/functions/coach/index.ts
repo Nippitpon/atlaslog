@@ -10,6 +10,7 @@
 //   { action: 'add-athlete', athlete }     coach REQUESTS an athlete (status pending)
 //   { action: 'respond-link', coachId, accept }  athlete accepts/declines a request
 //   { action: 'list-athletes' }            coach lists their athletes (+email, +status)
+//   { action: 'assign-program', athleteId, program }  coach assigns a program to an active athlete
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { sendPushToUser } from '../_shared/push.ts'
@@ -42,7 +43,7 @@ Deno.serve(async (req) => {
     if (userErr || !userData.user) return json({ error: 'Invalid token' }, 401)
     const caller = userData.user
 
-    const { action, code, athlete, coachId, accept } = await req.json()
+    const { action, code, athlete, coachId, accept, athleteId, program } = await req.json()
 
     // Resolve a user by email or 8-char uuid prefix.
     const resolveUser = async (raw: string) => {
@@ -156,6 +157,37 @@ Deno.serve(async (req) => {
         status: l.status,
       }))
       return json({ athletes })
+    }
+
+    if (action === 'assign-program') {
+      // Coach assigns one of their programs to an active athlete. Writes a fresh
+      // copy into the athlete's custom_programs (service_role bypasses RLS).
+      if (!athleteId || !program || !program.name || !Array.isArray(program.weeks)) {
+        return json({ error: 'Missing athleteId or valid program' }, 400)
+      }
+      const { data: link } = await admin.from('coach_athlete')
+        .select('status').eq('coach_id', caller.id).eq('athlete_id', athleteId).maybeSingle()
+      if (!link || link.status !== 'active') return json({ error: 'Athlete not linked (active)' }, 403)
+
+      const id = 'assigned-' + Date.now()
+      const cloned = {
+        ...program,
+        id,
+        isCustom: true,
+        source: 'coach',
+        assignedBy: caller.id,
+        assignedByEmail: caller.email ?? '',
+      }
+      const { error } = await admin.from('custom_programs').insert({ id, user_id: athleteId, program: cloned })
+      if (error) return json({ error: error.message }, 500)
+
+      await admin.from('notifications').insert({
+        user_id: athleteId,
+        type: 'program_assigned',
+        data: { coach_id: caller.id, coach_email: caller.email ?? '', program_name: program.name },
+      })
+      try { await sendPushToUser(admin, athleteId, { title: 'โค้ชส่งโปรแกรมให้คุณ 📋', body: `${caller.email ?? 'Your coach'} assigned "${program.name}"`, url: '/programs', tag: 'coach' }) } catch { /* non-fatal */ }
+      return json({ ok: true })
     }
 
     return json({ error: 'Unknown action' }, 400)

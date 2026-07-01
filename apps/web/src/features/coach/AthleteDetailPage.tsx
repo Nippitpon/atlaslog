@@ -2,12 +2,14 @@ import { useEffect, useState, useMemo } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import type { Session, StructuredProgram, BodyMetricEntry, UserBio, ProgramOneRMs } from '@atlaslog/shared'
 import { useAuthStore } from '../../store/useAuthStore.js'
+import { useProgramStore } from '../../store/useProgramStore.js'
 import {
-  getAthleteSessions, getAthletePrograms, getAthleteBodyMetrics, getAthleteState,
+  getAthleteSessions, getAthletePrograms, getAthleteBodyMetrics, getAthleteState, assignProgram,
 } from '../../lib/coachApi.js'
+import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { formatDate } from '../../lib/utils.js'
 import { calcEnergy, ACTIVITY } from '../../lib/energy.js'
-import { IconChevronLeft } from '../../components/icons/index.js'
+import { IconChevronLeft, IconPlus, IconCheck, IconX } from '../../components/icons/index.js'
 
 // Volume per calendar week (Sun-start) for the last `weeks` weeks, oldest→newest.
 function weeklyBuckets(sessions: Session[], weeks = 6) {
@@ -38,6 +40,10 @@ export function AthleteDetailPage() {
   const [oneRMs, setOneRMs] = useState<ProgramOneRMs | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showAssign, setShowAssign] = useState(false)
+  const [assignError, setAssignError] = useState<string | null>(null)
+
+  const refetchPrograms = () => { if (athleteId) void getAthletePrograms(athleteId).then(setPrograms).catch(() => {}) }
 
   useEffect(() => {
     if (!canCoach || !athleteId) return
@@ -288,21 +294,36 @@ export function AthleteDetailPage() {
           )}
 
           {/* Programs */}
-          {programs.length > 0 && (
-            <div style={{ padding: '0 20px 20px' }}>
-              <div className="t-eyebrow" style={{ marginBottom: 10 }}>PROGRAMS ({programs.length})</div>
+          <div style={{ padding: '0 20px 20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div className="t-eyebrow">PROGRAMS ({programs.length})</div>
+              <button onClick={() => { setAssignError(null); setShowAssign(true) }} style={{
+                display: 'flex', alignItems: 'center', gap: 4, background: 'transparent',
+                border: '1px solid var(--border)', borderRadius: 8, padding: '4px 10px',
+                color: 'var(--accent)', cursor: 'pointer', fontFamily: 'var(--font-mono)',
+                fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase',
+              }}>
+                <IconPlus size={13} stroke={2.5} /> Assign
+              </button>
+            </div>
+            {programs.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {programs.map(p => (
                   <div key={p.id} className="card card-tight">
-                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 15 }}>{p.name}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 15 }}>{p.name}</div>
+                      {p.source === 'coach' && <span className="pill" style={{ fontSize: 8, background: 'rgba(167,139,250,0.15)', borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }}>ASSIGNED</span>}
+                    </div>
                     <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
                       {p.totalWeeks}W · {p.daysPerWeek} DAYS/WK · {(p.programType ?? 'powerlifting') === 'general' ? 'GENERAL' : 'POWERLIFTING'}
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="t-mono" style={{ fontSize: 12, color: 'var(--muted)' }}>No programs yet — assign one</div>
+            )}
+          </div>
 
           {/* Recent sessions */}
           <div style={{ padding: '0 20px 32px' }}>
@@ -331,6 +352,82 @@ export function AthleteDetailPage() {
           </div>
         </>
       )}
+
+      {showAssign && athleteId && (
+        <AssignProgramSheet
+          assignedError={assignError}
+          onClose={() => setShowAssign(false)}
+          onAssign={async (program) => {
+            setAssignError(null)
+            try {
+              await assignProgram(athleteId, program)
+              setShowAssign(false)
+              refetchPrograms()
+            } catch (e) {
+              setAssignError(e instanceof Error ? e.message : String(e))
+            }
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function AssignProgramSheet({ onAssign, onClose, assignedError }: {
+  onAssign: (program: StructuredProgram) => Promise<void>
+  onClose: () => void
+  assignedError: string | null
+}) {
+  const customPrograms = useProgramStore(s => s.customPrograms)
+  // Coach's assignable library: built-in structured programs + their own custom ones.
+  const options = useMemo(() => [...STRUCTURED_PROGRAMS, ...customPrograms], [customPrograms])
+  const [pickedId, setPickedId] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const confirm = async () => {
+    const program = options.find(p => p.id === pickedId)
+    if (!program || busy) return
+    setBusy(true)
+    await onAssign(program)
+    setBusy(false)
+  }
+
+  return (
+    <div className="sheet-backdrop" onClick={onClose} style={{ zIndex: 100 }}>
+      <div className="sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+        <div className="sheet-handle" />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <h3 className="t-display" style={{ margin: 0, fontSize: 20 }}>Assign program</h3>
+          <button className="btn-icon" onClick={onClose}><IconX size={18} /></button>
+        </div>
+
+        <div style={{ overflowY: 'auto', flex: 1, margin: '0 -20px', padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {options.map(p => (
+            <button key={p.id} onClick={() => setPickedId(p.id)} style={{
+              all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+              padding: 12, borderRadius: 12, boxSizing: 'border-box',
+              border: `1px solid ${pickedId === p.id ? 'var(--accent)' : 'var(--border)'}`,
+              background: pickedId === p.id ? 'rgba(212,255,58,0.08)' : 'var(--surface-1)',
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 15 }}>{p.name}</div>
+                <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                  {p.totalWeeks}W · {p.daysPerWeek} DAYS/WK · {(p.programType ?? 'powerlifting') === 'general' ? 'GENERAL' : 'POWERLIFTING'}
+                </div>
+              </div>
+              {pickedId === p.id && <IconCheck size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />}
+            </button>
+          ))}
+        </div>
+
+        {assignedError && (
+          <div style={{ color: 'var(--danger)', fontSize: 12, marginTop: 10 }}>{assignedError}</div>
+        )}
+        <button className="btn btn-primary" style={{ width: '100%', marginTop: 12, opacity: pickedId && !busy ? 1 : 0.4 }}
+          disabled={!pickedId || busy} onClick={confirm}>
+          {busy ? 'Assigning…' : 'Assign to athlete'}
+        </button>
+      </div>
     </div>
   )
 }
