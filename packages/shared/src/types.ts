@@ -152,6 +152,9 @@ export interface StructuredProgram {
   focus: string
   weeks: StructuredWeek[]
   isCustom?: boolean
+  // Weekly routine (General only): no periodization / no start-end date setup —
+  // opening it shows the training days directly. Undefined = periodized (dated).
+  weekly?: boolean
   source?: 'builtin' | 'excel' | 'manual' | 'coach'
   // Set when a coach assigns this program to an athlete (source === 'coach').
   assignedBy?: string

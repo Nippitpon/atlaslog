@@ -1,8 +1,34 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-07-02 (รอบ 19 — ✅ SHIPPED: Coach assign โปรแกรมให้ athlete, deploy main + redeploy coach edge fn, e2e ผ่าน)
+> อัปเดตล่าสุด: 2026-07-02 (รอบ 20 — ✅ SHIPPED: General program ไม่ใส่ Week = weekly routine (ไม่ต้องตั้งวันเริ่ม/จบ, เข้าแล้วเห็นวันซ้อมเลย))
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-07-02 — รอบ 20 (✅ SHIPPED, deploy main): General weekly routine (ไม่ใส่ Week = ไม่ต้อง setup วันเริ่ม/จบ)
+
+สร้างโปรแกรม **General** โดยเว้นช่อง WEEKS ว่าง → โปรแกรม `weekly` (1 สัปดาห์วนซ้ำ) → **ไม่ต้องตั้งวันเริ่ม/จบ** +
+เข้าโปรแกรมแล้วเห็น **วันซ้อมรายวัน (DayCard + Start) ทันที** ไม่ผ่าน Setup/รายการสัปดาห์.
+**Powerlifting ไม่เปลี่ยน** — ยังต้องใส่ WEEKS + Setup (วันเริ่ม/จบ + 1RM) เสมอ (weekly ใช้ได้เฉพาะ General)
+
+### ทำอะไร
+- **types** `StructuredProgram.weekly?: boolean`
+- **CreateProgramPage** — WEEKS default ว่าง; `isWeekly = programType==='general' && weeks ว่าง`; General ว่าง = weekly (totalWeeks 1),
+  ใส่เลข = periodized; **Powerlifting ว่าง = canSave false** (บังคับใส่, ไม่มีทางเป็น weekly). helper text แยกตาม type
+- **WeekDays.tsx (ใหม่)** — ยก `DayCard`+`StatusBadge`+`SBD_IDS`+`handleStart`(weightOverrides/dayToProgram/customAccessories/startWorkout)+
+  `calcRMs`(config?.oneRMs ?? personalOneRMs)+accessory edit ออกจาก WeekDetailPage → reuse ทั้ง WeekDetailPage + weekly overview
+- **WeekDetailPage** — refactor เหลือ header + `<WeekDays>` + week-nav (พฤติกรรมเดิมเป๊ะ)
+- **ProgramOverviewPage** — ถ้า `weekly` → ซ่อน config/Setup/ProgressSummary/รายการสัปดาห์/ปุ่ม Settings, โชว์ "TRAINING DAYS" + `<WeekDays week={weeks[0]}>`; ไม่ weekly = เดิม
+- **ProgramsPage** — การ์ด weekly โชว์ badge "WEEKLY" + ซ่อน progress bar รายสัปดาห์
+
+### e2e verified (390px, coach.test) — 0 console errors, build+lint ผ่าน
+General เว้น WEEKS → overview เห็น TRAINING DAYS + DayCard ทันที (ไม่มี Setup) · Start → Logger ·
+Powerlifting เว้น WEEKS → Create disabled · **Regression** built-in 12-week: รายการ 12 สัปดาห์ + Setup + Progress ครบเหมือนเดิม
+
+### ไม่ทำรอบนี้
+weekly ไม่โผล่เป็น active program บน Dashboard (activeProgramInfo วนเฉพาะโปรแกรมที่มี config) — ผู้ใช้ขอเฉพาะหน้าโปรแกรม; ทำเพิ่มภายหลังได้ ·
+weekly powerlifting น้ำหนักใช้ Personal 1RM จากโปรไฟล์ (ไม่ตั้งก็โชว์แค่โครงท่า)
 
 ---
 
