@@ -22,7 +22,7 @@ export function CreateProgramPage() {
 
   const [name, setName] = useState('')
   const [focus, setFocus] = useState('')
-  const [weeks, setWeeks] = useState('4')
+  const [weeks, setWeeks] = useState('')
   const [days, setDays] = useState<DayDraft[]>([])
   const [programType, setProgramType] = useState<'general' | 'powerlifting'>('general')
   const [visibility, setVisibility] = useState<Visibility>('private')
@@ -46,8 +46,12 @@ export function CreateProgramPage() {
   const addExerciseToDay = (di: number, ex: StructuredExercise) =>
     setDays(d => d.map((day, idx) => idx === di ? { ...day, exercises: [...day.exercises, ex] } : day))
 
-  const weeksNum = Math.max(1, Math.min(52, Number(weeks) || 1))
-  const canSave = name.trim().length > 0 && days.length > 0
+  // Weekly routine = General program with no week count → no periodization,
+  // no start/end date setup. Powerlifting always requires a week count + setup.
+  const isWeekly = programType === 'general' && weeks.trim() === ''
+  const weeksNum = isWeekly ? 1 : Math.max(1, Math.min(52, Number(weeks) || 1))
+  const weeksValid = isWeekly || Number(weeks) >= 1
+  const canSave = name.trim().length > 0 && days.length > 0 && weeksValid
 
   const handleCreate = async () => {
     if (!canSave || busy) return
@@ -60,6 +64,7 @@ export function CreateProgramPage() {
       focus: focus.trim() || 'Custom',
       isCustom: true,
       source: 'manual',
+      weekly: isWeekly || undefined,
       programType,
       weeks: Array.from({ length: weeksNum }, (_, wi) => ({
         id: `week-${wi + 1}`,
@@ -129,12 +134,17 @@ export function CreateProgramPage() {
             <div style={{ width: 96 }}>
               <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>WEEKS</div>
               <input className="input-num tnum" type="number" inputMode="numeric" value={weeks}
+                placeholder={programType === 'general' ? '—' : '4'}
                 onChange={e => setWeeks(e.target.value)} onFocus={e => e.target.select()}
                 style={{ width: '100%', textAlign: 'center' }} />
             </div>
           </div>
-          <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
-            1 สัปดาห์ที่สร้างจะถูกทำซ้ำ {weeksNum} สัปดาห์
+          <div className="t-mono" style={{ fontSize: 10, color: isWeekly ? 'var(--accent)' : 'var(--muted)' }}>
+            {isWeekly
+              ? 'โปรแกรมประจำสัปดาห์ · ไม่ต้องตั้งวันเริ่ม/จบ'
+              : programType === 'general'
+                ? `เว้นว่าง = ประจำสัปดาห์ · ใส่เลข = ทำซ้ำ ${weeksNum} สัปดาห์`
+                : `1 สัปดาห์ที่สร้างจะถูกทำซ้ำ ${weeks.trim() === '' ? 'N' : weeksNum} สัปดาห์ (Powerlifting ต้องกำหนด)`}
           </div>
         </div>
       </div>

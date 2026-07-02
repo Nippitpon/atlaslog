@@ -5,6 +5,7 @@ import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { IconChevronLeft, IconChevronRight, IconCheck, IconSettings } from '../../components/icons/index.js'
 import { ProgramSetupSheet } from './ProgramSetupSheet.js'
+import { WeekDays } from './WeekDays.js'
 import { formatDMY } from '../../lib/utils.js'
 
 const STATUS_CONFIG: Record<DayStatus, { label: string; bg: string; border: string; color: string }> = {
@@ -73,17 +74,32 @@ export function ProgramOverviewPage() {
               {program.description}
             </p>
           </div>
-          <button className="btn-icon" onClick={() => setShowSetup(true)} aria-label="Configure program">
-            <IconSettings size={18} />
-          </button>
+          {!program.weekly && (
+            <button className="btn-icon" onClick={() => setShowSetup(true)} aria-label="Configure program">
+              <IconSettings size={18} />
+            </button>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          {[`${program.totalWeeks} weeks`, `${program.daysPerWeek} days/week`, program.focus].map(tag => (
+          {(program.weekly
+            ? ['Weekly routine', `${program.daysPerWeek} days/week`, program.focus]
+            : [`${program.totalWeeks} weeks`, `${program.daysPerWeek} days/week`, program.focus]
+          ).map(tag => (
             <span key={tag} className="pill" style={{ fontSize: 10 }}>{tag}</span>
           ))}
         </div>
       </div>
 
+      {/* Weekly routine: show the training days directly (no setup / no week list) */}
+      {program.weekly ? (
+        <>
+          <div style={{ padding: '0 20px 12px' }}>
+            <div className="t-eyebrow">TRAINING DAYS</div>
+          </div>
+          {program.weeks[0] && <WeekDays program={program} week={program.weeks[0]} />}
+        </>
+      ) : (
+      <>
       {/* Config banner or setup CTA */}
       {config ? (
         <div style={{ padding: '0 20px', marginBottom: 16 }}>
@@ -219,6 +235,8 @@ export function ProgramOverviewPage() {
           })}
         </div>
       </div>
+      </>
+      )}
 
       {showSetup && (
         <ProgramSetupSheet program={program} onClose={() => setShowSetup(false)} />

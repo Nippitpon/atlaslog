@@ -272,11 +272,15 @@ export function ProgramsPage() {
                         </div>
 
                         <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-                          {[`${sp.totalWeeks}W`, `${sp.daysPerWeek} DAYS/WK`].map(tag => (
+                          {(sp.weekly
+                            ? ['WEEKLY', `${sp.daysPerWeek} DAYS/WK`]
+                            : [`${sp.totalWeeks}W`, `${sp.daysPerWeek} DAYS/WK`]
+                          ).map(tag => (
                             <span key={tag} className="pill" style={{ fontSize: 9 }}>{tag}</span>
                           ))}
                         </div>
 
+                        {!sp.weekly && (
                         <div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
                             <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
@@ -293,6 +297,7 @@ export function ProgramsPage() {
                               borderRadius: 2, transition: 'width .4s ease' }} />
                           </div>
                         </div>
+                        )}
                       </div>
                     </div>
                   </div>
