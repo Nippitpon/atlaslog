@@ -25,6 +25,7 @@ export const router = createBrowserRouter([
       { index: true,                                         element: <DashboardPage /> },
       { path: 'programs',                                    element: <ProgramsPage /> },
       { path: 'programs/new',                                element: <CreateProgramPage /> },
+      { path: 'programs/:programId/edit',                    element: <CreateProgramPage /> },
       { path: 'programs/:programId',                         element: <ProgramOverviewPage /> },
       { path: 'programs/:programId/week/:weekId',            element: <WeekDetailPage /> },
       { path: 'workout',                                     element: <LoggerPage /> },
