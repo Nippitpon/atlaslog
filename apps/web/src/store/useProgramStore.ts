@@ -30,6 +30,7 @@ interface ProgramStore {
   getCustomAccessories: (programId: string, weekId: string, dayId: string) => StructuredExercise[] | null
 
   addCustomProgram: (program: StructuredProgram) => void
+  updateCustomProgram: (program: StructuredProgram) => void
   removeCustomProgram: (programId: string) => void
   setCustomPrograms: (programs: StructuredProgram[]) => void
   clearCustomPrograms: () => void
@@ -136,6 +137,60 @@ export const useProgramStore = create<ProgramStore>()(
           customPrograms: [...state.customPrograms.filter(p => p.id !== program.id), program],
         }))
         void syncProgramUpsert(program)
+      },
+
+      // Edit an existing program in place (same id): upsert + prune progress/
+      // accessories for weeks/days that no longer exist + recompute config.endDate.
+      updateCustomProgram: (program) => {
+        set(state => {
+          // Valid week ids → set of valid day ids in the new structure
+          const validDays: Record<string, Set<string>> = {}
+          program.weeks.forEach(w => { validDays[w.id] = new Set(w.days.map(d => d.id)) })
+
+          const pruneNested = <T,>(byWeek: Record<string, Record<string, T>> | undefined) => {
+            if (!byWeek) return byWeek
+            const next: Record<string, Record<string, T>> = {}
+            for (const [weekId, byDay] of Object.entries(byWeek)) {
+              const days = validDays[weekId]
+              if (!days) continue // week removed → drop
+              const keptDays: Record<string, T> = {}
+              for (const [dayId, val] of Object.entries(byDay)) {
+                if (days.has(dayId)) keptDays[dayId] = val
+              }
+              if (Object.keys(keptDays).length) next[weekId] = keptDays
+            }
+            return next
+          }
+
+          const progress = { ...state.progress }
+          if (progress[program.id]) progress[program.id] = pruneNested(progress[program.id])!
+          const customAccessories = { ...state.customAccessories }
+          if (customAccessories[program.id]) customAccessories[program.id] = pruneNested(customAccessories[program.id])!
+
+          // Recompute endDate from the new week count (keep startDate + 1RM);
+          // drop config entirely if the program became a weekly routine.
+          const configs = { ...state.configs }
+          const cfg = configs[program.id]
+          if (cfg) {
+            if (program.weekly) {
+              delete configs[program.id]
+            } else {
+              const [y, m, d] = cfg.startDate.split('-').map(Number)
+              const end = new Date(y, m - 1, d + program.totalWeeks * 7)
+              const endDate = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`
+              configs[program.id] = { ...cfg, endDate }
+            }
+          }
+
+          return {
+            customPrograms: [...state.customPrograms.filter(p => p.id !== program.id), program],
+            progress,
+            customAccessories,
+            configs,
+          }
+        })
+        void syncProgramUpsert(program)
+        queueStateSync(get)
       },
 
       removeCustomProgram: (programId) => {

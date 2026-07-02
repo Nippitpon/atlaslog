@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import type { DayStatus } from '@atlaslog/shared'
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
-import { IconChevronLeft, IconChevronRight, IconCheck, IconSettings } from '../../components/icons/index.js'
+import { useAuthStore } from '../../store/useAuthStore.js'
+import { IconChevronLeft, IconChevronRight, IconCheck, IconSettings, IconEdit } from '../../components/icons/index.js'
 import { ProgramSetupSheet } from './ProgramSetupSheet.js'
 import { WeekDays } from './WeekDays.js'
 import { formatDMY } from '../../lib/utils.js'
@@ -42,6 +43,7 @@ export function ProgramOverviewPage() {
   const { programId } = useParams<{ programId: string }>()
   const navigate = useNavigate()
   const { getWeekStatus, getConfig, customPrograms } = useProgramStore()
+  const { isCoach, isAdmin } = useAuthStore()
   const [showSetup, setShowSetup] = useState(false)
 
   const program = [...STRUCTURED_PROGRAMS, ...customPrograms].find(p => p.id === programId)
@@ -49,6 +51,9 @@ export function ProgramOverviewPage() {
     navigate('/programs', { replace: true })
     return null
   }
+
+  // Editable = your own custom program (in customPrograms, not coach-assigned), coach/admin
+  const canEdit = (isCoach || isAdmin) && customPrograms.some(p => p.id === program.id) && program.source !== 'coach'
 
   const config = getConfig(program.id)
 
@@ -74,11 +79,18 @@ export function ProgramOverviewPage() {
               {program.description}
             </p>
           </div>
-          {!program.weekly && (
-            <button className="btn-icon" onClick={() => setShowSetup(true)} aria-label="Configure program">
-              <IconSettings size={18} />
-            </button>
-          )}
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            {canEdit && (
+              <button className="btn-icon" onClick={() => navigate(`/programs/${program.id}/edit`)} aria-label="Edit program">
+                <IconEdit size={18} />
+              </button>
+            )}
+            {!program.weekly && (
+              <button className="btn-icon" onClick={() => setShowSetup(true)} aria-label="Configure program">
+                <IconSettings size={18} />
+              </button>
+            )}
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           {(program.weekly

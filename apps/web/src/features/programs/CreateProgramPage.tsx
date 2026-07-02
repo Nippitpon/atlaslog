@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Navigate } from 'react-router-dom'
+import { useNavigate, Navigate, useParams } from 'react-router-dom'
 import type { StructuredExercise, StructuredProgram, StructuredDay } from '@atlaslog/shared'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
@@ -10,21 +10,28 @@ import { IconChevronLeft, IconPlus, IconX, IconCheck, IconSearch, IconCopy } fro
 
 type Visibility = 'private' | 'code' | 'public'
 
-type DayDraft = { dayOfWeek: StructuredDay['dayOfWeek']; focus: string; exercises: StructuredExercise[] }
+type DayDraft = { id?: string; dayOfWeek: StructuredDay['dayOfWeek']; focus: string; exercises: StructuredExercise[] }
 
 const WEEKDAYS: StructuredDay['dayOfWeek'][] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 export function CreateProgramPage() {
   const navigate = useNavigate()
-  const { addCustomProgram } = useProgramStore()
+  const { programId } = useParams<{ programId: string }>()
+  const { addCustomProgram, updateCustomProgram, customPrograms } = useProgramStore()
   const { isCoach, isAdmin, roleLoaded } = useAuthStore()
   const canCreate = isCoach || isAdmin
 
-  const [name, setName] = useState('')
-  const [focus, setFocus] = useState('')
-  const [weeks, setWeeks] = useState('')
-  const [days, setDays] = useState<DayDraft[]>([])
-  const [programType, setProgramType] = useState<'general' | 'powerlifting'>('general')
+  // Edit mode: opened via /programs/:programId/edit for an own custom program.
+  const editing = programId ? customPrograms.find(p => p.id === programId) : undefined
+  const isEditable = !!editing && editing.source !== 'coach'
+
+  const [name, setName] = useState(() => editing?.name ?? '')
+  const [focus, setFocus] = useState(() => editing?.focus === 'Custom' ? '' : (editing?.focus ?? ''))
+  const [weeks, setWeeks] = useState(() => editing ? (editing.weekly ? '' : String(editing.totalWeeks)) : '')
+  const [days, setDays] = useState<DayDraft[]>(() =>
+    (editing?.weeks[0]?.days ?? []).map(d => ({ id: d.id, dayOfWeek: d.dayOfWeek, focus: d.focus, exercises: d.exercises }))
+  )
+  const [programType, setProgramType] = useState<'general' | 'powerlifting'>(() => editing?.programType ?? 'general')
   const [visibility, setVisibility] = useState<Visibility>('private')
   const [busy, setBusy] = useState(false)
   const [publishedCode, setPublishedCode] = useState<string | null>(null)
@@ -55,15 +62,20 @@ export function CreateProgramPage() {
 
   const handleCreate = async () => {
     if (!canSave || busy) return
+    // Assign stable day ids ONCE: keep existing (preserves progress), new days get
+    // a fresh non-positional id so nothing collides / drifts on later edits.
+    const stamp = Date.now()
+    const dayIds = days.map((d, di) => d.id ?? `day-${stamp}-${di}`)
     const program: StructuredProgram = {
-      id: `custom-${Date.now()}`,
+      id: editing ? editing.id : `custom-${stamp}`,
       name: name.trim(),
-      description: '',
+      description: editing?.description ?? '',
       totalWeeks: weeksNum,
       daysPerWeek: days.length,
       focus: focus.trim() || 'Custom',
       isCustom: true,
-      source: 'manual',
+      // Preserve source (manual/excel) when editing; new programs are manual.
+      source: editing?.source === 'excel' ? 'excel' : 'manual',
       weekly: isWeekly || undefined,
       programType,
       weeks: Array.from({ length: weeksNum }, (_, wi) => ({
@@ -71,13 +83,20 @@ export function CreateProgramPage() {
         weekNumber: wi + 1,
         phase: 'Accumulation' as const,
         days: days.map((d, di) => ({
-          id: `day-${di + 1}`,
+          id: dayIds[di],
           dayOfWeek: d.dayOfWeek,
           focus: d.focus.trim() || `${d.dayOfWeek} Training`,
           exercises: d.exercises,
         })),
       })),
     }
+
+    if (editing) {
+      updateCustomProgram(program)
+      navigate(`/programs/${program.id}`)
+      return
+    }
+
     addCustomProgram(program)
 
     if (visibility === 'private') {
@@ -102,6 +121,8 @@ export function CreateProgramPage() {
 
   if (!roleLoaded) return null
   if (!canCreate) return <Navigate to="/programs" replace />
+  // Edit route for a program that isn't yours/editable → bounce.
+  if (programId && !isEditable) return <Navigate to="/programs" replace />
 
   return (
     <div className="atlas-screen screen-enter">
@@ -110,10 +131,18 @@ export function CreateProgramPage() {
           <IconChevronLeft size={20} />
         </button>
         <div>
-          <div className="sub">NEW</div>
-          <h1>Create Program</h1>
+          <div className="sub">{editing ? 'EDIT' : 'NEW'}</div>
+          <h1>{editing ? 'Edit Program' : 'Create Program'}</h1>
         </div>
       </div>
+
+      {editing && (
+        <div style={{ padding: '0 20px 16px' }}>
+          <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', lineHeight: 1.6 }}>
+            การแก้ไม่กระทบสำเนาที่แชร์/มอบหมายไปแล้ว (ต้อง share/assign ใหม่) · วันที่ลบจะล้าง progress ของวันนั้น
+          </div>
+        </div>
+      )}
 
       {/* Program meta */}
       <div style={{ padding: '0 20px 20px' }}>
@@ -238,7 +267,8 @@ export function CreateProgramPage() {
         </button>
       </div>
 
-      {/* Visibility */}
+      {/* Visibility (create only — editing keeps existing shares untouched) */}
+      {!editing && (
       <div style={{ padding: '0 20px 20px' }}>
         <div className="t-eyebrow" style={{ marginBottom: 10 }}>VISIBILITY</div>
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -269,11 +299,12 @@ export function CreateProgramPage() {
           ))}
         </div>
       </div>
+      )}
 
       <div style={{ padding: '0 20px 32px' }}>
         <button className="btn btn-primary" style={{ width: '100%', opacity: canSave && !busy ? 1 : 0.4 }}
           disabled={!canSave || busy} onClick={() => void handleCreate()}>
-          <IconCheck size={18} stroke={3} /> {busy ? 'Publishing…' : 'Create Program'}
+          <IconCheck size={18} stroke={3} /> {editing ? 'Save changes' : busy ? 'Publishing…' : 'Create Program'}
         </button>
         {!canSave && (
           <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 8, textAlign: 'center' }}>

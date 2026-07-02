@@ -11,7 +11,7 @@ import { ImportProgramSheet } from './ImportProgramSheet.js'
 import { createShare, importShare, listPublicPrograms, type PublicProgram } from '../../lib/shareApi.js'
 import {
   IconSearch, IconClock, IconTrendingUp, IconChevronRight, IconUpload, IconTrash,
-  IconShare, IconCopy, IconLink, IconX, IconPlus,
+  IconShare, IconCopy, IconLink, IconX, IconPlus, IconEdit,
 } from '../../components/icons/index.js'
 
 const PHASE_COLOR: Record<string, string> = {
@@ -245,6 +245,19 @@ export function ProgramsPage() {
                             <div style={{ fontSize: 12, color: 'var(--text-2)' }}>{sp.focus}</div>
                           </div>
                           <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                            {sp.source !== 'coach' && (
+                              <button
+                                onClick={e => { e.stopPropagation(); navigate(`/programs/${sp.id}/edit`) }}
+                                style={{
+                                  background: 'transparent', border: 'none', cursor: 'pointer',
+                                  color: 'var(--muted)', padding: 4, borderRadius: 6,
+                                  display: 'flex', alignItems: 'center',
+                                }}
+                                aria-label="Edit program"
+                              >
+                                <IconEdit size={14} />
+                              </button>
+                            )}
                             <button
                               onClick={e => { e.stopPropagation(); void handleShare(sp) }}
                               disabled={sharing}
