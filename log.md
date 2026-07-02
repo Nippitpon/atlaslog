@@ -1,8 +1,35 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-07-01 (รอบ 18 — PLANNED: Web Push deploy/verify Part A + Part B cron เตือนวันซ้อม 08:00 ICT · ยังไม่ลงมือ)
+> อัปเดตล่าสุด: 2026-07-02 (รอบ 19 — ✅ SHIPPED: Coach assign โปรแกรมให้ athlete, deploy main + redeploy coach edge fn, e2e ผ่าน)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-07-02 — รอบ 19 (✅ SHIPPED, merge main `d704ee8` + edge redeploy): Coach assign โปรแกรมให้ athlete
+
+โค้ช assign โปรแกรมจากคลังตัวเองให้ลูกเทรน (active link) → โผล่ใน MY PROGRAMS ของลูกเทรน + แจ้งเตือน (in-app + push)
+
+### ทำอะไร (reuse ล้วน — **ไม่มีตาราง/SQL ใหม่**)
+- **Edge** `supabase/functions/coach/index.ts` — action ใหม่ `assign-program`: verify `coach_athlete` active →
+  clone program (`id='assigned-'+ts`, `source:'coach'`, `assignedBy`/`assignedByEmail`) → `insert` เข้า
+  `custom_programs` ของ athlete (service_role) → notification `program_assigned` + `sendPushToUser` (non-fatal)
+- **API** `coachApi.ts` — `assignProgram(athleteId, program)` (ผ่าน `call()` invoke 'coach')
+- **Coach UI** `AthleteDetailPage.tsx` — ปุ่ม "Assign" + `AssignProgramSheet` (list `STRUCTURED_PROGRAMS` + `customPrograms` ของโค้ช) → เลือก → assign → refetch; badge ASSIGNED บนโปรแกรม source==='coach'
+- **Athlete UI** — `DashboardPage.notificationText` case `program_assigned`; `ProgramsPage` badge **FROM COACH** (source==='coach'); flow Setup→Start เดิมใช้ได้ทั้งหมด
+- **Types** `StructuredProgram.source += 'coach'` + `assignedBy?`/`assignedByEmail?` (jsonb, ไม่ migrate)
+
+### Deploy
+- โค้ด: merge main (`d704ee8`) → Vercel auto-deploy
+- Edge: `npx supabase login --token <...>` → `npx supabase functions deploy coach --project-ref rhilcsfhibymgyoaltem`
+  (bundle `_shared/push.ts` ให้อัตโนมัติ; ไม่ต้อง Docker/SQL). **บทเรียน:** อย่ารัน `npx supabase` หลายตัวพร้อมกัน → EBUSY (แย่งล็อก binary ในแคช); login แบบ `--token` เลี่ยง browser ค้าง
+
+### e2e verified (390px, coach.test + athlete.a)
+coach assign 12-week → PROGRAMS (3)→(4) + ASSIGNED · athlete relogin → dashboard banner
+"coach.test… ส่งโปรแกรม "12 Weeks SBD Peaking" ให้คุณ" + MY PROGRAMS badge FROM COACH (Not started) · 0 console errors · build+lint ผ่าน
+
+### ไม่ทำรอบนี้
+ไม่มี accept/reject (assign = เพิ่มเข้า library เลย, athlete ลบเองได้) · โค้ชไม่ pre-set startDate/1RM · ไม่ realtime (โผล่ตอน refresh/relogin)
 
 ---
 
