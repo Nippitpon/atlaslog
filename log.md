@@ -1,8 +1,34 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-07-02 (รอบ 20 — ✅ SHIPPED: General program ไม่ใส่ Week = weekly routine (ไม่ต้องตั้งวันเริ่ม/จบ, เข้าแล้วเห็นวันซ้อมเลย))
+> อัปเดตล่าสุด: 2026-07-02 (รอบ 21 — ✅ SHIPPED: แก้ไขโปรแกรม (Edit) creator/admin แก้โปรแกรมตัวเองได้ + prune progress)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-07-02 — รอบ 21 (✅ SHIPPED, deploy main): แก้ไขโปรแกรม (Edit custom program)
+
+creator/admin แก้โปรแกรม **ในคลังตัวเอง** (source manual/excel) ได้: type, เพิ่ม/ลด/แก้วัน+ท่า, ชื่อ, จำนวนสัปดาห์.
+**client-only** (แก้ของ user คนอื่นข้ามบัญชี = นอกขอบเขต). built-in + coach-assigned (source coach) = แก้ไม่ได้
+
+### ทำอะไร (reuse CreateProgramPage เป็น edit mode)
+- **`useProgramStore.updateCustomProgram`** — upsert (id เดิม) + **prune** `progress`/`customAccessories` ของ week/day ที่หายไป
+  (คงของวันที่ยังอยู่) + คำนวณ `config.endDate` ใหม่จากจำนวนสัปดาห์ (drop config ถ้ากลายเป็น weekly)
+- **CreateProgramPage** — edit mode เมื่อเปิด `/programs/:programId/edit` ของ custom program ตัวเอง: prefill
+  name/focus/weeks/days(**คง id**)/type, ซ่อน VISIBILITY, ปุ่ม "Save changes" → updateCustomProgram; วันใหม่ gen id ใหม่ (ไม่ positional) → วันเดิม progress ไม่หาย
+- **router** `/programs/:programId/edit` (ก่อน `:programId`)
+- ปุ่ม **Edit** (ดินสอ) ใน ProgramOverviewPage header + ProgramsPage card — โชว์เมื่อ editable (`isCoach||isAdmin` && อยู่ใน customPrograms && source≠coach)
+- note ใน edit: "การแก้ไม่กระทบสำเนาที่แชร์/มอบหมายไปแล้ว · วันที่ลบจะล้าง progress ของวันนั้น"
+
+### ผลกระทบ (วิเคราะห์ + จัดการแล้ว)
+progress/accessory key เป็น id → **คง id วันเดิม** progress ไม่หาย, วันที่ลบ prune ทิ้ง · endDate คำนวณใหม่ · type general↔pl ไม่ loss ·
+`shared_programs`/coach-assigned = snapshot อิสระ แก้ต้นฉบับไม่กระทบ (ต้อง share/assign ใหม่) · History (Session snapshot) ไม่กระทบ
+
+### e2e verified (390px, coach.test) — 0 console errors, build+lint ผ่าน
+Edit prefill ครบ · rename → overview อัปเดต+persist · ลบวัน → prune save สะอาดไม่ crash · built-in ไม่มีปุ่ม Edit + `/edit` redirect
+
+### ไม่ทำรอบนี้
+admin แก้ของ user อื่น (cross-user/edge fn) · ไม่ auto-อัปเดตสำเนาที่ share/assign แล้ว · ไม่ทำ versioning/undo
 
 ---
 
