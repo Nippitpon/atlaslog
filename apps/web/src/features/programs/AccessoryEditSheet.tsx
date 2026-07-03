@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { StructuredExercise } from '@atlaslog/shared'
 import { allExercises } from '../../lib/data.js'
+import { muscleColor } from '../../lib/utils.js'
 import { IconX, IconPlus, IconCheck } from '../../components/icons/index.js'
 
 interface Props {
@@ -19,6 +20,7 @@ export function AccessoryEditSheet({ accessories, onSave, onClose }: Props) {
   const [pickingReps, setPickingReps] = useState('10')
   const [pickedId, setPickedId] = useState('')
   const [search, setSearch] = useState('')
+  const [groupFilter, setGroupFilter] = useState('All')
 
   const remove = (idx: number) => setList(l => l.filter((_, i) => i !== idx))
 
@@ -40,10 +42,13 @@ export function AccessoryEditSheet({ accessories, onSave, onClose }: Props) {
     setSearch('')
   }
 
+  const groups = ['All', ...Array.from(new Set(allExercises().map(e => e.group)))]
+
   const CAP = 80
   const matches = allExercises().filter(e =>
-    e.name.toLowerCase().includes(search.toLowerCase()) ||
-    e.group.toLowerCase().includes(search.toLowerCase())
+    (e.name.toLowerCase().includes(search.toLowerCase()) ||
+      e.group.toLowerCase().includes(search.toLowerCase()))
+    && (groupFilter === 'All' || e.group === groupFilter)
   )
   const filtered = matches.slice(0, CAP)
 
@@ -129,6 +134,25 @@ export function AccessoryEditSheet({ accessories, onSave, onClose }: Props) {
                 padding: '0 14px', outline: 'none', boxSizing: 'border-box', marginBottom: 12,
               }}
             />
+
+            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 12, paddingBottom: 2, flexShrink: 0 }}>
+              {groups.map(g => {
+                const active = groupFilter === g
+                const color = g === 'All' ? 'var(--accent)' : muscleColor(g)
+                return (
+                  <button key={g} onClick={() => setGroupFilter(g)}
+                    style={{
+                      flexShrink: 0, padding: '5px 12px', borderRadius: 999, cursor: 'pointer',
+                      fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
+                      border: `1px solid ${active ? color : 'var(--border)'}`,
+                      background: active ? color : 'var(--surface-2)',
+                      color: active ? '#0a0a0a' : 'var(--text-2)',
+                    }}>
+                    {g}
+                  </button>
+                )
+              })}
+            </div>
 
             <div style={{ flex: 1, overflowY: 'auto', marginBottom: 12 }}>
               {filtered.map(ex => (

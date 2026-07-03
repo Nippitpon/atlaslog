@@ -12,8 +12,12 @@ interface SwapSheetProps {
 
 export function SwapSheet({ current, title = 'Swap Exercise', onPick, onClose }: SwapSheetProps) {
   const [q, setQ] = useState('')
+  const [groupFilter, setGroupFilter] = useState('All')
+  const groups = ['All', ...Array.from(new Set(allExercises().map(e => e.group)))]
   const CAP = 80
-  const matches = allExercises().filter(e => e.name.toLowerCase().includes(q.toLowerCase()))
+  const matches = allExercises().filter(e =>
+    e.name.toLowerCase().includes(q.toLowerCase())
+    && (groupFilter === 'All' || e.group === groupFilter))
   const filtered = matches.slice(0, CAP)
 
   return (
@@ -25,6 +29,24 @@ export function SwapSheet({ current, title = 'Swap Exercise', onPick, onClose }:
         <div className="search-bar" style={{ marginBottom: 12 }}>
           <IconSearch size={18} style={{ color: 'var(--muted)' }} />
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search exercises…" />
+        </div>
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 12, paddingBottom: 2, flexShrink: 0 }}>
+          {groups.map(g => {
+            const active = groupFilter === g
+            const color = g === 'All' ? 'var(--accent)' : muscleColor(g)
+            return (
+              <button key={g} onClick={() => setGroupFilter(g)}
+                style={{
+                  flexShrink: 0, padding: '5px 12px', borderRadius: 999, cursor: 'pointer',
+                  fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
+                  border: `1px solid ${active ? color : 'var(--border)'}`,
+                  background: active ? color : 'var(--surface-2)',
+                  color: active ? '#0a0a0a' : 'var(--text-2)',
+                }}>
+                {g}
+              </button>
+            )
+          })}
         </div>
         <div style={{ overflowY: 'auto', flex: 1, margin: '0 -20px' }}>
           {filtered.map(ex => (
