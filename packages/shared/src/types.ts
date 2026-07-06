@@ -121,12 +121,18 @@ export interface StructuredExercise {
   id?: string
   exerciseId: string
   name: string
-  type: 'main' | 'accessory'
-  sets: number
-  reps: number | string
+  type: 'main' | 'accessory' | 'running'
+  // Optional because a 'running' activity has no sets/reps (it uses the target
+  // distance/duration below and opens the standalone /runs logger instead).
+  sets?: number
+  reps?: number | string
   rpe?: number
   pct?: number  // %1RM as decimal (e.g. 0.75 = 75%)
   note?: string
+  // Running activity target (type === 'running'). Both optional — a bare
+  // "go for a run" marker is valid. Tapping it opens the /runs page.
+  distanceKm?: number
+  durationMin?: number
 }
 
 export interface StructuredDay {

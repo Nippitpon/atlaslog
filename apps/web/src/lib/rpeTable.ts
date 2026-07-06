@@ -1,3 +1,5 @@
+import type { StructuredExercise, ProgramOneRMs } from '@atlaslog/shared'
+
 // Standard RPE chart (Tuchscherer / RTS)
 // Rows = reps 1–10, Cols = RPE 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0
 const RPE_COLS = [6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0]
@@ -38,4 +40,23 @@ export function calcWeight(oneRM: number, reps: number, rpe: number): number {
   const pct = getRpePct(reps, rpe) / 100
   const raw = oneRM * pct
   return Math.round(raw / 2.5) * 2.5
+}
+
+// Maps an exercise id to its SBD lift key (only the three main lifts have 1RMs).
+export const SBD_IDS: Record<string, keyof ProgramOneRMs> = {
+  squat: 'squat', bench: 'bench', deadlift: 'deadlift',
+}
+
+// Working weight for a structured exercise given the lifter's 1RMs. Returns null
+// when it isn't an SBD lift, no 1RM is set, or there's no %/RPE to calc from.
+// Shared by the Week view and the Dashboard "Today's session" card.
+export function structuredWeight(ex: StructuredExercise, oneRMs: ProgramOneRMs | null): number | null {
+  if (!oneRMs) return null
+  const liftKey = SBD_IDS[ex.exerciseId]
+  if (!liftKey) return null
+  const rm = oneRMs[liftKey]
+  if (!rm) return null
+  if (ex.pct !== undefined) return Math.round(rm * ex.pct / 2.5) * 2.5
+  if (ex.rpe === undefined || typeof ex.reps !== 'number') return null
+  return calcWeight(rm, ex.reps, ex.rpe)
 }

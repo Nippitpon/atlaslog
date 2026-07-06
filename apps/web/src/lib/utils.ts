@@ -84,6 +84,14 @@ export function muscleColor(group: string) {
   return map[group] ?? '#888'
 }
 
+// Human label for a program running target, e.g. "5 km · 30 min" (empty if neither set)
+export function runTarget(ex: { distanceKm?: number; durationMin?: number }): string {
+  const parts: string[] = []
+  if (ex.distanceKm) parts.push(`${ex.distanceKm} km`)
+  if (ex.durationMin) parts.push(`${ex.durationMin} min`)
+  return parts.join(' · ')
+}
+
 // Running pace: min/km → "M:SS" (per km)
 export function formatPace(distanceKm: number, durationMin: number): string {
   if (!distanceKm || !durationMin) return '—'

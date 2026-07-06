@@ -18,6 +18,8 @@ interface RawRow {
   pct?: unknown
   rpe?: unknown
   note?: unknown
+  distance?: unknown
+  duration?: unknown
 }
 
 export interface ImportResult {
@@ -81,10 +83,11 @@ export async function parseExcelFile(file: File): Promise<ImportResult> {
     }
 
     const type = String(row.type ?? '').trim()
-    if (!['main', 'accessory'].includes(type)) {
-      errors.push(`Row ${rowNum}: "type" ต้องเป็น "main" หรือ "accessory" (ได้รับ: "${type}")`)
+    if (!['main', 'accessory', 'running'].includes(type)) {
+      errors.push(`Row ${rowNum}: "type" ต้องเป็น "main", "accessory" หรือ "running" (ได้รับ: "${type}")`)
       return
     }
+    const isRunning = type === 'running'
 
     const exerciseId = String(row.exercise_id ?? '').trim().toLowerCase().replace(/\s+/g, '_')
     const exerciseName = String(row.exercise_name ?? '').trim()
@@ -93,8 +96,12 @@ export async function parseExcelFile(file: File): Promise<ImportResult> {
       return
     }
 
+    // Running rows carry distance/duration instead of sets/reps.
+    const distance = row.distance !== undefined && row.distance !== '' ? Number(row.distance) || undefined : undefined
+    const duration = row.duration !== undefined && row.duration !== '' ? Number(row.duration) || undefined : undefined
+
     const sets = Number(row.sets)
-    if (!sets || sets < 1) {
+    if (!isRunning && (!sets || sets < 1)) {
       errors.push(`Row ${rowNum}: "sets" ต้องเป็นตัวเลขมากกว่า 0`)
       return
     }
@@ -119,16 +126,27 @@ export async function parseExcelFile(file: File): Promise<ImportResult> {
 
     // Use dayOfWeek as day key (one day per day-of-week per week)
     if (!dayMap.has(dayOfWeek)) dayMap.set(dayOfWeek, [])
-    dayMap.get(dayOfWeek)!.push({
-      exerciseId,
-      name: exerciseName,
-      type: type as 'main' | 'accessory',
-      sets,
-      reps,
-      pct,
-      rpe,
-      note,
-    })
+    dayMap.get(dayOfWeek)!.push(
+      isRunning
+        ? {
+            exerciseId,
+            name: exerciseName,
+            type: 'running',
+            distanceKm: distance,
+            durationMin: duration,
+            note,
+          }
+        : {
+            exerciseId,
+            name: exerciseName,
+            type: type as 'main' | 'accessory',
+            sets,
+            reps,
+            pct,
+            rpe,
+            note,
+          }
+    )
 
     // Track focus per day (use focus from first row for that day)
     const focusKey = `${week}-${dayOfWeek}`

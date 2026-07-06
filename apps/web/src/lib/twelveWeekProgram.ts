@@ -322,10 +322,11 @@ export function dayToProgram(
     name: `${day.dayOfWeek} — ${day.focus}`,
     focus: day.focus,
     duration: 60,
-    exercises: day.exercises.map(ex => ({
+    // Running activities are logged on /runs, not the set-by-set logger — exclude them.
+    exercises: day.exercises.filter(ex => ex.type !== 'running').map(ex => ({
       exerciseId: ex.exerciseId,
       isMain: ex.type === 'main',
-      sets: Array.from({ length: ex.sets }, () => ({
+      sets: Array.from({ length: ex.sets ?? 0 }, () => ({
         w: weightOverrides?.[`${ex.exerciseId}:${ex.rpe}`] ?? 0,
         r: typeof ex.reps === 'number' ? ex.reps : 8,
       })),

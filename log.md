@@ -1,8 +1,91 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-07-02 (รอบ 21 — ✅ SHIPPED: แก้ไขโปรแกรม (Edit) creator/admin แก้โปรแกรมตัวเองได้ + prune progress)
+> อัปเดตล่าสุด: 2026-07-06 (รอบ 23 — ✅ SHIPPED: Running ในโปรแกรม + Main lift RPE/น้ำหนักใน Today's session)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-07-06 — รอบ 23 (✅ SHIPPED): Running ในโปรแกรม + Main lift ใน Today's session
+
+สองฟีเจอร์: (1) ใส่ **Running** เป็น activity ในวันของโปรแกรมได้ (เช่น Wed = วิ่ง) → โผล่ใน Today's session
+แล้วกดไปหน้า `/runs` เลย · (2) การ์ด **Today's session** บน Home ถ้าเป็น Powerlifting แสดง **RPE + น้ำหนัก Main lift**
+เป็นตัวเล็กใต้ focus
+
+### ทำอะไร
+- **types** `StructuredExercise.type += 'running'`; `sets`/`reps` เป็น optional; เพิ่ม `distanceKm?`/`durationMin?`
+  (เป้าหมายวิ่ง ไม่บังคับ) — lifting filter ทุกจุด (`e.type === 'main'|'accessory'`) ข้าม running อัตโนมัติ
+- **`rpeTable.ts`** — extract `structuredWeight(ex, oneRMs)` + export `SBD_IDS` (เดิมซ้ำใน WeekDays) ให้ WeekDays + Dashboard ใช้ร่วม;
+  **`utils.ts`** เพิ่ม `runTarget(ex)` → "5 km · 30 min"
+- **`dayToProgram`** (twelveWeekProgram.ts) — `filter(ex => ex.type !== 'running')` ก่อนแปลง + `ex.sets ?? 0` → running
+  ไม่เข้า Logger, ไม่มี divide-by-zero ใน progress bar
+- **WeekDays** — DayCard: section "RUNNING" เป็นปุ่ม 🏃 (ชื่อ + เป้าหมาย, กด → `/runs` ผ่าน `onOpenRun`); footer count เพิ่ม "· N run";
+  ถ้าวันวิ่งล้วน (`!hasLifts`) ปุ่มหลักเป็น "Go Run" แทน Start · getCalcWeight ใช้ `structuredWeight`
+- **DashboardPage** — Today's session: วันวิ่งล้วน = การ์ดทั้งใบ → `/runs` (icon 🏃, "RUN →"); วันเวท = ลิสต์ Main lift
+  ใต้ focus (`sets×reps @rpe` + น้ำหนัก accent) เฉพาะ powerlifting (calcRMs = config.oneRMs ?? personalOneRMs); ถ้ามี running ด้วยเพิ่มแถวปุ่มวิ่ง → `/runs`
+- **CreateProgramPage** — ปุ่ม "Running" ข้าง Add Exercise → `RunPicker` sheet (label + ระยะ/เวลา ไม่บังคับ) emit
+  `{exerciseId:'running', type:'running', distanceKm?, durationMin?}`; รายการท่าแสดง pill "RUN" + `runTarget`
+- **excelImport** — `type` รับ `running`; running row ไม่บังคับ sets/reps; เพิ่มคอลัมน์ `distance`/`duration` → distanceKm/durationMin
+
+### ผลกระทบ (จัดการแล้ว)
+running ไม่มี sets/reps → optional + filter ออกก่อนถึง Logger/weightOverrides (exerciseId 'running' ไม่อยู่ใน SBD_IDS อยู่แล้ว) ·
+customAccessories/AccessoryEdit จัดการเฉพาะ accessory (running แสดงจาก day.exercises เดิมเสมอ) · nested `<button>` เลี่ยงด้วยการเปลี่ยนการ์ด
+Today's session (กรณีมีเวท) เป็น `<div>` ครอบปุ่มพี่น้อง · non-SBD main → structuredWeight คืน null โชว์แค่ sets×reps@rpe
+
+### verify
+`tsc -b && vite build` ผ่าน (111 modules) + ESLint ผ่าน · **ยังไม่ได้ click-through e2e** (แอป gate ด้วย Supabase auth รัน headless ไม่ได้)
+→ ควรทดสอบ: สร้างโปรแกรม + วัน Wed + Running 5km/30min → หน้าโปรแกรมเห็น RUNNING กดไป /runs · Today's session (ถ้าตรงวัน) เห็น main lift + น้ำหนัก
+
+### ไม่ทำรอบนี้
+running-only day ไม่ได้ track "done" status ผ่าน Logger (วิ่งบันทึกที่ /runs แยก) · ไม่ auto-prefill ระยะ/เวลาเป้าหมายเข้าฟอร์ม /runs
+
+---
+
+## 2026-07-06 — รอบ 22 (PLANNED): ปรับปรุงการจัดเก็บข้อมูล (data storage hardening)
+
+จากการ audit สถาปัตยกรรมข้อมูลทั้ง 3 ชั้น (Zustand → localStorage → Supabase) พบจุดอ่อนที่ทำข้อมูลผู้ใช้หายได้จริง + ช่องโหว่ RLS + จุดที่จะช้าเมื่อผู้ใช้โต. แบ่งเป็น 3 รอบย่อย A→B→C
+
+### สถาปัตยกรรมปัจจุบัน (สรุป)
+- localStorage 3 กล่อง: `atlas:v2` (useAppStore: history เต็ม set-level, workout, bio, bodyMetrics, runs, customExercises) ·
+  `atlas:v1:program-progress` (useProgramStore: progress/configs/customAccessories/customPrograms nested เต็ม) ·
+  `atlas:v1:sync-queue` (offline queue, payload เต็มซ้ำ)
+- Supabase: sessions/custom_programs/program_state เก็บเป็น jsonb blob; body_metrics/runs/exercises columnar
+- sync: write-through fire-and-forget, conflict = last-write-wins, login ดึงทุกตาราง overwrite local (guard เฉพาะ program_state)
+
+### รอบ A — กันข้อมูลหาย (client อย่างเดียว, ไม่แตะ DB) — ทำก่อน
+1. **version+migrate บน persisted stores** — `useAppStore.ts:189` เคย bump `atlas:v1`→`atlas:v2` โดยไม่มี migrate (user เก่าโดน reset เงียบ, blob v1 ค้าง);
+   `useProgramStore.ts:229` ไม่มี version → เพิ่ม `version` + `migrate` ทั้ง 2 stores; ใน migrate อ่าน `atlas:v1` เก่ามา merge แล้วลบทิ้ง
+2. **เพิ่ม `session-delete` op** ใน `syncQueue.ts` (ตอนนี้ SyncOp ไม่มี → ลบ session แล้ว login ใหม่ฟื้นคืนชีพ) + ผูก UI ลบ session
+3. **flush ก่อน hydrate** — `useAuthStore.loadUserData` ตอนนี้ overwrite history จาก cloud โดยไม่รอ flushQueue → session ที่ซ้อมตอน offline หายจากตา;
+   แก้เป็น `await flushQueue()` ก่อน fetch (หรือ merge union-by-id สำหรับ sessions/metrics/runs)
+4. **เลิกกลืน error** — `writeQueue` catch{} เงียบตอน quota เต็ม → แจ้งเตือน (toast/flag ใน store) + ใส่ retry cap/backoff ใน flushQueue (ตอนนี้ op fail ถาวรวนไม่จบ)
+5. **id ใช้ `crypto.randomUUID()`** แทน `'h'+Date.now()` (ชนกันได้ใน ms เดียว)
+
+### รอบ B — ปิดช่อง RLS + index (SQL ใน Supabase + อัปเดต SUPABASE_SETUP.md)
+6. **`shared_programs` SELECT policy** ตอนนี้ `to authenticated using (true)` (SUPABASE_SETUP.md:85-86) → user ที่ login อ่านได้ทั้งตารางรวม share ส่วนตัวของคนอื่น;
+   แยกเป็น: public อ่านได้ทุกคน + private อ่านได้เฉพาะ owner + **RPC `security definer` รับ code** สำหรับ import-by-code
+   ⚠️ policy นี้เคยเป็นต้นเหตุบั๊ก "import by code not found" (2026-06-22) — ต้อง e2e ทดสอบ import/discover ซ้ำ
+7. **เพิ่ม indexes** (ตอนนี้มีแค่ push_subscriptions): `sessions(user_id, date desc)` · `body_metrics(user_id, date)` · `runs(user_id, date)` ·
+   `coach_athlete(coach_id, status)` · `coach_athlete(athlete_id)` · `shared_programs(is_public)` partial
+8. **เพิ่ม `updated_at` + trigger** ตารางหลัก (เตรียมทางเทียบ conflict; ตอนนี้ program_state ตั้ง client-side แต่ไม่เคยใช้)
+
+### รอบ C — hygiene + ลดโหลด (ทำเมื่อว่าง)
+9. **schema เข้า git** — `supabase/migrations/` ที่ CLAUDE.md อ้างไม่มีจริง; `supabase db pull` จาก linked project ให้ rebuild ได้ด้วยคำสั่งเดียว
+   (profiles schema ตอนนี้ฝังใน log.md เท่านั้น)
+10. **cache exercises 1,324 แถว** (TanStack Query staleTime ยาว / IndexedDB) — ตอนนี้ re-fetch ทุก login เพราะ dbExercises ไม่ persist
+11. **โหลด sessions แบบ date-window** (เช่น 6 เดือนล่าสุด + โหลดเพิ่มใน History) — ตอนนี้ดึงหมดทุก login
+12. (ถ้าต้อง merge ข้ามอุปกรณ์จริง) แตก `program_state` blob เป็น field-level หรือเทียบ updated_at ก่อน upsert — ตอนนี้ 2 เครื่องทับกันทั้ง blob
+
+### ผลกระทบถ้าไม่ทำ
+A: ข้อมูลหาย 4 ทาง (บางทางเกิดแล้ว — v1→v2 ไม่มี migrate) · B: ช่องโหว่ privacy + ช้าเมื่อ data โต · C: rebuild DB ยาก + เปิดแอปช้าลงเรื่อย ๆ
+
+### Verify (ต่อรอบ)
+A: seed `atlas:v1` เก่า → เปิดแอป migrate ครบ · จบ workout offline → login → ไม่หาย · ลบ session → relogin → ไม่ฟื้น · build+lint ผ่าน
+B: query `shared_programs` ตรงด้วย user อื่น → เห็นเฉพาะ public · import by code + Discover ยังทำงาน (e2e 390px)
+C: cold load รอบ 2 ไม่ fetch exercises ซ้ำ (network tab)
+
+### ไฟล์หลัก
+`useAppStore.ts` · `useProgramStore.ts` · `useAuthStore.ts` · `syncQueue.ts` · `SUPABASE_SETUP.md` + SQL Editor · ภายหลัง `supabase/migrations/`
 
 ---
 

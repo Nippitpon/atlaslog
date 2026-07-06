@@ -5,8 +5,8 @@ import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
 import { createShare } from '../../lib/shareApi.js'
 import { allExercises } from '../../lib/data.js'
-import { getExercise, muscleColor } from '../../lib/utils.js'
-import { IconChevronLeft, IconPlus, IconX, IconCheck, IconSearch, IconCopy } from '../../components/icons/index.js'
+import { getExercise, muscleColor, runTarget } from '../../lib/utils.js'
+import { IconChevronLeft, IconPlus, IconX, IconCheck, IconSearch, IconCopy, IconRun } from '../../components/icons/index.js'
 
 type Visibility = 'private' | 'code' | 'public'
 
@@ -38,6 +38,8 @@ export function CreateProgramPage() {
 
   // exercise picker target: index of day we're adding to (null = closed)
   const [pickerDay, setPickerDay] = useState<number | null>(null)
+  // running picker target: index of day we're adding a run to (null = closed)
+  const [runDay, setRunDay] = useState<number | null>(null)
 
   const addDay = () => {
     const used = new Set(days.map(d => d.dayOfWeek))
@@ -235,15 +237,19 @@ export function CreateProgramPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
                   {day.exercises.map((ex, ei) => (
                     <div key={ei} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span className="pill" style={{ fontSize: 8, flexShrink: 0 }}>{ex.type === 'main' ? 'MAIN' : 'ACC'}</span>
+                      <span className="pill" style={{ fontSize: 8, flexShrink: 0 }}>
+                        {ex.type === 'main' ? 'MAIN' : ex.type === 'running' ? 'RUN' : 'ACC'}
+                      </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.name}</div>
-                        {getExercise(ex.exerciseId)?.group && (
+                        {ex.type !== 'running' && getExercise(ex.exerciseId)?.group && (
                           <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)' }}>{getExercise(ex.exerciseId).group}</div>
                         )}
                       </div>
                       <span className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>
-                        {ex.sets}×{ex.reps}{ex.rpe !== undefined ? ` @${ex.rpe}` : ''}
+                        {ex.type === 'running'
+                          ? (runTarget(ex) || 'Run')
+                          : `${ex.sets}×${ex.reps}${ex.rpe !== undefined ? ` @${ex.rpe}` : ''}`}
                       </span>
                       <button onClick={() => removeExercise(di, ei)} aria-label="Remove exercise"
                         style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 2, flexShrink: 0 }}>
@@ -254,10 +260,16 @@ export function CreateProgramPage() {
                 </div>
               )}
 
-              <button className="btn btn-secondary" style={{ width: '100%', height: 38, fontSize: 12 }}
-                onClick={() => setPickerDay(di)}>
-                <IconPlus size={14} /> Add Exercise
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-secondary" style={{ flex: 1, height: 38, fontSize: 12 }}
+                  onClick={() => setPickerDay(di)}>
+                  <IconPlus size={14} /> Add Exercise
+                </button>
+                <button className="btn btn-secondary" style={{ height: 38, fontSize: 12, padding: '0 12px', flexShrink: 0 }}
+                  onClick={() => setRunDay(di)}>
+                  <IconRun size={14} /> Running
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -320,6 +332,13 @@ export function CreateProgramPage() {
         />
       )}
 
+      {runDay !== null && (
+        <RunPicker
+          onPick={ex => { addExerciseToDay(runDay, ex); setRunDay(null) }}
+          onClose={() => setRunDay(null)}
+        />
+      )}
+
       {/* Published share code */}
       {publishedCode && (
         <div className="sheet-backdrop" onClick={() => navigate('/programs')} style={{ zIndex: 100 }}>
@@ -345,6 +364,62 @@ export function CreateProgramPage() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function RunPicker({ onPick, onClose }: { onPick: (ex: StructuredExercise) => void; onClose: () => void }) {
+  const [label, setLabel] = useState('')
+  const [dist, setDist] = useState('')
+  const [dur, setDur] = useState('')
+
+  const confirm = () => {
+    onPick({
+      exerciseId: 'running',
+      name: label.trim() || 'Running',
+      type: 'running',
+      ...(Number(dist) > 0 ? { distanceKm: Number(dist) } : {}),
+      ...(Number(dur) > 0 ? { durationMin: Number(dur) } : {}),
+    })
+  }
+
+  return (
+    <div className="sheet-backdrop" onClick={onClose} style={{ zIndex: 100 }}>
+      <div className="sheet" onClick={e => e.stopPropagation()}>
+        <div className="sheet-handle" />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+          <h3 className="t-display" style={{ margin: 0, fontSize: 20 }}>Add Running</h3>
+          <button className="btn-icon" onClick={onClose}><IconX size={18} /></button>
+        </div>
+        <p className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 16 }}>
+          ตั้งเป้าหมายระยะ/เวลา (ไม่บังคับ) · วันนี้จะแสดงเป็น Running แล้วกดไปหน้า Running
+        </p>
+
+        <div style={{ marginBottom: 12 }}>
+          <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>LABEL (OPT)</div>
+          <input className="input-num" type="text" value={label} placeholder="e.g. Easy Zone 2"
+            onChange={e => setLabel(e.target.value)}
+            style={{ width: '100%', textAlign: 'left', fontFamily: 'var(--font-mono)', textTransform: 'none', fontSize: 13 }} />
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          {[
+            { label: 'DISTANCE (KM)', val: dist, set: setDist, ph: '5' },
+            { label: 'TIME (MIN)', val: dur, set: setDur, ph: '30' },
+          ].map(({ label, val, set, ph }) => (
+            <div key={label} style={{ flex: 1 }}>
+              <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>{label}</div>
+              <input className="input-num tnum" type="number" inputMode="decimal" value={val} placeholder={ph}
+                onChange={e => set(e.target.value)} onFocus={e => e.target.select()}
+                style={{ width: '100%', textAlign: 'center' }} />
+            </div>
+          ))}
+        </div>
+
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={confirm}>
+          <IconPlus size={16} /> Add to Day
+        </button>
+      </div>
     </div>
   )
 }

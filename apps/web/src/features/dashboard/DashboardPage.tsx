@@ -6,7 +6,8 @@ import { useAuthStore } from '../../store/useAuthStore.js'
 import { markAllRead, markRead } from '../../lib/notificationsApi.js'
 import { respondCoachRequest } from '../../lib/coachApi.js'
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
-import { weeklyVolume, getDayOfWeek } from '../../lib/utils.js'
+import { structuredWeight } from '../../lib/rpeTable.js'
+import { weeklyVolume, getDayOfWeek, runTarget } from '../../lib/utils.js'
 import { IconUser, IconDumbbell, IconSearch, IconCheck, IconBell, IconRun, IconUsers } from '../../components/icons/index.js'
 
 const DAY_SHORT = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
@@ -46,7 +47,7 @@ const PHASE_COLOR: Record<string, string> = {
 
 export function DashboardPage() {
   const navigate = useNavigate()
-  const { history } = useAppStore()
+  const { history, personalOneRMs } = useAppStore()
   const { configs, getDayStatus, customPrograms, progress } = useProgramStore()
   const { notifications, refreshNotifications } = useAuthStore()
 
@@ -230,25 +231,102 @@ export function DashboardPage() {
       )}
 
       {/* Today's training reminder */}
-      {todayReminder && (
-        <div style={{ padding: '0 20px', marginBottom: 16 }}>
-          <button
-            style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box' }}
-            onClick={() => navigate(`/programs/${todayReminder.program.id}/week/${todayReminder.currentWeek.id}`)}
-          >
-            <div className="card card-tight" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ fontSize: 22 }}>🗓️</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>TODAY'S SESSION</div>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>
-                  {todayReminder.day.focus}
+      {todayReminder && (() => {
+        const { day, program, currentWeek } = todayReminder
+        const runs = day.exercises.filter(e => e.type === 'running')
+        const mains = day.exercises.filter(e => e.type === 'main')
+        const hasLifts = mains.length > 0 || day.exercises.some(e => e.type === 'accessory')
+        const isPowerlifting = (program.programType ?? 'powerlifting') === 'powerlifting'
+        const configRMs = configs[program.id]?.oneRMs
+        const hasConfigRMs = !!configRMs && (configRMs.squat > 0 || configRMs.bench > 0 || configRMs.deadlift > 0)
+        const calcRMs = isPowerlifting ? (hasConfigRMs ? configRMs! : personalOneRMs) : null
+        const weekHref = `/programs/${program.id}/week/${currentWeek.id}`
+
+        // Running-only day → the whole card opens the /runs logger
+        if (!hasLifts && runs.length > 0) {
+          const target = runTarget(runs[0])
+          return (
+            <div style={{ padding: '0 20px', marginBottom: 16 }}>
+              <button
+                style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box' }}
+                onClick={() => navigate('/runs')}
+              >
+                <div className="card card-tight" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ fontSize: 22 }}>🏃</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>TODAY'S SESSION</div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>
+                      {day.focus}
+                    </div>
+                    {target && (
+                      <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{target}</div>
+                    )}
+                  </div>
+                  <span className="t-mono" style={{ fontSize: 11, color: 'var(--accent)' }}>RUN →</span>
                 </div>
-              </div>
-              <span className="t-mono" style={{ fontSize: 11, color: 'var(--accent)' }}>START →</span>
+              </button>
             </div>
-          </button>
-        </div>
-      )}
+          )
+        }
+
+        return (
+          <div style={{ padding: '0 20px', marginBottom: 16 }}>
+            <div className="card card-tight">
+              <button
+                style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, width: '100%', boxSizing: 'border-box' }}
+                onClick={() => navigate(weekHref)}
+              >
+                <div style={{ fontSize: 22 }}>🗓️</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>TODAY'S SESSION</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>
+                    {day.focus}
+                  </div>
+                </div>
+                <span className="t-mono" style={{ fontSize: 11, color: 'var(--accent)' }}>START →</span>
+              </button>
+
+              {/* Main lifts — RPE + working weight (powerlifting) */}
+              {mains.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 10, paddingLeft: 34 }}>
+                  {mains.map((ex, i) => {
+                    const wt = structuredWeight(ex, calcRMs)
+                    return (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.name}</span>
+                        <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 'auto', flexShrink: 0 }}>
+                          {ex.sets != null && `${ex.sets}×${ex.reps}`}
+                          {ex.rpe !== undefined && ` @${ex.rpe}`}
+                          {wt ? <span style={{ color: 'var(--accent)', marginLeft: 6 }}>{wt}kg</span> : null}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Running on a lifting day → separate tap target to /runs */}
+              {runs.length > 0 && (
+                <button
+                  onClick={() => navigate('/runs')}
+                  style={{
+                    all: 'unset', cursor: 'pointer', boxSizing: 'border-box', width: '100%',
+                    display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, padding: '8px 10px',
+                    borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)',
+                  }}
+                >
+                  <IconRun size={15} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{runs[0].name}</span>
+                  {runTarget(runs[0]) && (
+                    <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>{runTarget(runs[0])}</span>
+                  )}
+                  <span className="t-mono" style={{ fontSize: 10, color: 'var(--accent)', marginLeft: 'auto' }}>LOG →</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Stats card */}
       <div style={{ padding: '0 20px', marginBottom: 16 }}>

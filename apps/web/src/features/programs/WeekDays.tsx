@@ -4,8 +4,9 @@ import type { DayStatus, StructuredDay, StructuredExercise, StructuredProgram, S
 import { dayToProgram } from '../../lib/twelveWeekProgram.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAppStore } from '../../store/useAppStore.js'
-import { calcWeight } from '../../lib/rpeTable.js'
-import { IconCheck, IconPlay, IconChevronRight, IconEdit } from '../../components/icons/index.js'
+import { calcWeight, structuredWeight, SBD_IDS } from '../../lib/rpeTable.js'
+import { runTarget } from '../../lib/utils.js'
+import { IconCheck, IconPlay, IconChevronRight, IconEdit, IconRun } from '../../components/icons/index.js'
 import { AccessoryEditSheet } from './AccessoryEditSheet.js'
 
 const STATUS_CONFIG: Record<DayStatus, { label: string; bg: string; border: string; color: string }> = {
@@ -17,10 +18,6 @@ const STATUS_CONFIG: Record<DayStatus, { label: string; bg: string; border: stri
 const DAY_FULL: Record<string, string> = {
   Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday',
   Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday',
-}
-
-const SBD_IDS: Record<string, 'squat' | 'bench' | 'deadlift'> = {
-  squat: 'squat', bench: 'bench', deadlift: 'deadlift',
 }
 
 function StatusBadge({ status }: { status: DayStatus }) {
@@ -40,7 +37,7 @@ function StatusBadge({ status }: { status: DayStatus }) {
 }
 
 function DayCard({
-  day, status, accessories, oneRMs, onStart, onEditAccessories,
+  day, status, accessories, oneRMs, onStart, onEditAccessories, onOpenRun,
 }: {
   day: StructuredDay
   status: DayStatus
@@ -48,8 +45,11 @@ function DayCard({
   oneRMs: { squat: number; bench: number; deadlift: number } | null
   onStart: () => void
   onEditAccessories: () => void
+  onOpenRun: () => void
 }) {
   const mains = day.exercises.filter(e => e.type === 'main').slice(0, 2)
+  const runs = day.exercises.filter(e => e.type === 'running')
+  const hasLifts = day.exercises.some(e => e.type === 'main') || accessories.length > 0
   const isDone = status === 'done'
   const isInProgress = status === 'in_progress'
 
@@ -58,16 +58,7 @@ function DayCard({
     ? { background: 'var(--surface-2)', color: 'var(--text-2)', border: '1px solid var(--border)' }
     : { background: 'var(--accent)', color: 'var(--accent-ink)', border: 'none' }
 
-  const getCalcWeight = (ex: StructuredExercise): number | null => {
-    if (!oneRMs) return null
-    const liftKey = SBD_IDS[ex.exerciseId]
-    if (!liftKey) return null
-    const rm = oneRMs[liftKey]
-    if (!rm) return null
-    if (ex.pct !== undefined) return Math.round(rm * ex.pct / 2.5) * 2.5
-    if (ex.rpe === undefined || typeof ex.reps !== 'number') return null
-    return calcWeight(rm, ex.reps, ex.rpe)
-  }
+  const getCalcWeight = (ex: StructuredExercise): number | null => structuredWeight(ex, oneRMs)
 
   return (
     <div className="card" style={{
@@ -151,11 +142,42 @@ function DayCard({
         </div>
       )}
 
+      {/* Running — logged on the /runs page, not the set logger */}
+      {runs.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 5 }}>RUNNING</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {runs.map((ex, i) => {
+              const target = runTarget(ex)
+              return (
+                <button
+                  key={i}
+                  onClick={e => { e.stopPropagation(); onOpenRun() }}
+                  style={{
+                    all: 'unset', cursor: 'pointer', boxSizing: 'border-box', width: '100%',
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                    borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)',
+                  }}
+                >
+                  <IconRun size={15} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{ex.name}</span>
+                  {target && (
+                    <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>{target}</span>
+                  )}
+                  <span className="t-mono" style={{ fontSize: 10, color: 'var(--accent)', marginLeft: 'auto' }}>LOG →</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Footer: count + edit + start */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
             {day.exercises.filter(e => e.type === 'main').length + accessories.length} exercises
+            {runs.length > 0 && ` · ${runs.length} run`}
           </span>
           <button
             onClick={e => { e.stopPropagation(); onEditAccessories() }}
@@ -169,19 +191,34 @@ function DayCard({
             <IconEdit size={11} /> Edit
           </button>
         </div>
-        <button
-          onClick={onStart}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 7,
-            padding: '0 16px', height: 36, borderRadius: 10,
-            fontFamily: 'var(--font-display)', fontWeight: 700,
-            fontSize: 12, letterSpacing: '0.05em', textTransform: 'uppercase',
-            cursor: 'pointer', ...btnStyle,
-          }}
-        >
-          {isDone ? <IconChevronRight size={14} /> : <IconPlay size={14} />}
-          {btnLabel}
-        </button>
+        {hasLifts ? (
+          <button
+            onClick={onStart}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              padding: '0 16px', height: 36, borderRadius: 10,
+              fontFamily: 'var(--font-display)', fontWeight: 700,
+              fontSize: 12, letterSpacing: '0.05em', textTransform: 'uppercase',
+              cursor: 'pointer', ...btnStyle,
+            }}
+          >
+            {isDone ? <IconChevronRight size={14} /> : <IconPlay size={14} />}
+            {btnLabel}
+          </button>
+        ) : runs.length > 0 ? (
+          <button
+            onClick={e => { e.stopPropagation(); onOpenRun() }}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              padding: '0 16px', height: 36, borderRadius: 10,
+              fontFamily: 'var(--font-display)', fontWeight: 700,
+              fontSize: 12, letterSpacing: '0.05em', textTransform: 'uppercase',
+              cursor: 'pointer', background: 'var(--accent)', color: 'var(--accent-ink)', border: 'none',
+            }}
+          >
+            <IconRun size={14} /> Go Run
+          </button>
+        ) : null}
       </div>
     </div>
   )
@@ -246,6 +283,7 @@ export function WeekDays({ program, week }: { program: StructuredProgram; week: 
               oneRMs={calcRMs}
               onStart={() => handleStart(day)}
               onEditAccessories={() => setEditingDayId(day.id)}
+              onOpenRun={() => navigate('/runs')}
             />
           )
         })}
