@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
@@ -8,7 +8,7 @@ import { respondCoachRequest } from '../../lib/coachApi.js'
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { structuredWeight } from '../../lib/rpeTable.js'
 import { weeklyVolume, getDayOfWeek, runTarget } from '../../lib/utils.js'
-import { IconUser, IconDumbbell, IconSearch, IconCheck, IconBell, IconRun, IconUsers } from '../../components/icons/index.js'
+import { IconDumbbell, IconSearch, IconCheck, IconBell, IconRun, IconUsers, IconX } from '../../components/icons/index.js'
 
 const DAY_SHORT = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 
@@ -51,9 +51,11 @@ export function DashboardPage() {
   const { configs, getDayStatus, customPrograms, progress } = useProgramStore()
   const { notifications, refreshNotifications } = useAuthStore()
 
+  const [showNotifs, setShowNotifs] = useState(false)
   const unread = useMemo(() => notifications.filter(n => !n.readAt), [notifications])
   const coachRequests = useMemo(() => unread.filter(n => n.type === 'coach_request'), [unread])
   const bannerNotifs = useMemo(() => unread.filter(n => n.type !== 'coach_request'), [unread])
+  const unreadCount = unread.length
 
   const dismissNotifications = async () => {
     const { user } = useAuthStore.getState()
@@ -162,73 +164,26 @@ export function DashboardPage() {
           <div className="sub">{getDayOfWeek()}</div>
           <h1>Let's lift.</h1>
         </div>
-        <button className="btn-icon" onClick={() => navigate('/profile')} aria-label="Profile">
-          <IconUser size={20} />
+        <button
+          className="btn-icon"
+          onClick={() => setShowNotifs(true)}
+          aria-label="Notifications"
+          style={{ position: 'relative' }}
+        >
+          <IconBell size={20} />
+          {unreadCount > 0 && (
+            <span style={{
+              position: 'absolute', top: -3, right: -3, minWidth: 16, height: 16, padding: '0 3px',
+              borderRadius: 8, background: 'var(--danger)', color: '#fff',
+              fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
+            }}>
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
         </button>
       </div>
 
-      {/* Coach requests — need the athlete's consent */}
-      {coachRequests.length > 0 && (
-        <div style={{ padding: '0 20px', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {coachRequests.map(n => {
-            const coachId = (n.data?.coach_id as string) || ''
-            const coachEmail = (n.data?.coach_email as string) || 'A coach'
-            return (
-              <div key={n.id} className="card card-tight" style={{ borderLeft: '3px solid #f97316', paddingLeft: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <IconUsers size={15} style={{ color: '#f97316' }} />
-                  <div className="t-eyebrow" style={{ fontSize: 9 }}>COACH REQUEST</div>
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 10 }}>
-                  <b>{coachEmail}</b> wants to coach you. ยอมรับเพื่อให้โค้ชเห็นข้อมูลการซ้อมของคุณ
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    className="btn btn-primary"
-                    style={{ flex: 1, height: 40, fontSize: 12 }}
-                    disabled={!coachId}
-                    onClick={() => void respondRequest(n.id, coachId, true)}
-                  >
-                    Accept
-                  </button>
-                  <button
-                    className="btn btn-secondary"
-                    style={{ flex: 1, height: 40, fontSize: 12 }}
-                    onClick={() => void respondRequest(n.id, coachId, false)}
-                  >
-                    Decline
-                  </button>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Notifications banner */}
-      {bannerNotifs.length > 0 && (
-        <div style={{ padding: '0 20px', marginBottom: 16 }}>
-          <div className="card card-tight" style={{ borderLeft: '3px solid var(--accent)', paddingLeft: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <IconBell size={15} style={{ color: 'var(--accent)' }} />
-              <div className="t-eyebrow" style={{ fontSize: 9, flex: 1 }}>NOTIFICATIONS</div>
-              <button
-                onClick={() => void dismissNotifications()}
-                style={{ all: 'unset', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)' }}
-              >
-                MARK ALL READ
-              </button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {bannerNotifs.slice(0, 5).map(n => (
-                <div key={n.id} style={{ fontSize: 13, color: 'var(--text)' }}>
-                  {notificationText(n)}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Today's training reminder */}
       {todayReminder && (() => {
@@ -516,6 +471,84 @@ export function DashboardPage() {
           </button>
         ))}
       </div>
+
+      {/* Notifications sheet */}
+      {showNotifs && (
+        <div className="sheet-backdrop" onClick={() => setShowNotifs(false)} style={{ zIndex: 100 }}>
+          <div className="sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '80%', overflowY: 'auto' }}>
+            <div className="sheet-handle" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <h3 className="t-display" style={{ margin: 0, fontSize: 20 }}>Notifications</h3>
+              <button className="btn-icon" onClick={() => setShowNotifs(false)} aria-label="Close"><IconX size={18} /></button>
+            </div>
+
+            {unread.length === 0 ? (
+              <div className="t-mono" style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', padding: '32px 0' }}>
+                ไม่มีการแจ้งเตือนใหม่
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+                {/* Coach requests — need the athlete's consent */}
+                {coachRequests.map(n => {
+                  const coachId = (n.data?.coach_id as string) || ''
+                  const coachEmail = (n.data?.coach_email as string) || 'A coach'
+                  return (
+                    <div key={n.id} className="card card-tight" style={{ borderLeft: '3px solid #f97316', paddingLeft: 14 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <IconUsers size={15} style={{ color: '#f97316' }} />
+                        <div className="t-eyebrow" style={{ fontSize: 9 }}>COACH REQUEST</div>
+                      </div>
+                      <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 10 }}>
+                        <b>{coachEmail}</b> wants to coach you. ยอมรับเพื่อให้โค้ชเห็นข้อมูลการซ้อมของคุณ
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          className="btn btn-primary"
+                          style={{ flex: 1, height: 40, fontSize: 12 }}
+                          disabled={!coachId}
+                          onClick={() => void respondRequest(n.id, coachId, true)}
+                        >
+                          Accept
+                        </button>
+                        <button
+                          className="btn btn-secondary"
+                          style={{ flex: 1, height: 40, fontSize: 12 }}
+                          onClick={() => void respondRequest(n.id, coachId, false)}
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {/* Informational notifications */}
+                {bannerNotifs.map(n => (
+                  <div key={n.id} className="card card-tight" style={{ borderLeft: '3px solid var(--accent)', paddingLeft: 14 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <IconBell size={15} style={{ color: 'var(--accent)' }} />
+                      <div className="t-eyebrow" style={{ fontSize: 9 }}>NOTIFICATION</div>
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--text)' }}>
+                      {notificationText(n)}
+                    </div>
+                  </div>
+                ))}
+
+                {bannerNotifs.length > 0 && (
+                  <button
+                    className="btn btn-secondary"
+                    style={{ width: '100%', height: 40, fontSize: 12, marginTop: 4 }}
+                    onClick={() => void dismissNotifications()}
+                  >
+                    Mark all read
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
     </div>
   )
