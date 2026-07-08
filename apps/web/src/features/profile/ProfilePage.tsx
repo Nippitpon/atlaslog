@@ -64,6 +64,7 @@ export function ProfilePage() {
   const [draft, setDraft] = useState(personalOneRMs)
   const [saved, setSaved] = useState(false)
   const [show1RM, setShow1RM] = useState(false)
+  const [showVer, setShowVer] = useState(false)
 
   const handleSave = () => {
     setPersonalOneRMs(draft)
@@ -445,6 +446,28 @@ export function ProfilePage() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Version — tap the mark to reveal */}
+      <div style={{ padding: '0 20px 40px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+        <button
+          onClick={() => setShowVer(v => !v)}
+          aria-label="App version"
+          style={{
+            width: 26, height: 26, borderRadius: 8, cursor: 'pointer',
+            background: 'transparent', border: '1px solid var(--border)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--muted)', opacity: 0.5,
+          }}
+        >
+          <IconBolt size={13} />
+        </button>
+        {showVer && (
+          <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', textAlign: 'center', lineHeight: 1.5 }}>
+            Atlaslog v{__APP_VERSION__}<br />
+            {__APP_COMMIT__} · {__APP_BUILD_DATE__}
+          </div>
+        )}
       </div>
 
       {/* Personal 1RM popup */}
