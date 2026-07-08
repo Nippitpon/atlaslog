@@ -4,6 +4,7 @@ import type { Session, Workout, Program, BodyMetricEntry, RunEntry, Exercise, Us
 import { makeSeedHistory, setCustomExercisesRegistry, setDbExercisesRegistry } from '../lib/data.js'
 import { useProgramStore } from './useProgramStore.js'
 import { syncSession, syncBodyMetric, syncBodyMetricDelete, syncRun, syncRunDelete, syncExercise, syncExerciseDelete } from '../lib/syncQueue.js'
+import { sessionCalories, latestWeightKg } from '../lib/calories.js'
 
 interface OneRMs { squat: number; bench: number; deadlift: number }
 
@@ -101,12 +102,16 @@ export const useAppStore = create<AppStore>()(
       }),
 
       finishWorkout: () => {
-        const { workout, history } = get()
+        const { workout, history, bodyMetrics } = get()
         if (!workout) return null
         const duration = Math.max(1, Math.round((Date.now() - workout.startTime) / 60000))
         const volume = workout.exercises.reduce((s, e) =>
           s + e.sets.filter(x => x.done).reduce((ss, st) => ss + (st.w * st.r), 0), 0)
         const setCount = workout.exercises.reduce((s, e) => s + e.sets.filter(x => x.done).length, 0)
+        const calories = sessionCalories(
+          { exercises: workout.exercises, duration },
+          latestWeightKg(bodyMetrics),
+        )
         const session: Session = {
           id: 'h' + Date.now(),
           programId: workout.programId,
@@ -115,6 +120,7 @@ export const useAppStore = create<AppStore>()(
           duration,
           volume,
           setCount,
+          calories,
           exercises: workout.exercises,
         }
         set({ history: [session, ...history], workout: null })

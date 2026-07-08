@@ -8,6 +8,8 @@ import { respondCoachRequest } from '../../lib/coachApi.js'
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { structuredWeight } from '../../lib/rpeTable.js'
 import { weeklyVolume, getDayOfWeek, runTarget } from '../../lib/utils.js'
+import { latestWeightKg, weeklyCalories } from '../../lib/calories.js'
+import { CalorieRing } from './CalorieRing.js'
 import { IconDumbbell, IconSearch, IconCheck, IconBell, IconRun, IconUsers, IconX } from '../../components/icons/index.js'
 
 const DAY_SHORT = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
@@ -47,7 +49,7 @@ const PHASE_COLOR: Record<string, string> = {
 
 export function DashboardPage() {
   const navigate = useNavigate()
-  const { history, personalOneRMs } = useAppStore()
+  const { history, personalOneRMs, bodyMetrics, runs } = useAppStore()
   const { configs, getDayStatus, customPrograms, progress } = useProgramStore()
   const { notifications, refreshNotifications } = useAuthStore()
 
@@ -73,6 +75,11 @@ export function DashboardPage() {
       await refreshNotifications()
     } catch { /* ignore */ }
   }
+
+  const weightKg = useMemo(() => latestWeightKg(bodyMetrics), [bodyMetrics])
+  const calWeek = useMemo(() => weeklyCalories(history, runs, weightKg), [history, runs, weightKg])
+  const caloriesToday = calWeek.find(d => d.isToday)?.calories ?? 0
+  const caloriesPeak = Math.max(0, ...calWeek.map(d => d.calories))
 
   const week = weeklyVolume(history)
   const maxVol = Math.max(1, ...week.map(d => d.volume))
@@ -286,6 +293,18 @@ export function DashboardPage() {
       {/* Stats card */}
       <div style={{ padding: '0 20px', marginBottom: 16 }}>
         <div className="card">
+          {/* Calories burned ring */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+            <CalorieRing
+              calories={caloriesToday}
+              peak={caloriesPeak}
+              subtitle={weightKg
+                ? (caloriesPeak > 0 ? `PEAK ${caloriesPeak.toLocaleString()} kcal · สัปดาห์นี้` : 'ยังไม่มีการซ้อมสัปดาห์นี้')
+                : 'ใส่น้ำหนักตัวใน Profile เพื่อคำนวณ'}
+              onClick={weightKg ? undefined : () => navigate('/profile')}
+            />
+          </div>
+
           {/* SBD Total row */}
           {sbdTotal.total > 0 && (
             <div style={{

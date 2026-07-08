@@ -1,6 +1,8 @@
 import type { Workout } from '@atlaslog/shared'
 import { IconCheck } from '../../components/icons/index.js'
 import { getExercise } from '../../lib/utils.js'
+import { useAppStore } from '../../store/useAppStore.js'
+import { sessionCalories, latestWeightKg } from '../../lib/calories.js'
 
 interface FinishReviewProps {
   workout: Workout
@@ -10,10 +12,12 @@ interface FinishReviewProps {
 }
 
 export function FinishReview({ workout, now, onConfirm, onCancel }: FinishReviewProps) {
+  const bodyMetrics = useAppStore(s => s.bodyMetrics)
   const duration = Math.max(1, Math.round((now - workout.startTime) / 60000))
   const volume = workout.exercises.reduce((s, e) =>
     s + e.sets.filter(x => x.done).reduce((ss, st) => ss + (st.w * st.r), 0), 0)
   const setCount = workout.exercises.reduce((s, e) => s + e.sets.filter(x => x.done).length, 0)
+  const calories = sessionCalories({ exercises: workout.exercises, duration }, latestWeightKg(bodyMetrics))
 
   const done = workout.exercises
     .map((e, idx) => ({ key: `${e.exerciseId}-${idx}`, exerciseId: e.exerciseId, sets: e.sets.filter(s => s.done) }))
@@ -45,14 +49,15 @@ export function FinishReview({ workout, now, onConfirm, onCancel }: FinishReview
         </div>
 
         {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 20 }}>
           {[
             { value: String(duration), unit: 'min' },
             { value: `${(volume / 1000).toFixed(1)}k`, unit: 'kg' },
             { value: String(setCount), unit: 'sets' },
+            { value: calories > 0 ? String(calories) : '—', unit: 'kcal' },
           ].map((item, i) => (
-            <div key={i} style={{ textAlign: 'center', padding: '12px 8px', background: 'var(--surface-2)', borderRadius: 12 }}>
-              <div className="stat-big tnum" style={{ fontSize: 22 }}>{item.value}</div>
+            <div key={i} style={{ textAlign: 'center', padding: '12px 4px', background: 'var(--surface-2)', borderRadius: 12 }}>
+              <div className="stat-big tnum" style={{ fontSize: 18 }}>{item.value}</div>
               <div className="t-eyebrow" style={{ fontSize: 8, marginTop: 4, color: 'var(--muted)' }}>{item.unit}</div>
             </div>
           ))}

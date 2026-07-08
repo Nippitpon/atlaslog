@@ -68,6 +68,7 @@ export interface Session {
   duration: number
   volume: number
   setCount: number
+  calories?: number
   exercises?: WorkoutExercise[]
 }
 
