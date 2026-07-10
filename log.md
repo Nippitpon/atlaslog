@@ -1,8 +1,72 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-07-06 (รอบ 23 — ✅ SHIPPED: Running ในโปรแกรม + Main lift RPE/น้ำหนักใน Today's session)
+> อัปเดตล่าสุด: 2026-07-10 (รอบ 25 — ✅ SHIPPED: RPE เป้าหมายในหน้า RECORDING)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-07-10 — รอบ 25 (✅ SHIPPED, deploy main): RPE เป้าหมายในหน้า RECORDING
+
+หน้า RECORDING (Logger) แสดง **RPE เป้าหมาย** ของแต่ละท่าเป็น badge (สี accent) ข้าง group pill + EX indicator
+เมื่อท่านั้นมีค่า RPE จากโปรแกรม — เดิม RPE ถูกทิ้งระหว่างแปลงโปรแกรม → workout จึงไม่เคยถึง Logger. commit `5531c3c`
+
+### ทำอะไร (ต่อท่อ RPE ให้ไหลถึง Logger)
+- **types** เพิ่ม `targetRpe?: number` ใน `ProgramExercise` + `WorkoutExercise` (`packages/shared/src/types.ts`)
+- **`dayToProgram`** (`twelveWeekProgram.ts`) ส่ง `targetRpe: ex.rpe` ตอนแปลง StructuredDay → Program
+- **`startWorkout`** (`useAppStore.ts`) ส่ง `targetRpe: e.targetRpe` ต่อเข้า Workout
+- **LoggerPage** แสดง `<span className="pill">RPE {cur.targetRpe}</span>` (accent) ในหัวท่า เฉพาะเมื่อ `cur.targetRpe !== undefined`
+
+### ผลกระทบ (จัดการแล้ว)
+- badge แสดง **ทุกท่าที่มีค่า RPE** (รวม accessory เช่น Speed Bench @6) ต่างจากหน้า overview (WeekDays) ที่โชว์ `@rpe`
+  เฉพาะ main lift — เจตนาให้ Logger เห็นเป้าครบตอนซ้อมจริง (ถ้าอยากจำกัดเฉพาะ main เพิ่มเงื่อนไข `cur.isMain` บรรทัดเดียว)
+- ท่าที่ไม่มี RPE (ท่าที่ add เอง / โปรแกรม general) → ไม่มี `targetRpe` → ไม่โชว์ badge (optional ทุกชั้น ไม่กระทบ startWorkout เดิม)
+- ไม่แตะ DB/sync — `targetRpe` เป็น field ใน workout state ชั่วคราว ไม่เก็บลง Session/history
+
+### verify (390px, Playwright coach.test) — 0 console errors
+เข้า 12 Weeks SBD → Week 1 → Mon: Back Squat โชว์ **RPE 7**, Back-off **RPE 6**, Speed Bench accessory **RPE 6** ตรง data ·
+`pnpm build` ผ่าน (113 modules) · ESLint สะอาด · discard workout ทดสอบเรียบร้อย
+
+### ไม่ทำรอบนี้
+ไม่ให้กรอก/บันทึก actual RPE ที่ทำได้จริงลง set (แสดงเป้าหมายอย่างเดียว) · ไม่ปรับหน้า overview ให้โชว์ RPE ของ accessory
+
+---
+
+## 2026-07-08 — รอบ 24 (✅ SHIPPED): Calories ring + Notifications bell + Version indicator
+
+สามงานย่อยในรอบเดียว (deploy ต่อเนื่อง 3 commit): `0a19c81` version · `2be34e3` noti bell · `0706c22` calories ring
+
+### 1. Calories-burned ring หน้า Home (commit 0706c22)
+แสดง **แคลอรีที่เผาผลาญ** จากการซ้อม บนวง Progress Ring วงแรกของแอป
+- **สูตร**: `Calories = MET × Weight(kg) × Duration(hr)` — MET: วิ่ง 9.8 / ยกเวทหนัก 6.0 / ยกเวทเบา 3.5
+- **Heavy vs Light**: ถ้า session มีท่าหลัก SBD (`WorkoutExercise.isMain`) → Heavy 6.0, ไม่งั้น → Light 3.5
+- **น้ำหนักตัว**: ดึง `bodyMetrics` ล่าสุด (`latestWeightKg`); ยังไม่กรอก → วงโชว์ 0 + "ใส่น้ำหนักตัวใน Profile" กดไป `/profile`
+- **Ring target**: ไม่มีเป้าตายตัว — วงเต็มเทียบกับ **วันที่เผาผลาญมากสุดในสัปดาห์** (แบบเดียวกับ WEEKLY VOLUME · PEAK)
+- **รวมวิ่งด้วย**: RunEntry จากหน้า `/runs` (MET 9.8) คำนวณสดรวมเข้ายอดรายวันบน Dashboard
+- ไฟล์ใหม่: `lib/calories.ts` (MET + `sessionCalories`/`runCalories`/`latestWeightKg`/`weeklyCalories`) ·
+  `features/dashboard/CalorieRing.tsx` (SVG stroke-dasharray) · แก้ `types.ts` (`Session.calories?`) ·
+  `useAppStore.finishWorkout` (คำนวณ+บันทึกตอน Finish) · `DashboardPage` (วงบนสุด stats card) ·
+  `FinishReview` (เพิ่มช่อง KCAL, grid 3→4 คอลัมน์)
+- **ไม่แตะ DB/sync**: calories เก็บ local บน session; Dashboard คำนวณ fallback ให้ session เก่า/sync มา → ไม่มี migration, ไม่กระทบ sync
+
+### 2. Notifications bell หน้า Home (commit 2be34e3)
+เปลี่ยนไอคอนขวาบนหน้า Home จาก **Profile (👤) → กระดิ่ง (🔔)** พร้อม badge เลข unread (1, 2 … 9+)
+- แตะ → เปิด sheet "Notifications" รวม coach request (Accept/Decline) + แจ้งเตือนทั่วไป (Mark all read) + empty state
+- เอา banner แจ้งเตือนกลางหน้า Home ออก (ย้ายเข้า sheet) · Profile ยังเข้าได้ทาง Bottom Nav (มี badge อยู่แล้ว)
+- แก้เฉพาะ `DashboardPage.tsx`
+
+### 3. Version indicator หน้า Profile (commit 0a19c81)
+ไอคอน ⚡ เล็ก ๆ ล่างสุดหน้า Profile แตะเพื่อโชว์เวอร์ชัน — `Atlaslog v1.0.0 · <commit> · <build date>`
+- ฝังตอน build ผ่าน `vite.config.ts` define: `__APP_VERSION__` (จาก package.json) · `__APP_COMMIT__` (git short hash, fallback `VERCEL_GIT_COMMIT_SHA`) · `__APP_BUILD_DATE__`
+- ไฟล์: `vite.config.ts` · `src/vite-env.d.ts` (declare globals) · `apps/web/package.json` (0.0.0→1.0.0) · `ProfilePage.tsx`
+
+### verify
+`pnpm build` ผ่านทั้ง 3 (113 modules) · สูตรแคลอรีตรวจแล้ว (Heavy 80kg×60min=480 · Light×45min=210 · วิ่ง×30min=392)
+· **ยังไม่ได้ click-through e2e** (แอป gate ด้วย Supabase auth รัน headless ไม่ได้)
+→ ควรทดสอบ: กรอกน้ำหนักใน Profile → ซ้อมวันมี main lift → Home เห็นวงแคลอรี · วิ่ง /runs → ยอดเพิ่ม · กระดิ่งมี noti โชว์ badge
+
+### ไม่ทำรอบนี้
+running calories ไม่ได้เก็บลง RunEntry (คำนวณสดบน Dashboard) · version bump ยัง manual (แก้ package.json เอง)
 
 ---
 
