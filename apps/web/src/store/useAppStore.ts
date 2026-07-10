@@ -84,6 +84,7 @@ export const useAppStore = create<AppStore>()(
             id: `we${Date.now()}-${i}`,
             exerciseId: e.exerciseId,
             isMain: e.isMain,
+            targetRpe: e.targetRpe,
             sets: e.sets.map((s, si) => ({ id: `ws${Date.now()}-${i}-${si}`, w: s.w, r: s.r, done: false })),
           })),
         }

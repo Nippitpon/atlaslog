@@ -162,6 +162,13 @@ export function LoggerPage() {
               <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
                 EX {workout.currentIdx + 1}/{workout.exercises.length}
               </span>
+              {cur.targetRpe !== undefined && (
+                <span className="pill" style={{
+                  background: 'transparent',
+                  borderColor: 'var(--accent)',
+                  color: 'var(--accent)',
+                }}>RPE {cur.targetRpe}</span>
+              )}
             </div>
             <h2 className="t-display" style={{ margin: 0, fontSize: 30, letterSpacing: '-0.03em' }}>
               {exMeta.name}

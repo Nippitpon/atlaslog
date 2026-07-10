@@ -28,6 +28,7 @@ export interface ProgramExercise {
   exerciseId: string
   sets: ProgramSet[]
   isMain?: boolean
+  targetRpe?: number
 }
 
 export interface Program {
@@ -50,6 +51,7 @@ export interface WorkoutExercise {
   exerciseId: string
   sets: WorkoutSet[]
   isMain?: boolean
+  targetRpe?: number
 }
 
 export interface Workout {

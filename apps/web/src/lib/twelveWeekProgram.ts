@@ -326,6 +326,7 @@ export function dayToProgram(
     exercises: day.exercises.filter(ex => ex.type !== 'running').map(ex => ({
       exerciseId: ex.exerciseId,
       isMain: ex.type === 'main',
+      targetRpe: ex.rpe,
       sets: Array.from({ length: ex.sets ?? 0 }, () => ({
         w: weightOverrides?.[`${ex.exerciseId}:${ex.rpe}`] ?? 0,
         r: typeof ex.reps === 'number' ? ex.reps : 8,
