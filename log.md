@@ -1,8 +1,34 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-07-10 (รอบ 25 — ✅ SHIPPED: RPE เป้าหมายในหน้า RECORDING)
+> อัปเดตล่าสุด: 2026-07-12 (รอบ 26 — ✅ SHIPPED: Set/Rep/% รายสัปดาห์ + Top set/Back-off ใน Create Program)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-07-12 — รอบ 26 (✅ SHIPPED, deploy main): Create Program — Set/Rep/%1RM รายสัปดาห์ + Top set/Back-off
+
+หน้า Create Program (โปรแกรม powerlifting) ตั้ง **%1RM, Sets, Reps ได้ราย "สัปดาห์"** ผ่านตารางในหน้า Add Exercise
+(quick-fill base% + step แล้วแก้รายช่องได้) และระบุ **Top set / Back-off** ได้ (เพิ่มท่าเดิม 2 ครั้ง เลือก role → ได้ 2 แถว
+`exerciseId` เดียวกัน). รวมงาน 2 ส่วนที่ทำต่อเนื่องในรอบเดียว (%1RM รายสัปดาห์ → ต่อยอด Set/Rep + Top/Back-off). commit `29065cf`
+
+### ทำอะไร
+- **Authoring** (`CreateProgramPage.tsx`): draft type `ExerciseDraft.weekly: WeekCell[]` (per-week sets/reps/pct, authoring-only ถูก expand ตอน save) · `ExercisePicker` เพิ่ม role selector (`Top set`/`Back-off`/`Working` → ต่อ suffix ที่ชื่อ) + ตาราง **Set/Rep/%** ต่อสัปดาห์ + quick-fill % (base+step) · `handleCreate` expand เป็นราย week + assign `id` ต่อแถว (`${dayId}-e${i}`) · edit round-trip reconstruct `weekly` จากทุก week · `pctRangeLabel` โชว์ช่วง `70→95%` ในลิสต์
+- **แก้บั๊ก logger** (`WeekDays.handleStart` + `dayToProgram` ใน `twelveWeekProgram.ts`): คีย์ weight override ด้วย `ex.id ?? exerciseId:rpe` (เดิม `exerciseId:rpe`) → ท่าซ้ำ id (top+back-off) ไม่ทับกัน · reuse `structuredWeight()` เป็น single source → **ใส่ % แต่ไม่ใส่ RPE ก็คิดน้ำหนักได้ (เดิมได้ 0)** · ตัด import `calcWeight`/`SBD_IDS` ที่ไม่ใช้แล้ว
+- **แยกชื่อในหน้า logger**: เพิ่ม `name?` ใน `ProgramExercise` + `WorkoutExercise` (`types.ts`) · `dayToProgram` ส่ง `name: ex.name` · `startWorkout` (`useAppStore.ts`) ส่งต่อ · `LoggerPage` (tab/header/Next) + `FinishReview` ใช้ `e.name ?? getExercise().name`
+- **polish**: DayCard `mains.slice(0,2)→(0,4)` กันตัดแถว main ที่ 3+ (`WeekDays.tsx`)
+
+### ผลกระทบ (จัดการแล้ว)
+- ไม่แตะ schema หลัก — `StructuredExercise.pct/id`, `reps: number|string` มีอยู่แล้ว; เพิ่มแค่ optional `name?` (มี fallback ชื่อ canonical ทุกจุด ไม่กระทบ built-in/โปรแกรมเดิม)
+- built-in 12 สัปดาห์ไม่มี `id` → ตกลง fallback `exerciseId:rpe` (rpe ต่างกันอยู่แล้ว) = พฤติกรรมเดิม
+- role + ตาราง Set/Rep/% โชว์เฉพาะ powerlifting + main เท่านั้น (accessory/general/running = เดิม)
+
+### verify (e2e 390px จริง ผ่าน Playwright, 0 console errors)
+สร้าง PL 6 สัปดาห์: Top set (fill 75 step 2.5, แก้ reps wk3=4) + Back-off (70% flat 3×8) → state ที่ save: Top pct `.75→.875` reps `[5,5,4,5,5,5]`, Back flat `.70`, 2 แถว/สัปดาห์ id แยก `-e0`/`-e1` · WeekDays (1RM squat 200): Top **150kg** / Back **140kg** (คนละค่า ไม่ชน ไม่ 0) · Logger: 2 การ์ดชื่อแยก, 150×5(1 set) / 140×8(3 sets), "Next: Back-off" · Edit→Save: per-week ไม่ flatten · `pnpm build` ผ่าน (113 modules) · ESLint สะอาด
+> ทดสอบผ่าน login gate ด้วยการเปิด store ชั่วคราวใน `main.tsx` แล้ว revert ทิ้ง (ไม่ขึ้น prod)
+
+### ไม่ทำรอบนี้
+Top set + back-off แยกเป็น **แถวละ role** (เพิ่มท่า 2 ครั้ง) ไม่ใช่บล็อกเดียวกรอกพร้อมกัน · ไม่มี UI แก้ per-week ของแถวที่ add แล้ว (ต้องลบแล้ว add ใหม่) · RPE ยังเป็นค่าเดียวต่อ row (ไม่ราย week)
 
 ---
 
