@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { useNavigate, Navigate, useParams } from 'react-router-dom'
 import type { StructuredExercise, StructuredProgram, StructuredDay } from '@atlaslog/shared'
 import { useProgramStore } from '../../store/useProgramStore.js'
@@ -10,9 +10,22 @@ import { IconChevronLeft, IconPlus, IconX, IconCheck, IconSearch, IconCopy, Icon
 
 type Visibility = 'private' | 'code' | 'public'
 
-type DayDraft = { id?: string; dayOfWeek: StructuredDay['dayOfWeek']; focus: string; exercises: StructuredExercise[] }
+// Authoring-only: a powerlifting main lift carries a per-week Set/Rep/% scheme
+// (index 0 = week 1). Expanded into each week's StructuredExercise on save.
+type WeekCell = { sets?: number; reps?: number; pct?: number }
+type ExerciseDraft = StructuredExercise & { weekly?: WeekCell[] }
+type DayDraft = { id?: string; dayOfWeek: StructuredDay['dayOfWeek']; focus: string; exercises: ExerciseDraft[] }
 
 const WEEKDAYS: StructuredDay['dayOfWeek'][] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+// "70→95%" range label for a draft main lift with a per-week scheme (null if no % set).
+function pctRangeLabel(ex: ExerciseDraft): string | null {
+  const vals = (ex.weekly ?? []).map(c => c.pct).filter((v): v is number => v !== undefined)
+  if (!vals.length) return null
+  const lo = Math.round(Math.min(...vals) * 100)
+  const hi = Math.round(Math.max(...vals) * 100)
+  return lo === hi ? `${lo}%` : `${lo}→${hi}%`
+}
 
 export function CreateProgramPage() {
   const navigate = useNavigate()
@@ -29,7 +42,23 @@ export function CreateProgramPage() {
   const [focus, setFocus] = useState(() => editing?.focus === 'Custom' ? '' : (editing?.focus ?? ''))
   const [weeks, setWeeks] = useState(() => editing ? (editing.weekly ? '' : String(editing.totalWeeks)) : '')
   const [days, setDays] = useState<DayDraft[]>(() =>
-    (editing?.weeks[0]?.days ?? []).map(d => ({ id: d.id, dayOfWeek: d.dayOfWeek, focus: d.focus, exercises: d.exercises }))
+    (editing?.weeks[0]?.days ?? []).map((d, di) => ({
+      id: d.id,
+      dayOfWeek: d.dayOfWeek,
+      focus: d.focus,
+      // Reconstruct per-week Set/Rep/% for main lifts so editing doesn't flatten it.
+      exercises: d.exercises.map((ex, ei) =>
+        editing && editing.programType === 'powerlifting' && editing.weeks.length > 1 && ex.type === 'main'
+          ? {
+              ...ex,
+              weekly: editing.weeks.map(w => {
+                const x = w.days[di]?.exercises[ei]
+                return { sets: x?.sets, reps: typeof x?.reps === 'number' ? x.reps : undefined, pct: x?.pct }
+              }),
+            }
+          : ex
+      ),
+    }))
   )
   const [programType, setProgramType] = useState<'general' | 'powerlifting'>(() => editing?.programType ?? 'general')
   const [visibility, setVisibility] = useState<Visibility>('private')
@@ -52,7 +81,7 @@ export function CreateProgramPage() {
   const removeExercise = (di: number, ei: number) =>
     setDayField(di, { exercises: days[di].exercises.filter((_, idx) => idx !== ei) })
 
-  const addExerciseToDay = (di: number, ex: StructuredExercise) =>
+  const addExerciseToDay = (di: number, ex: ExerciseDraft) =>
     setDays(d => d.map((day, idx) => idx === di ? { ...day, exercises: [...day.exercises, ex] } : day))
 
   // Weekly routine = General program with no week count → no periodization,
@@ -88,7 +117,21 @@ export function CreateProgramPage() {
           id: dayIds[di],
           dayOfWeek: d.dayOfWeek,
           focus: d.focus.trim() || `${d.dayOfWeek} Training`,
-          exercises: d.exercises,
+          // Expand per-week Set/Rep/% into each week + assign a per-row id (so two
+          // same-exerciseId main rows never collide in the logger's weight map).
+          exercises: d.exercises.map((ex, ei) => {
+            const { weekly, ...base } = ex
+            const id = `${dayIds[di]}-e${ei}`
+            if (!weekly) return { ...base, id } as StructuredExercise
+            // In-range blank cells fall back to the base value; weeks past the array clamp to last.
+            const c = wi < weekly.length ? weekly[wi] : weekly[weekly.length - 1]
+            const row = { ...base, id } as StructuredExercise
+            if (c.sets !== undefined) row.sets = c.sets
+            if (c.reps !== undefined) row.reps = c.reps
+            if (c.pct !== undefined) row.pct = c.pct
+            else delete row.pct
+            return row
+          }),
         })),
       })),
     }
@@ -249,7 +292,7 @@ export function CreateProgramPage() {
                       <span className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>
                         {ex.type === 'running'
                           ? (runTarget(ex) || 'Run')
-                          : `${ex.sets}×${ex.reps}${ex.rpe !== undefined ? ` @${ex.rpe}` : ''}`}
+                          : `${ex.sets}×${ex.reps}${ex.rpe !== undefined ? ` @${ex.rpe}` : ''}${pctRangeLabel(ex) ? ` · ${pctRangeLabel(ex)}` : ''}`}
                       </span>
                       <button onClick={() => removeExercise(di, ei)} aria-label="Remove exercise"
                         style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 2, flexShrink: 0 }}>
@@ -327,6 +370,8 @@ export function CreateProgramPage() {
 
       {pickerDay !== null && (
         <ExercisePicker
+          weeks={weeksNum}
+          programType={programType}
           onPick={ex => { addExerciseToDay(pickerDay, ex); setPickerDay(null) }}
           onClose={() => setPickerDay(null)}
         />
@@ -424,7 +469,12 @@ function RunPicker({ onPick, onClose }: { onPick: (ex: StructuredExercise) => vo
   )
 }
 
-function ExercisePicker({ onPick, onClose }: { onPick: (ex: StructuredExercise) => void; onClose: () => void }) {
+function ExercisePicker({ weeks, programType, onPick, onClose }: {
+  weeks: number
+  programType: 'general' | 'powerlifting'
+  onPick: (ex: ExerciseDraft) => void
+  onClose: () => void
+}) {
   const [search, setSearch] = useState('')
   const [groupFilter, setGroupFilter] = useState('All')
   const [pickedId, setPickedId] = useState('')
@@ -432,6 +482,29 @@ function ExercisePicker({ onPick, onClose }: { onPick: (ex: StructuredExercise) 
   const [sets, setSets] = useState('3')
   const [reps, setReps] = useState('10')
   const [rpe, setRpe] = useState('')
+  const [basePct, setBasePct] = useState('')
+  const [stepPct, setStepPct] = useState('')
+  const [role, setRole] = useState<'top' | 'backoff' | 'working'>('working')
+  const [wSets, setWSets] = useState<string[]>([])
+  const [wReps, setWReps] = useState<string[]>([])
+  const [wPct, setWPct] = useState<string[]>([])
+
+  // Per-week Set/Rep/% table only makes sense for a powerlifting main lift.
+  const showWeekly = programType === 'powerlifting' && type === 'main'
+
+  const fillPct = () => {
+    const b = Number(basePct)
+    if (!b) return
+    const s = Number(stepPct) || 0
+    setWPct(Array.from({ length: weeks }, (_, i) =>
+      String(Math.max(0, Math.min(100, Math.round((b + s * i) * 10) / 10)))
+    ))
+  }
+  const editCell = (arr: string[], setArr: (v: string[]) => void, i: number, v: string) => {
+    const next = arr.length ? [...arr] : Array.from({ length: weeks }, () => '')
+    next[i] = v
+    setArr(next)
+  }
 
   const groups = ['All', ...Array.from(new Set(allExercises().map(e => e.group)))]
 
@@ -452,14 +525,31 @@ function ExercisePicker({ onPick, onClose }: { onPick: (ex: StructuredExercise) 
   const confirm = () => {
     const ex = allExercises().find(e => e.id === pickedId)
     if (!ex) return
-    onPick({
+    const suffix = role === 'top' ? ' — Top set' : role === 'backoff' ? ' — Back-off' : ''
+    const draft: ExerciseDraft = {
       exerciseId: ex.id,
-      name: ex.name,
+      name: ex.name + (showWeekly ? suffix : ''),
       type,
       sets: Number(sets) || 3,
       reps: Number(reps) || 10,
       ...(rpe ? { rpe: Number(rpe) } : {}),
-    })
+    }
+    if (showWeekly) {
+      const weekly = Array.from({ length: weeks }, (_, i) => {
+        const p = wPct[i]?.trim()
+        return {
+          sets: Number(wSets[i] || sets) || undefined,
+          reps: Number(wReps[i] || reps) || undefined,
+          pct: p ? Math.max(0, Math.min(1, Number(p) / 100)) : undefined,
+        }
+      })
+      draft.weekly = weekly
+      // Representative week-1 values for the day-list summary / week-1 consumers.
+      if (weekly[0]?.sets !== undefined) draft.sets = weekly[0].sets
+      if (weekly[0]?.reps !== undefined) draft.reps = weekly[0].reps
+      draft.pct = weekly.find(c => c.pct !== undefined)?.pct
+    }
+    onPick(draft)
   }
 
   return (
@@ -545,10 +635,28 @@ function ExercisePicker({ onPick, onClose }: { onPick: (ex: StructuredExercise) 
                 </button>
               ))}
             </div>
+
+            {showWeekly && (
+              <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                {([['top', 'Top set'], ['backoff', 'Back-off'], ['working', 'Working']] as const).map(([r, lbl]) => (
+                  <button key={r} onClick={() => setRole(r)}
+                    style={{
+                      flex: 1, height: 32, borderRadius: 8, cursor: 'pointer',
+                      border: `1px solid ${role === r ? 'var(--accent)' : 'var(--border)'}`,
+                      background: role === r ? 'rgba(212,255,58,0.12)' : 'var(--surface-2)',
+                      color: role === r ? 'var(--accent)' : 'var(--text-2)',
+                      fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
+                    }}>
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
               {[
-                { label: 'SETS', val: sets, set: setSets, ph: '3' },
-                { label: 'REPS', val: reps, set: setReps, ph: '10' },
+                { label: showWeekly ? 'SETS (BASE)' : 'SETS', val: sets, set: setSets, ph: '3' },
+                { label: showWeekly ? 'REPS (BASE)' : 'REPS', val: reps, set: setReps, ph: '10' },
                 { label: 'RPE (opt)', val: rpe, set: setRpe, ph: '—' },
               ].map(({ label, val, set, ph }) => (
                 <div key={label} style={{ flex: 1 }}>
@@ -559,6 +667,53 @@ function ExercisePicker({ onPick, onClose }: { onPick: (ex: StructuredExercise) 
                 </div>
               ))}
             </div>
+
+            {showWeekly && (
+              <div style={{ marginBottom: 12 }}>
+                <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 6 }}>Set / Rep / %1RM ต่อสัปดาห์</div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 10 }}>
+                  <div style={{ flex: 1 }}>
+                    <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>BASE %</div>
+                    <input className="input-num tnum" type="number" inputMode="numeric" value={basePct} placeholder="70"
+                      onChange={e => setBasePct(e.target.value)} onFocus={e => e.target.select()}
+                      style={{ width: '100%', textAlign: 'center' }} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>STEP %/WK</div>
+                    <input className="input-num tnum" type="number" inputMode="numeric" value={stepPct} placeholder="5"
+                      onChange={e => setStepPct(e.target.value)} onFocus={e => e.target.select()}
+                      style={{ width: '100%', textAlign: 'center' }} />
+                  </div>
+                  <button className="btn btn-secondary" style={{ height: 36, padding: '0 14px', flexShrink: 0, opacity: basePct ? 1 : 0.4 }}
+                    disabled={!basePct} onClick={fillPct}>Fill %</button>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '26px 1fr 1fr 1fr', gap: 4, alignItems: 'center', minWidth: 210 }}>
+                    <div />
+                    <div className="t-eyebrow" style={{ fontSize: 8, textAlign: 'center' }}>SET</div>
+                    <div className="t-eyebrow" style={{ fontSize: 8, textAlign: 'center' }}>REP</div>
+                    <div className="t-eyebrow" style={{ fontSize: 8, textAlign: 'center' }}>%</div>
+                    {Array.from({ length: weeks }, (_, i) => (
+                      <Fragment key={i}>
+                        <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', textAlign: 'center' }}>{i + 1}</div>
+                        <input className="input-num tnum" type="number" inputMode="numeric" value={wSets[i] ?? ''} placeholder={sets || '—'}
+                          onChange={e => editCell(wSets, setWSets, i, e.target.value)} onFocus={e => e.target.select()}
+                          style={{ width: '100%', textAlign: 'center' }} />
+                        <input className="input-num tnum" type="number" inputMode="numeric" value={wReps[i] ?? ''} placeholder={reps || '—'}
+                          onChange={e => editCell(wReps, setWReps, i, e.target.value)} onFocus={e => e.target.select()}
+                          style={{ width: '100%', textAlign: 'center' }} />
+                        <input className="input-num tnum" type="number" inputMode="numeric" value={wPct[i] ?? ''} placeholder="—"
+                          onChange={e => editCell(wPct, setWPct, i, e.target.value)} onFocus={e => e.target.select()}
+                          style={{ width: '100%', textAlign: 'center' }} />
+                      </Fragment>
+                    ))}
+                  </div>
+                </div>
+                <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', marginTop: 6 }}>
+                  คำนวณน้ำหนักเฉพาะ squat / bench / deadlift · เว้นว่าง Set/Rep = ใช้ค่า BASE · เว้น % = ใช้ RPE
+                </div>
+              </div>
+            )}
           </>
         )}
 

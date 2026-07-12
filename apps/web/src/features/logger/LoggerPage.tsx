@@ -133,7 +133,7 @@ export function LoggerPage() {
               </div>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 13,
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {meta.name}
+                {e.name ?? meta.name}
               </div>
             </button>
           )
@@ -171,7 +171,7 @@ export function LoggerPage() {
               )}
             </div>
             <h2 className="t-display" style={{ margin: 0, fontSize: 30, letterSpacing: '-0.03em' }}>
-              {exMeta.name}
+              {cur.name ?? exMeta.name}
             </h2>
           </div>
           <button className="btn-icon" onClick={() => setShowSwap(true)} aria-label="Swap exercise">
@@ -257,7 +257,7 @@ export function LoggerPage() {
           )}
           {workout.currentIdx < workout.exercises.length - 1 ? (
             <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => goToExercise(workout.currentIdx + 1)}>
-              Next: {getExercise(workout.exercises[workout.currentIdx + 1].exerciseId).name}
+              Next: {workout.exercises[workout.currentIdx + 1].name ?? getExercise(workout.exercises[workout.currentIdx + 1].exerciseId).name}
               <IconChevronRight size={18} />
             </button>
           ) : (

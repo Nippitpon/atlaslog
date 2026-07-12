@@ -26,6 +26,9 @@ export interface ProgramSet {
 
 export interface ProgramExercise {
   exerciseId: string
+  // Optional display name override (e.g. "Back Squat — Back-off"); falls back to
+  // the canonical exercise name when absent.
+  name?: string
   sets: ProgramSet[]
   isMain?: boolean
   targetRpe?: number
@@ -49,6 +52,7 @@ export interface WorkoutSet {
 export interface WorkoutExercise {
   id?: string
   exerciseId: string
+  name?: string
   sets: WorkoutSet[]
   isMain?: boolean
   targetRpe?: number

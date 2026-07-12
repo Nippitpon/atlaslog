@@ -4,7 +4,7 @@ import type { DayStatus, StructuredDay, StructuredExercise, StructuredProgram, S
 import { dayToProgram } from '../../lib/twelveWeekProgram.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAppStore } from '../../store/useAppStore.js'
-import { calcWeight, structuredWeight, SBD_IDS } from '../../lib/rpeTable.js'
+import { structuredWeight } from '../../lib/rpeTable.js'
 import { runTarget } from '../../lib/utils.js'
 import { IconCheck, IconPlay, IconChevronRight, IconEdit, IconRun } from '../../components/icons/index.js'
 import { AccessoryEditSheet } from './AccessoryEditSheet.js'
@@ -47,7 +47,7 @@ function DayCard({
   onEditAccessories: () => void
   onOpenRun: () => void
 }) {
-  const mains = day.exercises.filter(e => e.type === 'main').slice(0, 2)
+  const mains = day.exercises.filter(e => e.type === 'main').slice(0, 4)
   const runs = day.exercises.filter(e => e.type === 'running')
   const hasLifts = day.exercises.some(e => e.type === 'main') || accessories.length > 0
   const isDone = status === 'done'
@@ -243,18 +243,11 @@ export function WeekDays({ program, week }: { program: StructuredProgram; week: 
   const handleStart = (day: StructuredDay) => {
     const weightOverrides: Record<string, number> = {}
     if (calcRMs) {
-      const oneRMs = calcRMs
       day.exercises.forEach(ex => {
-        const liftKey = SBD_IDS[ex.exerciseId] as 'squat' | 'bench' | 'deadlift' | undefined
-        if (!liftKey || !oneRMs[liftKey] || ex.rpe === undefined) return
-        const rm = oneRMs[liftKey]
-        let weight = 0
-        if (ex.pct !== undefined) {
-          weight = Math.round(rm * ex.pct / 2.5) * 2.5
-        } else if (typeof ex.reps === 'number') {
-          weight = calcWeight(rm, ex.reps, ex.rpe)
-        }
-        if (weight > 0) weightOverrides[`${ex.exerciseId}:${ex.rpe}`] = weight
+        // structuredWeight is the single source of truth (pct → else rpe); key by the
+        // per-row id so a top set + back-off (same exerciseId) never overwrite each other.
+        const w = structuredWeight(ex, calcRMs)
+        if (w) weightOverrides[ex.id ?? `${ex.exerciseId}:${ex.rpe}`] = w
       })
     }
     const customAcc = getCustomAccessories(program.id, week.id, day.id)
