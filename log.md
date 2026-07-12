@@ -1,8 +1,34 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-07-12 (รอบ 27 — ✅ SHIPPED: Add Exercise เป็น 2 สเต็ป เลือกท่า → หน้าตั้งค่า)
+> อัปเดตล่าสุด: 2026-07-12 (รอบ 28 — ✅ SHIPPED: ลาก reorder ท่าใน WEEK TEMPLATE)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-07-12 — รอบ 28 (✅ SHIPPED, deploy main): ลาก reorder ท่าใน WEEK TEMPLATE (Create Program)
+
+ปรับลำดับท่าในแต่ละวันของ WEEK TEMPLATE ได้ด้วยการ **กด grip ค้างแล้วลากขึ้น/ลง** (custom pointer-drag,
+ใช้ได้ทั้ง touch + mouse, ไม่เพิ่ม dependency). commit `3a8fc63`
+
+### ทำอะไร
+- `icons/index.tsx`: เพิ่ม `IconGrip` (6 จุด = ที่จับลาก)
+- `CreateProgramPage.tsx`:
+  - grip handle ซ้ายสุดของแต่ละแถวท่า (`touchAction: 'none'` กันจอเลื่อนตอนลากจาก handle) · แถว `data-ex-row data-day data-idx`
+  - `startExDrag(di, ei, e)` — pointerdown บน handle → เพิ่ม `pointermove`/`pointerup` บน `window` (ไม่ผูกกับ element ที่ reorder) · onMove ใช้ `document.elementFromPoint` หา row ที่นิ้วอยู่ → splice ย้ายใน `days[di].exercises` (live) · ไฮไลต์แถวที่ลากด้วย `dragKey`
+  - จำกัด reorder **ภายในวันเดียวกัน** (`overDay !== d.di` → ไม่ย้าย)
+
+### ผลกระทบ (จัดการแล้ว)
+- ⚠️ บั๊กที่เจอ+แก้: `setDays` functional updater รัน **ทีหลัง** → เดิมอ่าน `d.index` ในตัว updater ซึ่งถูก mutate เป็นค่าปลายทางไปแล้ว → splice เป็น no-op (ลากแล้วไม่ขยับ). แก้โดย `const from = d.index` **ก่อน** เรียก setDays แล้วใช้ `from` ใน updater
+- key แถวเป็น index — reorder ได้เพราะแถวไม่มี state ภายใน (แสดงผลอย่างเดียว + ปุ่มลบ) · id ท่าถูก gen ใหม่ตามลำดับใหม่ตอน save (`${dayId}-e${ei}`)
+- ไม่แตะ save/logger, ExercisePicker, RunPicker
+
+### verify (e2e จริง Playwright 390×740, 0 console errors)
+เพิ่ม 3 ท่า [Bench, Squat, Deadlift] → ลาก Bench ลงล่างสุด → `[Squat, Deadlift, Bench]` · ลากกลับขึ้นบน → `[Bench, Squat, Deadlift]` · ไฮไลต์ตอนลากทำงาน · `pnpm build` ผ่าน (113 modules) · ESLint สะอาด
+> ทดสอบด้วยการยิง PointerEvent ผ่าน gate (debug hook ชั่วคราวใน `main.tsx` แล้ว revert). หมายเหตุ: bottom nav (fixed) บังแถวล่างสุดตอน viewport เตี้ย — ผู้ใช้จริง scroll ก่อนลากได้ปกติ
+
+### ไม่ทำรอบนี้
+ยังไม่รองรับลากข้ามวัน (คนละ day) · ไม่มี auto-scroll ตอนลากใกล้ขอบจอ (ลิสต์ต่อวันสั้น) · ไม่ทำ animation ระหว่างสลับ (ไฮไลต์อย่างเดียว)
 
 ---
 
