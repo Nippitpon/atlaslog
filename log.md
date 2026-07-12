@@ -1,8 +1,36 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-07-12 (รอบ 26 — ✅ SHIPPED: Set/Rep/% รายสัปดาห์ + Top set/Back-off ใน Create Program)
+> อัปเดตล่าสุด: 2026-07-12 (รอบ 27 — ✅ SHIPPED: Add Exercise เป็น 2 สเต็ป เลือกท่า → หน้าตั้งค่า)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-07-12 — รอบ 27 (✅ SHIPPED, deploy main): Add Exercise เป็น 2 สเต็ป (เลือกท่า → หน้าตั้งค่า)
+
+เปลี่ยน `ExercisePicker` หน้า Create Program จาก "config โผล่ inline ใต้ list (ต้องเลื่อนยาว)" → **2 สเต็ปในชีตเดียว**:
+แตะท่า → สลับไปหน้าตั้งค่า (มี `‹ Back`). แก้ปัญหาที่ตาราง %1RM รายสัปดาห์สูง (หลาย week) แล้วเลื่อนไปกดปุ่ม Add ไม่ถึง.
+ทำต่อจากรอบ 26 (ผู้ใช้เจอ bug ตอนสร้างโปรแกรมหลายสัปดาห์). commit `43ed740`
+
+### ทำอะไร
+- แยก return ของ `ExercisePicker` (`CreateProgramPage.tsx`) เป็น 2 สเต็ปด้วย `pickedId === ''`:
+  - **STEP 1**: header "Add Exercise" (ปุ่ม X ปิดชีต) + search + chips + list — แตะท่า = `setPickedId(id)` → เข้าสเต็ป 2 (ไม่มีปุ่ม Add ในสเต็ปนี้)
+  - **STEP 2**: header `‹ Back` (`IconChevronLeft`) + ชื่อท่า · scroll region (`flex:1 overflowY:auto`) ครอบ main/accessory + role + base set/rep + ตาราง Set/Rep/% · ปุ่ม **Add to Day ตรึงล่าง** (`flexShrink:0`)
+- เพิ่ม `resetConfig()` เรียกตอนกด Back → คืน type/role/set/rep/%/ตาราง เป็น default (ท่าใหม่เริ่มสะอาด); คง search/filter ไว้
+- ลบ workaround รอบก่อนที่ยังไม่ commit (scrollIntoView + `configRef` + รวม list/config ใน scroll เดียว) ออก — 2 สเต็ปแก้ปัญหาเลื่อนในตัว
+- pattern reuse จาก `AccessoryEditSheet` (สลับ 2 view ในชีตเดียวด้วย boolean)
+
+### ผลกระทบ (จัดการแล้ว)
+- `onPick`/`onClose` signature เท่าเดิม → จุดเรียก `<ExercisePicker/>` ไม่ต้องแก้ · หลัง Add ชีตปิด เพิ่มท่าถัดไปเริ่มสเต็ป 1 สะอาด
+- ไม่แตะ logic save/logger, `confirm`/`fillPct`/`editCell`, day list, `RunPicker`
+- accessory/general → สเต็ป 2 ไม่โชว์ role + ตาราง (`showWeekly` เดิม) · default type ยังเป็น accessory
+
+### verify (e2e จริง Playwright 390×740, 0 console errors)
+PL 12 สัปดาห์: STEP 1 มีแค่ search+list (ไม่มี Add/toggle) · แตะ Back Squat → STEP 2 (title "Back Squat", Back, main/accessory, Add) · เลือก main → ตาราง 12 week, scroll region เลื่อนได้ (1044/430), **ปุ่ม Add เห็นเต็มจอ (bottom 704 ≤ 740)** · `‹ Back` → STEP 1 + config รีเซ็ต (main กลับ inactive) · Fill % + Add → ชีตปิด `Back Squat — Top set · 3×10 · 75→100%` เข้า day · `pnpm build` ผ่าน (113 modules) · ESLint สะอาด
+> ทดสอบผ่าน login gate ด้วย debug hook ชั่วคราวใน `main.tsx` แล้ว revert (diff ว่าง)
+
+### ไม่ทำรอบนี้
+ไม่ทำแบบ dialog เด้งซ้อนกลางจอ (เลือก in-place step ตาม pattern แอป — ดูรอบสนทนา) · ยังไม่มี UI แก้ per-week ของแถวที่ add แล้ว (ต้องลบแล้ว add ใหม่)
 
 ---
 
