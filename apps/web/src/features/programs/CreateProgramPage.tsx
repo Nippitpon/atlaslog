@@ -492,6 +492,14 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
   // Per-week Set/Rep/% table only makes sense for a powerlifting main lift.
   const showWeekly = programType === 'powerlifting' && type === 'main'
 
+  // Reset the config step to defaults (called when going back to the exercise list).
+  const resetConfig = () => {
+    setType('accessory'); setRole('working')
+    setSets('3'); setReps('10'); setRpe('')
+    setBasePct(''); setStepPct('')
+    setWSets([]); setWReps([]); setWPct([])
+  }
+
   const fillPct = () => {
     const b = Number(basePct)
     if (!b) return
@@ -556,6 +564,8 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
     <div className="sheet-backdrop" onClick={onClose} style={{ zIndex: 100 }}>
       <div className="sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
         <div className="sheet-handle" />
+        {pickedId === '' ? (
+        <>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <h3 className="t-display" style={{ margin: 0, fontSize: 20 }}>Add Exercise</h3>
           <button className="btn-icon" onClick={onClose}><IconX size={18} /></button>
@@ -618,9 +628,18 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
             </div>
           )}
         </div>
-
-        {pickedId && (
-          <>
+        </>
+        ) : (
+        <>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+          <button className="btn-icon" onClick={() => { setPickedId(''); resetConfig() }} aria-label="Back">
+            <IconChevronLeft size={18} />
+          </button>
+          <h3 className="t-display" style={{ margin: 0, fontSize: 18, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {allExercises().find(e => e.id === pickedId)?.name ?? 'Exercise'}
+          </h3>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', marginBottom: 12 }}>
             <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
               {(['main', 'accessory'] as const).map(t => (
                 <button key={t} onClick={() => setType(t)}
@@ -714,13 +733,13 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
                 </div>
               </div>
             )}
-          </>
-        )}
+        </div>
 
-        <button className="btn btn-primary" style={{ width: '100%', opacity: pickedId ? 1 : 0.4 }}
-          disabled={!pickedId} onClick={confirm}>
+        <button className="btn btn-primary" style={{ width: '100%', flexShrink: 0 }} onClick={confirm}>
           <IconPlus size={16} /> Add to Day
         </button>
+        </>
+        )}
       </div>
     </div>
   )
