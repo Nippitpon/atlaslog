@@ -94,6 +94,11 @@ export const IconRun = (p: IconProps) => <Icon {...p} d={<>
   <path d="M10 10L6 9l-2 3"/>
   <path d="M13 13l4 1 1 4"/>
 </>} />
+export const IconGrip = (p: IconProps) => <Icon {...p} fill="currentColor" stroke="none" d={<>
+  <circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/>
+  <circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/>
+  <circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/>
+</>} />
 export const IconScale = (p: IconProps) => <Icon {...p} d={<>
   <rect x="3" y="3" width="18" height="18" rx="3"/>
   <path d="M8 8h8"/>

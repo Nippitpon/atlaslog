@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useRef, useState } from 'react'
 import { useNavigate, Navigate, useParams } from 'react-router-dom'
 import type { StructuredExercise, StructuredProgram, StructuredDay } from '@atlaslog/shared'
 import { useProgramStore } from '../../store/useProgramStore.js'
@@ -6,7 +6,7 @@ import { useAuthStore } from '../../store/useAuthStore.js'
 import { createShare } from '../../lib/shareApi.js'
 import { allExercises } from '../../lib/data.js'
 import { getExercise, muscleColor, runTarget } from '../../lib/utils.js'
-import { IconChevronLeft, IconPlus, IconX, IconCheck, IconSearch, IconCopy, IconRun } from '../../components/icons/index.js'
+import { IconChevronLeft, IconPlus, IconX, IconCheck, IconSearch, IconCopy, IconRun, IconGrip } from '../../components/icons/index.js'
 
 type Visibility = 'private' | 'code' | 'public'
 
@@ -83,6 +83,44 @@ export function CreateProgramPage() {
 
   const addExerciseToDay = (di: number, ex: ExerciseDraft) =>
     setDays(d => d.map((day, idx) => idx === di ? { ...day, exercises: [...day.exercises, ex] } : day))
+
+  // Pointer-based drag to reorder exercises within a day (touch + mouse, no deps).
+  // Live-reorders the array as the pointer passes over other rows in the same day.
+  const [dragKey, setDragKey] = useState<string | null>(null)
+  const dragRef = useRef<{ di: number; index: number } | null>(null)
+  const startExDrag = (di: number, ei: number, e: React.PointerEvent) => {
+    e.preventDefault()
+    dragRef.current = { di, index: ei }
+    setDragKey(`${di}:${ei}`)
+    const onMove = (ev: PointerEvent) => {
+      const d = dragRef.current
+      if (!d) return
+      const row = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest('[data-ex-row]') as HTMLElement | null
+      if (!row) return
+      const overDay = Number(row.dataset.day)
+      const overIdx = Number(row.dataset.idx)
+      if (overDay !== d.di || overIdx === d.index) return
+      // Capture the source index now — the setDays updater runs later, after we mutate d.index.
+      const from = d.index
+      setDays(prev => prev.map((day, i) => {
+        if (i !== d.di) return day
+        const arr = [...day.exercises]
+        const [moved] = arr.splice(from, 1)
+        arr.splice(overIdx, 0, moved)
+        return { ...day, exercises: arr }
+      }))
+      d.index = overIdx
+      setDragKey(`${d.di}:${overIdx}`)
+    }
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      dragRef.current = null
+      setDragKey(null)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
 
   // Weekly routine = General program with no week count → no periodization,
   // no start/end date setup. Powerlifting always requires a week count + setup.
@@ -279,7 +317,15 @@ export function CreateProgramPage() {
               {day.exercises.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
                   {day.exercises.map((ex, ei) => (
-                    <div key={ei} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div key={ei} data-ex-row data-day={di} data-idx={ei}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8, borderRadius: 8, transition: 'background .12s',
+                        background: dragKey === `${di}:${ei}` ? 'var(--surface-3)' : 'transparent',
+                      }}>
+                      <div onPointerDown={e => startExDrag(di, ei, e)} aria-label="Drag to reorder"
+                        style={{ flexShrink: 0, display: 'flex', alignItems: 'center', cursor: 'grab', touchAction: 'none', color: 'var(--muted)', padding: '4px 0' }}>
+                        <IconGrip size={16} />
+                      </div>
                       <span className="pill" style={{ fontSize: 8, flexShrink: 0 }}>
                         {ex.type === 'main' ? 'MAIN' : ex.type === 'running' ? 'RUN' : 'ACC'}
                       </span>
