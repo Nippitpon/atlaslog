@@ -1,8 +1,36 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-07-12 (รอบ 28 — ✅ SHIPPED: ลาก reorder ท่าใน WEEK TEMPLATE)
+> อัปเดตล่าสุด: 2026-07-13 (รอบ 29 — ✅ SHIPPED: RPE รายสัปดาห์ใน WEEK TEMPLATE)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-07-13 — รอบ 29 (✅ SHIPPED, deploy main): RPE รายสัปดาห์ในตาราง WEEK TEMPLATE (Create Program)
+
+เพิ่มคอลัมน์ **RPE ต่อสัปดาห์** ในตาราง Set/Rep/%1RM ของท่า main (powerlifting) — ต่อยอดจากรอบ 26 ที่ทำ
+set/rep/% รายสัปดาห์ไว้แล้ว ตอนนี้กำหนด RPE ไล่ขึ้นแต่ละสัปดาห์ได้ (เช่น 7→8→9). commit `909d3c1`
+
+### ทำอะไร
+- `CreateProgramPage.tsx`:
+  - `WeekCell` เพิ่มฟิลด์ `rpe?` · ตอน save expand ลงแต่ละ week: มีค่า → `row.rpe`, ไม่มี → `delete row.rpe`
+  - `ExercisePicker`: เพิ่ม state `wRpe[]` + คอลัมน์ที่ 5 (RPE) ในตาราง (grid `26px 1fr×4`, minWidth 260) · label BASE เปลี่ยน `RPE (opt)` → `RPE (BASE)` เมื่อ `showWeekly`
+  - เว้นเซลล์ RPE ราย week → fallback ใช้ค่า RPE (BASE) (placeholder โชว์ค่า base) · เว้นทั้งคู่ = undefined
+  - `draft.rpe` ตั้งจาก week แรกที่มีค่า (ให้ตัวแทนท่าโชว์ RPE เดียวได้)
+  - `rpeRangeLabel(ex)` ใหม่ — สรุปในรายการวันเป็น `@7→9` (ค่าเดียว = `@8`); เดิมโชว์ `ex.rpe` ตัวเดียว
+  - โหลดตอน edit: อ่าน `x?.rpe` ของแต่ละ week กลับเข้า `weekly[]`
+
+### ผลกระทบ (จัดการแล้ว)
+- ตาราง per-week โผล่เฉพาะ `programType === 'powerlifting' && type === 'main'` เท่าเดิม — accessory/general ไม่กระทบ
+- เว้น % ไว้แต่ใส่ RPE → คำนวณน้ำหนักจาก RPE table (hint เดิม "เว้น % = ใช้ RPE" ยังจริง) · เติม hint "เว้น RPE = ใช้ค่า BASE"
+- `StructuredExercise.rpe` เป็น optional อยู่แล้วใน types → ไม่ต้องแก้ shared types · logger/save อ่าน rpe ราย week ได้เพราะ expand ลงทุก week ตอน save
+
+### verify (e2e จริง Playwright, 0 console errors)
+PL 3 สัปดาห์ → Back Squat main: ตาราง `Set/Rep/%1RM/RPE ต่อสัปดาห์` โชว์คอลัมน์ RPE ครบ 3 แถว, label `RPE (BASE)` · กรอก RPE 7/8/9 (เว้น %) → Add → สรุปในวัน `3×10 @7→9` · Create → `customPrograms` ล่าสุด week 1/2/3 = `{sets:3,reps:10,rpe:7|8|9}`, `pct` ถูกตัดออก · เปิดหน้า edit โปรแกรมนั้น → summary ยัง `3×10 @7→9` (round-trip ผ่าน) · `pnpm build` ผ่าน (113 modules) · ESLint สะอาด
+> ทดสอบผ่าน login gate ด้วย debug hook ชั่วคราวใน `main.tsx` (override `init` เป็น no-op กัน getSession reset user) แล้ว revert (diff ว่าง)
+
+### ไม่ทำรอบนี้
+ยังไม่มี UI แก้ per-week ของแถวที่ add แล้ว (ต้องลบแล้ว add ใหม่ — เหมือนรอบ 27) · ไม่มีปุ่ม "Fill RPE" แบบ step อัตโนมัติเหมือน Fill % (กรอกมือทีละ week)
 
 ---
 
