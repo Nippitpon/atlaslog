@@ -12,7 +12,7 @@ type Visibility = 'private' | 'code' | 'public'
 
 // Authoring-only: a powerlifting main lift carries a per-week Set/Rep/% scheme
 // (index 0 = week 1). Expanded into each week's StructuredExercise on save.
-type WeekCell = { sets?: number; reps?: number; pct?: number }
+type WeekCell = { sets?: number; reps?: number; pct?: number; rpe?: number }
 type ExerciseDraft = StructuredExercise & { weekly?: WeekCell[] }
 type DayDraft = { id?: string; dayOfWeek: StructuredDay['dayOfWeek']; focus: string; exercises: ExerciseDraft[] }
 
@@ -25,6 +25,15 @@ function pctRangeLabel(ex: ExerciseDraft): string | null {
   const lo = Math.round(Math.min(...vals) * 100)
   const hi = Math.round(Math.max(...vals) * 100)
   return lo === hi ? `${lo}%` : `${lo}→${hi}%`
+}
+
+// "@7→9" RPE range label for the day-list summary (falls back to the single rpe).
+function rpeRangeLabel(ex: ExerciseDraft): string | null {
+  const vals = (ex.weekly ?? []).map(c => c.rpe).filter((v): v is number => v !== undefined)
+  if (!vals.length) return ex.rpe !== undefined ? `@${ex.rpe}` : null
+  const lo = Math.min(...vals)
+  const hi = Math.max(...vals)
+  return lo === hi ? `@${lo}` : `@${lo}→${hi}`
 }
 
 export function CreateProgramPage() {
@@ -53,7 +62,7 @@ export function CreateProgramPage() {
               ...ex,
               weekly: editing.weeks.map(w => {
                 const x = w.days[di]?.exercises[ei]
-                return { sets: x?.sets, reps: typeof x?.reps === 'number' ? x.reps : undefined, pct: x?.pct }
+                return { sets: x?.sets, reps: typeof x?.reps === 'number' ? x.reps : undefined, pct: x?.pct, rpe: x?.rpe }
               }),
             }
           : ex
@@ -168,6 +177,8 @@ export function CreateProgramPage() {
             if (c.reps !== undefined) row.reps = c.reps
             if (c.pct !== undefined) row.pct = c.pct
             else delete row.pct
+            if (c.rpe !== undefined) row.rpe = c.rpe
+            else delete row.rpe
             return row
           }),
         })),
@@ -338,7 +349,7 @@ export function CreateProgramPage() {
                       <span className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>
                         {ex.type === 'running'
                           ? (runTarget(ex) || 'Run')
-                          : `${ex.sets}×${ex.reps}${ex.rpe !== undefined ? ` @${ex.rpe}` : ''}${pctRangeLabel(ex) ? ` · ${pctRangeLabel(ex)}` : ''}`}
+                          : `${ex.sets}×${ex.reps}${rpeRangeLabel(ex) ? ` ${rpeRangeLabel(ex)}` : ''}${pctRangeLabel(ex) ? ` · ${pctRangeLabel(ex)}` : ''}`}
                       </span>
                       <button onClick={() => removeExercise(di, ei)} aria-label="Remove exercise"
                         style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 2, flexShrink: 0 }}>
@@ -534,6 +545,7 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
   const [wSets, setWSets] = useState<string[]>([])
   const [wReps, setWReps] = useState<string[]>([])
   const [wPct, setWPct] = useState<string[]>([])
+  const [wRpe, setWRpe] = useState<string[]>([])
 
   // Per-week Set/Rep/% table only makes sense for a powerlifting main lift.
   const showWeekly = programType === 'powerlifting' && type === 'main'
@@ -543,7 +555,7 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
     setType('accessory'); setRole('working')
     setSets('3'); setReps('10'); setRpe('')
     setBasePct(''); setStepPct('')
-    setWSets([]); setWReps([]); setWPct([])
+    setWSets([]); setWReps([]); setWPct([]); setWRpe([])
   }
 
   const fillPct = () => {
@@ -591,10 +603,12 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
     if (showWeekly) {
       const weekly = Array.from({ length: weeks }, (_, i) => {
         const p = wPct[i]?.trim()
+        const r = (wRpe[i] ?? '').trim() || rpe // blank per-week cell falls back to RPE (BASE)
         return {
           sets: Number(wSets[i] || sets) || undefined,
           reps: Number(wReps[i] || reps) || undefined,
           pct: p ? Math.max(0, Math.min(1, Number(p) / 100)) : undefined,
+          rpe: r ? Number(r) : undefined,
         }
       })
       draft.weekly = weekly
@@ -602,6 +616,7 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
       if (weekly[0]?.sets !== undefined) draft.sets = weekly[0].sets
       if (weekly[0]?.reps !== undefined) draft.reps = weekly[0].reps
       draft.pct = weekly.find(c => c.pct !== undefined)?.pct
+      draft.rpe = weekly.find(c => c.rpe !== undefined)?.rpe
     }
     onPick(draft)
   }
@@ -722,7 +737,7 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
               {[
                 { label: showWeekly ? 'SETS (BASE)' : 'SETS', val: sets, set: setSets, ph: '3' },
                 { label: showWeekly ? 'REPS (BASE)' : 'REPS', val: reps, set: setReps, ph: '10' },
-                { label: 'RPE (opt)', val: rpe, set: setRpe, ph: '—' },
+                { label: showWeekly ? 'RPE (BASE)' : 'RPE (opt)', val: rpe, set: setRpe, ph: '—' },
               ].map(({ label, val, set, ph }) => (
                 <div key={label} style={{ flex: 1 }}>
                   <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>{label}</div>
@@ -735,7 +750,7 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
 
             {showWeekly && (
               <div style={{ marginBottom: 12 }}>
-                <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 6 }}>Set / Rep / %1RM ต่อสัปดาห์</div>
+                <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 6 }}>Set / Rep / %1RM / RPE ต่อสัปดาห์</div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 10 }}>
                   <div style={{ flex: 1 }}>
                     <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>BASE %</div>
@@ -753,11 +768,12 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
                     disabled={!basePct} onClick={fillPct}>Fill %</button>
                 </div>
                 <div style={{ overflowX: 'auto' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '26px 1fr 1fr 1fr', gap: 4, alignItems: 'center', minWidth: 210 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '26px 1fr 1fr 1fr 1fr', gap: 4, alignItems: 'center', minWidth: 260 }}>
                     <div />
                     <div className="t-eyebrow" style={{ fontSize: 8, textAlign: 'center' }}>SET</div>
                     <div className="t-eyebrow" style={{ fontSize: 8, textAlign: 'center' }}>REP</div>
                     <div className="t-eyebrow" style={{ fontSize: 8, textAlign: 'center' }}>%</div>
+                    <div className="t-eyebrow" style={{ fontSize: 8, textAlign: 'center' }}>RPE</div>
                     {Array.from({ length: weeks }, (_, i) => (
                       <Fragment key={i}>
                         <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', textAlign: 'center' }}>{i + 1}</div>
@@ -770,12 +786,15 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
                         <input className="input-num tnum" type="number" inputMode="numeric" value={wPct[i] ?? ''} placeholder="—"
                           onChange={e => editCell(wPct, setWPct, i, e.target.value)} onFocus={e => e.target.select()}
                           style={{ width: '100%', textAlign: 'center' }} />
+                        <input className="input-num tnum" type="number" inputMode="decimal" step="0.5" value={wRpe[i] ?? ''} placeholder={rpe || '—'}
+                          onChange={e => editCell(wRpe, setWRpe, i, e.target.value)} onFocus={e => e.target.select()}
+                          style={{ width: '100%', textAlign: 'center' }} />
                       </Fragment>
                     ))}
                   </div>
                 </div>
                 <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', marginTop: 6 }}>
-                  คำนวณน้ำหนักเฉพาะ squat / bench / deadlift · เว้นว่าง Set/Rep = ใช้ค่า BASE · เว้น % = ใช้ RPE
+                  คำนวณน้ำหนักเฉพาะ squat / bench / deadlift · เว้นว่าง Set/Rep = ใช้ค่า BASE · เว้น % = ใช้ RPE · เว้น RPE = ใช้ค่า BASE
                 </div>
               </div>
             )}
