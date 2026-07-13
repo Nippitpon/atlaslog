@@ -20,7 +20,7 @@ export function FinishReview({ workout, now, onConfirm, onCancel }: FinishReview
   const calories = sessionCalories({ exercises: workout.exercises, duration }, latestWeightKg(bodyMetrics))
 
   const done = workout.exercises
-    .map((e, idx) => ({ key: `${e.exerciseId}-${idx}`, exerciseId: e.exerciseId, name: e.name, sets: e.sets.filter(s => s.done) }))
+    .map((e, idx) => ({ key: `${e.exerciseId}-${idx}`, exerciseId: e.exerciseId, name: e.name, label: e.label, sets: e.sets.filter(s => s.done) }))
     .filter(e => e.sets.length > 0)
 
   return (
@@ -73,10 +73,15 @@ export function FinishReview({ workout, now, onConfirm, onCancel }: FinishReview
                   <div style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8,
                   }}>
-                    <span style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 14 }}>
-                      {e.name ?? meta.name}
-                    </span>
-                    <span className="t-eyebrow" style={{ fontSize: 9, color: 'var(--muted)' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <span style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 14 }}>
+                        {e.name ?? meta.name}
+                      </span>
+                      {e.label && (
+                        <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', letterSpacing: '0.02em' }}>{e.label}</div>
+                      )}
+                    </div>
+                    <span className="t-eyebrow" style={{ fontSize: 9, color: 'var(--muted)', flexShrink: 0 }}>
                       {e.sets.length} SET{e.sets.length !== 1 ? 'S' : ''}
                     </span>
                   </div>

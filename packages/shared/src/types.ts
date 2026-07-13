@@ -29,6 +29,9 @@ export interface ProgramExercise {
   // Optional display name override (e.g. "Back Squat — Back-off"); falls back to
   // the canonical exercise name when absent.
   name?: string
+  // Optional sub-label distinguishing rows of the same lift (e.g. "Competition · Top set"
+  // vs "Competition · Back-off"). Sourced from Excel Variant/Prescription columns.
+  label?: string
   sets: ProgramSet[]
   isMain?: boolean
   targetRpe?: number
@@ -53,6 +56,7 @@ export interface WorkoutExercise {
   id?: string
   exerciseId: string
   name?: string
+  label?: string
   sets: WorkoutSet[]
   isMain?: boolean
   targetRpe?: number
@@ -128,6 +132,9 @@ export interface StructuredExercise {
   id?: string
   exerciseId: string
   name: string
+  // Optional sub-label distinguishing rows of the same lift within a day
+  // (e.g. "Competition · Top set" vs "Volume · Back-off"). From Excel Variant/Prescription.
+  label?: string
   type: 'main' | 'accessory' | 'running'
   // Optional because a 'running' activity has no sets/reps (it uses the target
   // distance/duration below and opens the standalone /runs logger instead).

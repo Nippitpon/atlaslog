@@ -97,8 +97,13 @@ function DayCard({
               return (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{ex.name}</span>
-                  <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 'auto' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{ex.name}</span>
+                    {ex.label && (
+                      <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', letterSpacing: '0.02em' }}>{ex.label}</div>
+                    )}
+                  </div>
+                  <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 'auto', flexShrink: 0 }}>
                     {ex.sets}×{ex.reps}
                     {ex.rpe !== undefined && ` @${ex.rpe}`}
                     {wt ? (
@@ -122,8 +127,13 @@ function DayCard({
               return (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--border-strong)', flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{ex.name}</span>
-                  <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 'auto' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{ex.name}</span>
+                    {ex.label && (
+                      <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', letterSpacing: '0.02em' }}>{ex.label}</div>
+                    )}
+                  </div>
+                  <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 'auto', flexShrink: 0 }}>
                     {ex.sets}×{ex.reps}
                     {wt ? <span style={{ color: 'var(--text-2)', marginLeft: 5 }}>{wt}kg</span> : null}
                   </span>

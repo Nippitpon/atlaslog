@@ -53,6 +53,7 @@ export function ImportProgramSheet({ onClose }: Props) {
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [program, setProgram] = useState<StructuredProgram | null>(null)
+  const [programName, setProgramName] = useState('')
 
   // Setup step state
   const todayISO = new Date().toISOString().split('T')[0]
@@ -91,6 +92,7 @@ export function ImportProgramSheet({ onClose }: Props) {
         setErrors(result.errors)
       } else if (result.program) {
         setProgram(result.program)
+        setProgramName(result.program.name)
         setStep('preview')
       }
     } catch (err) {
@@ -112,10 +114,11 @@ export function ImportProgramSheet({ onClose }: Props) {
         deadlift: Number(deadliftRM) || 0,
       },
     }
-    addCustomProgram(program)
-    setConfig(program.id, config)
+    const finalProgram = { ...program, name: programName.trim() || program.name }
+    addCustomProgram(finalProgram)
+    setConfig(finalProgram.id, config)
     onClose()
-    navigate(`/programs/${program.id}`)
+    navigate(`/programs/${finalProgram.id}`)
   }
 
   return (
@@ -149,11 +152,11 @@ export function ImportProgramSheet({ onClose }: Props) {
         {step === 'upload' && (
           <>
             <p style={{ margin: '0 0 20px', color: 'var(--text-2)', fontSize: 13, lineHeight: 1.6 }}>
-              อัพโหลดไฟล์ Excel ที่มี 2 Sheets:<br />
-              <span className="t-mono" style={{ color: 'var(--accent)', fontSize: 11 }}>Program</span>
-              {' '}— รายการ exercises ทั้งหมด<br />
-              <span className="t-mono" style={{ color: 'var(--accent)', fontSize: 11 }}>Meta</span>
-              {' '}— ชื่อ, description, focus ของโปรแกรม
+              อัพโหลดไฟล์ Excel ที่มีตารางโปรแกรม (sheet ชื่อ{' '}
+              <span className="t-mono" style={{ color: 'var(--accent)', fontSize: 11 }}>Template</span>{' '}
+              หรือ <span className="t-mono" style={{ color: 'var(--accent)', fontSize: 11 }}>Program</span>)
+              — ระบบอ่าน header อัตโนมัติ ทั้งแบบ <span className="t-mono" style={{ fontSize: 11 }}>Week/Day/Lift</span>{' '}
+              และแบบเดิม <span className="t-mono" style={{ fontSize: 11 }}>week/day_of_week/exercise_id</span>
             </p>
 
             {/* Column list */}
@@ -161,14 +164,14 @@ export function ImportProgramSheet({ onClose }: Props) {
               background: 'var(--surface-2)', border: '1px solid var(--border)',
               borderRadius: 12, padding: 14, marginBottom: 20,
             }}>
-              <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 8 }}>COLUMNS ที่จำเป็นใน SHEET "PROGRAM"</div>
+              <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 8 }}>COLUMNS ที่จำเป็น</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {['week', 'phase', 'day_of_week', 'focus', 'exercise_name', 'exercise_id', 'type', 'sets', 'reps'].map(c => (
+                {['Week', 'Day', 'Lift', 'Sets', 'Reps'].map(c => (
                   <span key={c} className="pill" style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>{c}</span>
                 ))}
               </div>
               <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 8 }}>
-                optional: pct (0-1), rpe (6-10), note
+                optional: Phase, Variant, Prescription, PCT (0–1.1), RPE, Notes
               </div>
               <a
                 href="/atlaslog-program-template.xlsx"
@@ -266,6 +269,35 @@ export function ImportProgramSheet({ onClose }: Props) {
               )}
             </div>
 
+            {/* Sample: first day of week 1 — confirms parsing + shows Variant/Prescription labels */}
+            {program.weeks[0]?.days[0] && (
+              <>
+                <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 8 }}>
+                  ตัวอย่าง — WEEK {program.weeks[0].weekNumber}, {program.weeks[0].days[0].dayOfWeek}
+                </div>
+                <div style={{
+                  background: 'var(--surface-2)', borderRadius: 10, padding: '10px 12px', marginBottom: 20,
+                  display: 'flex', flexDirection: 'column', gap: 6,
+                }}>
+                  {program.weeks[0].days[0].exercises.map((ex, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600 }}>{ex.name}</span>
+                        {ex.label && (
+                          <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)' }}>{ex.label}</div>
+                        )}
+                      </div>
+                      <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', flexShrink: 0 }}>
+                        {ex.type === 'running'
+                          ? [ex.distanceKm && `${ex.distanceKm}km`, ex.durationMin && `${ex.durationMin}min`].filter(Boolean).join(' · ')
+                          : `${ex.sets}×${ex.reps}${ex.pct ? ` @${Math.round(ex.pct * 100)}%` : ex.rpe !== undefined ? ` @RPE${ex.rpe}` : ''}`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
             <div style={{ display: 'flex', gap: 10 }}>
               <button className="btn btn-secondary" style={{ flex: 1 }}
                 onClick={() => { setStep('upload'); setErrors([]) }}>
@@ -298,6 +330,20 @@ export function ImportProgramSheet({ onClose }: Props) {
                 </div>
               </>
             )}
+
+            <div className="t-eyebrow" style={{ marginBottom: 6, fontSize: 10 }}>PROGRAM NAME</div>
+            <input
+              value={programName}
+              onChange={e => setProgramName(e.target.value)}
+              placeholder="ชื่อโปรแกรม"
+              style={{
+                width: '100%', height: 48, marginBottom: 16,
+                background: 'var(--surface-2)', border: '1px solid var(--border)',
+                borderRadius: 12, color: 'var(--text)', padding: '0 14px',
+                fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 16,
+                outline: 'none', boxSizing: 'border-box',
+              }}
+            />
 
             <div className="t-eyebrow" style={{ marginBottom: 6, fontSize: 10 }}>START DATE</div>
             <div style={{ marginBottom: 16 }}>

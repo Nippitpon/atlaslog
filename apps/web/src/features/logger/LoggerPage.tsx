@@ -135,6 +135,12 @@ export function LoggerPage() {
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {e.name ?? meta.name}
               </div>
+              {e.label && (
+                <div className="t-mono" style={{ fontSize: 8, color: 'var(--muted)',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {e.label}
+                </div>
+              )}
             </button>
           )
         })}
@@ -173,6 +179,11 @@ export function LoggerPage() {
             <h2 className="t-display" style={{ margin: 0, fontSize: 30, letterSpacing: '-0.03em' }}>
               {cur.name ?? exMeta.name}
             </h2>
+            {cur.label && (
+              <div className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, letterSpacing: '0.02em' }}>
+                {cur.label}
+              </div>
+            )}
           </div>
           <button className="btn-icon" onClick={() => setShowSwap(true)} aria-label="Swap exercise">
             <IconSwap size={18} />
