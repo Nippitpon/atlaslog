@@ -1,12 +1,14 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-07-13 (รอบ 31 — ✅ BUILT+VERIFIED (รอ commit/deploy): import template แบบ Hybrid)
+> อัปเดตล่าสุด: 2026-07-13 (รอบ 31 — ✅ SHIPPED, deploy main: import template แบบ Hybrid)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
 
 ---
 
-## 2026-07-13 — รอบ 31 (✅ BUILT + VERIFIED, ยังไม่ commit): รองรับ import template แบบ Hybrid Powerlifting
+## 2026-07-13 — รอบ 31 (✅ SHIPPED, deploy main): รองรับ import template แบบ Hybrid Powerlifting
+
+commit `7536231` (feat) + `757aa0e` (docs)
 
 import รองรับ layout ของ `Hybrid_Powerlifting-Template.xlsx` (sheet เดียวชื่อ `Template`,
 header Title Case, `Lift`/`Variant`/`Prescription`/`Type`=Work/Test, ไม่มี Meta) โดย **ยังรองรับ
