@@ -85,40 +85,44 @@ packages/shared/src/
 
 ### Template Format
 
-**Sheet 1 — `Program`** (one row per exercise entry):
+`excelImport.ts` normalizes headers (case-insensitive alias map) and accepts **two column vocabularies
+in one parser** — full details + coach guide in `docs/excel-import-guide.md`.
 
-| Column | Type | Required | Example |
-|--------|------|----------|---------|
-| `week` | number | ✅ | `1` |
-| `phase` | string | ✅ | `Accumulation` |
-| `day_of_week` | Mon/Tue/Wed/Thu/Fri/Sat | ✅ | `Mon` |
-| `focus` | string | ✅ | `Squat Focus` |
-| `exercise_name` | string | ✅ | `Back Squat` |
-| `exercise_id` | string | ✅ | `squat` |
-| `type` | main/accessory | ✅ | `main` |
-| `sets` | number | ✅ | `1` |
-| `reps` | number or `AMRAP` | ✅ | `5` |
-| `pct` | number 0–1 | optional | `0.75` |
-| `rpe` | number 6–10 | optional | `7` |
-| `note` | string | optional | `เน้น bar path` |
+**Hybrid/Coach format** — single sheet `Template` (or first sheet with recognizable headers):
 
-**Sheet 2 — `Meta`**:
+| Column | Type | Required | Notes |
+|--------|------|----------|-------|
+| `Week` | int ≥ 1 | ✅ | |
+| `Day` | Mon–Sat | ✅ | also full names + Thai (`จันทร์`) |
+| `Lift` | string | ✅ | `Squat`/`Bench`/`Deadlift` → mapped to `squat`/`bench`/`deadlift` for 1RM calc |
+| `Sets` | int 1–50 | ✅ | |
+| `Reps` | int ≥ 1 or `AMRAP` | ✅ | |
+| `Phase` | string | opt | `Accum*`/`Intens*`/`Peak*`/`Taper*`/`Test*` → mapped; `Taper/Test`→`Taper` |
+| `Variant`+`Prescription` | string | opt | joined into `StructuredExercise.label` (e.g. "Competition · Top set") |
+| `PCT` | 0–1.1 | opt | attempts may exceed 100% |
+| `RPE` | number | opt | non-numeric (e.g. `<6.0`) preserved into `note` |
+| `Type` | Work/Test/accessory | opt | Work/Test/blank → `main` |
+| `Notes` | string | opt | |
+| `Target Weight (kg)` | — | — | **ignored** — app recomputes from user 1RM |
 
-| Column | Example |
-|--------|---------|
-| `name` | My 8 Week Program |
-| `description` | สำหรับ intermediate lifter |
-| `focus` | Squat · Bench · Deadlift |
-| `program_type` *(optional)* | `powerlifting` (default) หรือ `general` (ไม่คำนวณน้ำหนัก) |
+**Legacy format** (still supported) — sheet `Program` + optional `Meta`: lowercase
+`week/phase/day_of_week/focus/exercise_name/exercise_id/type/sets/reps/pct/rpe/note`.
+
+**Program name:** `Meta.name` if present, else derived from the **file name**, editable in Setup step.
+`Meta` sheet is optional; `program_type` `powerlifting` (default) / `general`.
+
+**Key invariants:** every imported row gets a stable per-row `id` (`w{week}-{Day}-e{idx}`) so a Top set +
+Back-off of the same lift never collide on the weight-override key. `label` is threaded through
+`ProgramExercise`/`WorkoutExercise` and shown in WeekDays / LoggerPage / FinishReview.
 
 ### Import UI Flow
 
 ```
-ProgramsPage → [+ Import from Excel]
+ProgramsPage → [Import from Excel]
   → file picker (.xlsx / .xls only)
-  → SheetJS parse → validate (error shows row number)
-  → preview modal (week/day summary table)
-  → ProgramSetupSheet (start date + 3× 1RM)
+  → SheetJS parse → normalize headers → validate (error shows row number)
+  → preview (week summary + first-day sample with labels)
+  → ProgramSetupSheet (editable name + start date + 3× 1RM)
   → save to useProgramStore.customPrograms
   → redirect to ProgramOverviewPage
 ```
@@ -130,7 +134,7 @@ ProgramsPage → [+ Import from Excel]
 All in `packages/shared/src/types.ts`:
 
 ```
-StructuredExercise  → exerciseId, name, type, sets, reps, pct?, rpe?, note?
+StructuredExercise  → exerciseId, name, label?, type, sets, reps, pct?, rpe?, note?
 StructuredDay       → id, dayOfWeek, focus, exercises[]
 StructuredWeek      → id, weekNumber, phase, days[]
 StructuredProgram   → id, name, description, totalWeeks, daysPerWeek, focus, weeks[], isCustom?, source?

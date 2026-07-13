@@ -1,82 +1,94 @@
 # 📥 คู่มือ Import โปรแกรมจาก Excel — Atlaslog
 
 นำเข้าโปรแกรมเทรนของคุณเองเข้า Atlaslog ได้ด้วยไฟล์ Excel (`.xlsx` / `.xls`)
-ไฟล์ต้องมี **2 sheet** ชื่อตรงเป๊ะ: `Program` และ `Meta`
+
+ระบบอ่าน **หัวคอลัมน์อัตโนมัติ** (ไม่สนตัวพิมพ์ใหญ่-เล็ก) และรองรับ **2 รูปแบบ**:
+- **แบบ Hybrid/Coach** — sheet เดียวชื่อ `Template` คอลัมน์ `Week / Day / Lift / Variant / Prescription / …`
+- **แบบเดิม** — sheet `Program` (+ `Meta`) คอลัมน์ `week / day_of_week / exercise_id / …`
 
 > 💡 ดาวน์โหลดไฟล์ตัวอย่างพร้อมใช้งานได้ที่ `apps/web/public/atlaslog-program-template.xlsx`
-> เปิดแล้วแก้ตัวเลขตามโปรแกรมตัวเองได้เลย
+> (หรือปุ่ม "ดาวน์โหลดไฟล์ตัวอย่าง" ในหน้า Import) — เปิดแล้วแก้ตัวเลขตามโปรแกรมตัวเองได้เลย
 
 ---
 
-## Sheet 1 — `Program`
+## รูปแบบหลัก — sheet `Template`
 
-หนึ่ง **แถว = หนึ่งท่า** ในวันนั้น ๆ แถวแรกเป็นหัวคอลัมน์ (ชื่อต้องตรงตามตาราง)
+หนึ่ง **แถว = หนึ่งเซ็ตของท่า (prescription)** ในวันนั้น ๆ แถวแรกเป็นหัวคอลัมน์
 
 | คอลัมน์ | ชนิด | บังคับ | ตัวอย่าง | หมายเหตุ |
 |---------|------|:-----:|----------|----------|
-| `week` | จำนวนเต็ม ≥ 1 | ✅ | `1` | สัปดาห์ที่เท่าไหร่ |
-| `phase` | ข้อความ | ✅ | `Accumulation` | ต้องเป็น 1 ใน 4 ค่า (ดูด้านล่าง) |
-| `day_of_week` | Mon–Sat | ✅ | `Mon` | วันในสัปดาห์ |
-| `focus` | ข้อความ | ✅ | `Squat Focus` | โฟกัสของวันนั้น |
-| `exercise_name` | ข้อความ | ✅ | `Back Squat` | ชื่อท่าที่แสดงผล |
-| `exercise_id` | ข้อความ | ✅ | `squat` | id ของท่า (ดูหมายเหตุ) |
-| `type` | `main` / `accessory` | ✅ | `main` | ท่าหลัก หรือ ท่าเสริม |
-| `sets` | จำนวน ≥ 1 | ✅ | `3` | จำนวนเซ็ต |
-| `reps` | จำนวน หรือ `AMRAP` | ✅ | `5` | จำนวนครั้ง |
-| `pct` | 0–1 | ❌ | `0.75` | % ของ 1RM (0.75 = 75%) |
-| `rpe` | 6–10 | ❌ | `8` | ระดับความหนัก |
-| `note` | ข้อความ | ❌ | `เน้น bar path` | โน้ตของท่า |
+| `Week` | จำนวนเต็ม ≥ 1 | ✅ | `1` | สัปดาห์ที่เท่าไหร่ |
+| `Day` | Mon–Sat | ✅ | `Mon` | รองรับชื่อเต็ม (`Monday`) + ไทย (`จันทร์`) |
+| `Lift` | ข้อความ | ✅ | `Squat` | `Squat`/`Bench`/`Deadlift` → คำนวณน้ำหนักจาก 1RM |
+| `Sets` | จำนวนเต็ม 1–50 | ✅ | `4` | จำนวนเซ็ต |
+| `Reps` | จำนวนเต็ม ≥ 1 หรือ `AMRAP` | ✅ | `5` | จำนวนครั้ง |
+| `Phase` | ข้อความ | ❌ | `Accumulation` | ดูกฎด้านล่าง |
+| `Variant` | ข้อความ | ❌ | `Competition` | รวมเป็น label ใต้ชื่อท่า |
+| `Prescription` | ข้อความ | ❌ | `Top set` | รวมเป็น label ใต้ชื่อท่า |
+| `PCT` | 0–1.1 | ❌ | `0.75` | % ของ 1RM (0.75 = 75%; attempt เกิน 100% ได้ถึง 1.1) |
+| `RPE` | ตัวเลข | ❌ | `8` | ถ้าไม่ใช่ตัวเลข (เช่น `<6.0`) จะเก็บไว้ใน note |
+| `Type` | `Work` / `Test` / `accessory` | ❌ | `Work` | `Work`/`Test`/ว่าง = ท่าหลัก |
+| `Notes` | ข้อความ | ❌ | `Pause 1 วิ` | โน้ตของท่า |
+
+> คอลัมน์อื่น (เช่น `Target Weight (kg)`) จะถูก **ข้าม** — แอปคำนวณน้ำหนักจาก 1RM ของคุณเองเสมอ
 
 ### กฎสำคัญ
 
-- **`phase`** ต้องเป็นหนึ่งใน: `Accumulation` · `Intensification` · `Peaking` · `Taper`
-  (ถ้าใส่ค่าอื่น ระบบจะตั้งให้เป็น `Accumulation` อัตโนมัติ) — phase ของแต่ละสัปดาห์
-  ยึดจากแถวแรกของสัปดาห์นั้น
-- **`exercise_id`** จะถูกแปลงอัตโนมัติ: ตัวพิมพ์เล็กทั้งหมด + เว้นวรรคเปลี่ยนเป็น `_`
-  เช่น `Back Squat` → `back_squat` — แนะนำให้ใช้ id ที่ตรงกับท่าในระบบ
-  (`squat`, `bench`, `deadlift`) เพื่อให้คำนวณน้ำหนักจาก 1RM ได้
-- **`pct` กับ `rpe`** ใส่อย่างใดอย่างหนึ่งหรือทั้งคู่ก็ได้ / เว้นว่างได้
-- ท่าหลายท่าใน **วันเดียวกัน** ให้ใส่ `week` + `day_of_week` ซ้ำในหลายแถว
-- ท่าจะเรียงตามลำดับแถวในไฟล์ / วันเรียงตาม Mon → Sat อัตโนมัติ
+- **`Phase`** map อัตโนมัติจากคำที่มี: `Accum*` → Accumulation · `Intens*` → Intensification ·
+  `Peak*` → Peaking · `Taper*`/`Test*` → Taper (เช่น `Taper/Test` = Taper) — ค่าอื่น = Accumulation
+- **`Lift`** → `Squat`/`Bench`/`Deadlift` (รวม `Back Squat`/`Bench Press`) map เป็นท่าในระบบเพื่อคำนวณน้ำหนัก
+  ท่าอื่นที่ไม่รู้จักยัง import ได้ (เป็นท่าเสริม ไม่คำนวณน้ำหนัก)
+- **`Variant` + `Prescription`** → รวมเป็น label เช่น `Competition · Top set` แสดงใต้ชื่อท่าทุกที่
+  (หน้า week / logger / review) — ทำให้ **Top set กับ Back-off ของลิฟต์เดียวกันไม่ปนกัน**
+- **`PCT` มาก่อน `RPE`** ในการคำนวณน้ำหนัก (มี PCT → ใช้ PCT, ไม่มีก็ใช้ RPE table)
+- ท่าหลายเซ็ตใน **วันเดียวกัน** ใส่ `Week` + `Day` ซ้ำหลายแถว — เรียงตามลำดับแถวในไฟล์
+- แต่ละวันคำนวณ **focus อัตโนมัติ** จากชื่อลิฟต์ที่ไม่ซ้ำ (เช่น `Squat · Deadlift`)
 
-### ตัวอย่างข้อมูล (Sheet `Program`)
+### ตัวอย่างข้อมูล (sheet `Template`)
 
-| week | phase | day_of_week | focus | exercise_name | exercise_id | type | sets | reps | pct | rpe | note |
-|------|-------|-------------|-------|---------------|-------------|------|------|------|-----|-----|------|
-| 1 | Accumulation | Mon | Squat Focus | Back Squat | squat | main | 4 | 5 | 0.75 | | |
-| 1 | Accumulation | Mon | Squat Focus | Leg Press | leg_press | accessory | 3 | 10 | | 8 | |
-| 1 | Accumulation | Wed | Bench Focus | Bench Press | bench | main | 4 | 5 | 0.72 | | เน้น leg drive |
-| 1 | Accumulation | Fri | Deadlift Focus | Deadlift | deadlift | main | 3 | 3 | 0.80 | | |
-| 2 | Intensification | Mon | Squat Focus | Back Squat | squat | main | 4 | 3 | 0.82 | | |
+| Week | Phase | Day | Lift | Variant | Prescription | Sets | Reps | PCT | RPE | Type | Notes |
+|------|-------|-----|------|---------|--------------|------|------|-----|-----|------|-------|
+| 1 | Accumulation | Mon | Squat | Competition | Top set | 1 | 5 | 0.75 | 7 | Work | คุมจังหวะ |
+| 1 | Accumulation | Mon | Squat | Competition | Back-off | 4 | 5 | 0.70 | 6 | Work | |
+| 1 | Accumulation | Mon | Deadlift | Volume | Work sets | 3 | 6 | 0.70 | 7 | Work | |
+| 3 | Taper/Test | Fri | Squat | Competition | Attempt 3 | 1 | 1 | 1.02 | 9.5 | Test | 3rd attempt |
 
 ---
 
-## Sheet 2 — `Meta`
+## ชื่อโปรแกรม
 
-ข้อมูลหัวเรื่องของโปรแกรม รูปแบบ **key / value** (คอลัมน์ A = key, คอลัมน์ B = ค่า)
+- ถ้ามี sheet `Meta` และมีค่า `name` → ใช้ค่านั้น
+- ถ้าไม่มี → ใช้ **ชื่อไฟล์** เป็นค่าเริ่มต้น (เช่น `Hybrid_Powerlifting-Template.xlsx` → "Hybrid Powerlifting Template")
+- แก้ชื่อได้ในขั้น **Setup** ก่อนบันทึกเสมอ
 
-| คอลัมน์ A (key) | คอลัมน์ B (value) | บังคับ |
-|-----------------|-------------------|:-----:|
-| `name` | `My 8 Week Program` | ✅ |
+---
+
+## รูปแบบเดิม — sheet `Program` + `Meta` (ยังรองรับ)
+
+คอลัมน์ตัวพิมพ์เล็ก: `week`, `phase`, `day_of_week`, `focus`, `exercise_name`, `exercise_id`,
+`type` (`main`/`accessory`), `sets`, `reps`, `pct`, `rpe`, `note` — ทำงานเหมือนเดิมทุกอย่าง
+
+sheet `Meta` (optional) รูปแบบ key/value:
+
+| key | value | บังคับ |
+|-----|-------|:-----:|
+| `name` | `My 8 Week Program` | ❌ (ไม่มี = ใช้ชื่อไฟล์) |
 | `description` | `สำหรับ intermediate lifter` | ❌ |
 | `focus` | `Squat · Bench · Deadlift` | ❌ |
-| `program_type` | `powerlifting` หรือ `general` | ❌ |
+| `program_type` | `powerlifting` / `general` | ❌ |
 
-### `program_type` (optional)
-
-- **`powerlifting`** (ค่าเริ่มต้น ถ้าเว้นว่าง) — ระบบ **คำนวณน้ำหนักต่อเซ็ตจาก 1RM** (`1RM × pct` หรือจาก RPE)
-- **`general`** — **ไม่คำนวณน้ำหนัก** ผู้ใช้กรอกน้ำหนักเอง + ไม่โชว์ SBD/1RM
-- ไฟล์เทมเพลตเดิม (ไม่มีแถวนี้) ยังใช้ได้ตามปกติ — ถือเป็น `powerlifting` อัตโนมัติ
+- **`powerlifting`** (ค่าเริ่มต้น) — คำนวณน้ำหนักต่อเซ็ตจาก 1RM
+- **`general`** — ไม่คำนวณน้ำหนัก ผู้ใช้กรอกเอง + ไม่โชว์ SBD/1RM
 
 ---
 
 ## ขั้นตอน Import ในแอป
 
-1. ไปที่หน้า **Programs** → กดปุ่ม **`+ Import from Excel`**
+1. ไปที่หน้า **Programs** → กดปุ่ม **Import from Excel**
 2. เลือกไฟล์ `.xlsx` / `.xls`
 3. ระบบตรวจสอบไฟล์ — ถ้าผิดจะบอก **เลขแถว** ที่มีปัญหา
-4. ดู preview สรุปสัปดาห์/วัน → กดถัดไป
-5. (โปรแกรม **powerlifting**) กรอก **วันเริ่ม (Start Date)** + **1RM** — หรือใช้ 1RM จากโปรไฟล์
+4. ดู preview สรุปสัปดาห์/วัน + ตัวอย่างวันแรก (เห็น label Top set/Back-off) → กดถัดไป
+5. (โปรแกรม powerlifting) แก้ชื่อโปรแกรม + กรอก **Start Date** + **1RM** (หรือใช้ 1RM จากโปรไฟล์)
 6. บันทึก → โปรแกรมพร้อมใช้งาน
 
 ---
@@ -85,8 +97,8 @@
 
 | อาการ | สาเหตุ / วิธีแก้ |
 |-------|-----------------|
-| `ไม่พบ Sheet ชื่อ "Program"` / `"Meta"` | ชื่อ sheet ไม่ตรง (ต้องเป๊ะ ตัวพิมพ์ใหญ่-เล็กมีผล) |
-| `ไม่พบ column: "xxx"` | หัวคอลัมน์สะกดผิด หรือมีเว้นวรรคเกิน |
-| `Row N: "day_of_week" ต้องเป็น Mon/Tue/...` | ใช้ `Sun` หรือชื่อเต็ม (`Monday`) ไม่ได้ |
-| `Row N: "type" ต้องเป็น main หรือ accessory` | สะกดผิด เช่น `Main` (ต้องพิมพ์เล็ก) |
-| `Sheet "Meta": ต้องมี row ที่มี key "name"` | ลืมใส่แถว `name` ใน sheet Meta |
+| `ไม่พบตารางโปรแกรมที่อ่านได้` | ไม่มี sheet ที่มีคอลัมน์ `Week`, `Day`, `Lift` (หรือ `exercise_id`) ครบ |
+| `Row N: "Sets" ต้องเป็นจำนวนเต็ม 1–50` | Sets ว่าง/ติดลบ/ทศนิยม/มากเกินไป |
+| `Row N: "Reps" ต้องเป็นจำนวนเต็มบวก หรือ "AMRAP"` | Reps เป็นช่วง (`5-8`) หรือทศนิยม — ใส่ค่าเดียว |
+| `Row N: "PCT" ต้องอยู่ในช่วง 0–1.1` | ใส่ `75` แทน `0.75` หรือค่าเกิน 110% |
+| `Row N: "Day" ต้องเป็น Mon/Tue/...` | วันสะกดผิด (รองรับ Mon–Sat, ชื่อเต็ม, ไทย — ไม่รองรับ Sun) |

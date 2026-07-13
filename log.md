@@ -1,8 +1,69 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-07-13 (รอบ 29 — ✅ SHIPPED: RPE รายสัปดาห์ใน WEEK TEMPLATE)
+> อัปเดตล่าสุด: 2026-07-13 (รอบ 31 — ✅ BUILT+VERIFIED (รอ commit/deploy): import template แบบ Hybrid)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-07-13 — รอบ 31 (✅ BUILT + VERIFIED, ยังไม่ commit): รองรับ import template แบบ Hybrid Powerlifting
+
+import รองรับ layout ของ `Hybrid_Powerlifting-Template.xlsx` (sheet เดียวชื่อ `Template`,
+header Title Case, `Lift`/`Variant`/`Prescription`/`Type`=Work/Test, ไม่มี Meta) โดย **ยังรองรับ
+format เดิม (Program+Meta) ได้ด้วย** — แผนเต็ม: **`docs/excel-hybrid-import-plan.md`**, คู่มือ: `docs/excel-import-guide.md`
+
+### การตัดสินใจที่ยืนยันแล้ว
+- **Format:** รับทั้ง 2 แบบ — normalization layer เดียว auto-detect (ไม่พังของเดิม)
+- **ชื่อโปรแกรม:** default จากชื่อไฟล์ + แก้ได้ตอน setup (Hybrid ไม่มี Meta)
+- **Variant/Prescription:** เพิ่มฟิลด์ `label?` ใน `StructuredExercise` แสดงเป็น sub-text ("Competition · Top set")
+
+### ทำอะไร
+- `excelImport.ts` (rewrite): อ่าน header จริง (row 1) + alias map (Title Case↔lowercase) · หา sheet ยืดหยุ่น
+  (`Program`→`Template`→sheet แรกที่ header ครบ) · Meta optional · Lift dictionary (Squat→squat) ·
+  Type Work/Test/ว่าง→main · phase `Taper/Test`→`Taper` · coercion เข้ม (sets int 1–50, reps int/AMRAP,
+  pct 0–1.1 ยอม attempt, rpe non-numeric `<6.0`→note) · ใส่ `id` ต่อแถว `w{week}-{Day}-e{i}` · gen `label`+`focus`
+- `types.ts`: เพิ่ม `label?` ใน `StructuredExercise`/`ProgramExercise`/`WorkoutExercise`
+- thread `label`: `dayToProgram` + `useAppStore.startWorkout` · แสดงใน `WeekDays`/`LoggerPage`/`FinishReview`
+- `ImportProgramSheet`: ช่องแก้ชื่อโปรแกรม + hint ใหม่ (2 format) + preview โชว์ตัวอย่างวันแรกพร้อม label
+- template ที่แจก (`public/atlaslog-program-template.xlsx`): gen ใหม่เป็น Hybrid format แบบ compact (3 wk ตัวอย่าง + AMRAP + attempt 1.02)
+- อัปเดต `docs/excel-import-guide.md` + `CLAUDE.md`
+
+### verify (e2e จริง Playwright 390px, debug hook ใน main.tsx แล้ว revert, 0 console errors)
+Node unit: parse `Hybrid_Powerlifting-Template.xlsx` → 12 wk (W11=3d, W12=2d), phase A/I/P/T ถูก, id ไม่ซ้ำ 0 วัน,
+`<6.0`→note, `1.02` ผ่าน · regression: old format (Program+Meta) + ไฟล์ Thai days (`จันทร์`, `%1RM`) parse ผ่าน ·
+E2E: import→preview (label Top set/Back-off แยก)→แก้ชื่อ→setup 1RM 180/120/220→overview (variable days)→
+week 1: Squat Top set **135kg** vs Back-off **125kg** (คนละค่า = collision fixed), Deadlift 155kg →
+logger: chip + title โชว์ label, set 1 prefill 135×5 · `pnpm build` + ESLint ผ่าน
+
+### เกี่ยวข้องกับรอบ 30
+เคลียร์บั๊กกลุ่ม Excel ของรอบ 30 ไปพร้อมกัน: A1/A2/A4/A6/B1 (validation) + A3/M2 (override key ชนกัน)
+
+---
+
+## 2026-07-13 — รอบ 30 (📋 PLANNED): แก้ตาม senior code review
+
+รีวิวเต็ม 4 ด้าน (state/sync, domain logic + Excel import, security, UI flows) — รายงาน + backlog ติ๊กได้
+อยู่ที่ **`docs/code-review-2026-07-13.md`** (ทุกข้อ verify กับโค้ดจริงแล้ว, อ้าง `file:line`)
+
+### ต้องแก้ก่อนปล่อยจริง (🔴 สูง)
+- **Sync data-loss 4 ตัว** (`syncQueue.ts`, `useProgramStore.ts`, `useAuthStore.ts`): op ต่อคิวระหว่าง flush
+  ถูกเขียนทับ · op ตอน sign-out (userId null) sync เข้าบัญชีคนถัดไป · debounce timer + sign-out ล้าง
+  program_state เป็นค่าว่างบน cloud · `loadUserData` แข่ง `flushQueue` → cloud เก่าทับ local ใหม่
+- **Excel import** (`excelImport.ts`, `rpeTable.ts`, `WeekDays.tsx`): reps ทศนิยม → crash จอขาว (render path) ·
+  pct ไม่ตรวจช่วง (75 แทน 0.75 = 13,500 kg) · คีย์ override ชนกัน (back-off prefill = top set) ·
+  แก้โปรแกรม import → regenerate ทุกสัปดาห์จาก week 1 (periodization หาย)
+- **UI** : ปุ่ม Continue/START ทับ workout ค้าง ไม่มี resume · ลบ custom program แตะเดียวไม่ confirm
+- **Security**: coach function harvest อีเมลผู้ใช้ทุกคน (UUID-prefix + ไม่เช็ค role)
+
+### แก้รอบถัดไป (🟡 กลาง — เด่น)
+- calories หายตอน round-trip cloud · ไม่มี retry limit (op fail วนไม่จบ) · `flushing` guard ตั้งหลัง await ·
+  SIGNED_OUT ไม่ล้าง store · persist ไม่มี version/migrate · sets ไม่จำกัดเพดาน · วันที่คำนวณ UTC (off-by-one ไทย) ·
+  week นับ done หลังทำวันเดียว · `shared_programs` SELECT `using(true)` · coach ไม่เช็ค role ฝั่ง server
+
+### สิ่งที่ยังไม่มีเลย
+- **ไม่มี unit test / E2E สักไฟล์** — target คุ้มสุด: `flushQueue`, `parseExcelFile`, RPE math, date helper (ดูรายละเอียดในไฟล์รีวิว)
+
+> รายละเอียดเต็ม + วิธีแก้ทีละข้อ + ✅ จุดที่ตรวจแล้วปลอดภัย → `docs/code-review-2026-07-13.md`
 
 ---
 
