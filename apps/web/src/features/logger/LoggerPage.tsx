@@ -284,7 +284,9 @@ export function LoggerPage() {
           current={cur.exerciseId}
           onPick={id => {
             const next: Workout = { ...workout }
-            next.exercises = next.exercises.map((e, i) => i !== workout.currentIdx ? e : { ...e, exerciseId: id })
+            // Drop the imported name/label overrides so the display falls back to
+            // the swapped-in exercise's canonical name (matches History rendering).
+            next.exercises = next.exercises.map((e, i) => i !== workout.currentIdx ? e : { ...e, exerciseId: id, name: undefined, label: undefined })
             updateWorkout(next)
             setShowSwap(false)
           }}
