@@ -1,8 +1,35 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-07-13 (รอบ 31 — ✅ SHIPPED, deploy main: import template แบบ Hybrid)
+> อัปเดตล่าสุด: 2026-07-15 (รอบ 32 — ✅ SHIPPED, deploy main: Swap Exercise ชื่อไม่อัปเดต)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-07-15 — รอบ 32 (✅ SHIPPED, deploy main): Swap Exercise แล้วชื่อท่าไม่เปลี่ยนตาม
+
+ตอน Swap Exercise ในหน้า Logger ชื่อท่าค้างเป็นชื่อเดิม แต่ประเภท (group) เปลี่ยนถูก —
+เช่น swap `Bulgarian Split Squat` (Legs) → `Cable Fly` (Chest) แล้วหัวข้อยังโชว์ "Bulgarian Split Squat"
+ทั้งที่ pill เป็น Chest แล้ว. History แสดงถูกอยู่แล้ว (คนละ code path).
+
+### สาเหตุ
+- `WorkoutExercise` มี `name`/`label` เป็น override ที่ก็อปมาจากโปรแกรมตอน `startWorkout`
+- swap handler (`LoggerPage.tsx`) อัปเดตแค่ `exerciseId` → `name`/`label` เดิมค้าง
+- Logger header (`cur.name ?? exMeta.name`) + tab list + `FinishReview` ใช้ override ที่ค้าง → โชว์ชื่อเก่า
+- แต่ group pill ดึงจาก `getExercise(cur.exerciseId).group` (id เปลี่ยนแล้ว) → เปลี่ยนถูก = ที่มาของอาการ "ชื่อไม่เปลี่ยน ประเภทเปลี่ยน"
+- `HistoryPage` resolve ชื่อจาก `getExercise(exId).name` ตรง ๆ (ไม่สน override) → เลยถูกมาตลอด
+
+### ทำอะไร
+- `LoggerPage.tsx` swap `onPick`: เคลียร์ `name: undefined, label: undefined` ตอนสลับ id → display fallback ไปชื่อจริงของท่าใหม่ (ตรงกับที่ History ทำ)
+- คง `targetRpe`/`isMain`/sets ไว้ (เป็นการกำหนดของ slot ไม่ใช่ตัวท่า)
+
+### verify (e2e จริง Playwright 390px, 0 console errors)
+inject workout `exerciseId: leg-press` + name ค้าง "Bulgarian Split Squat" + label → swap เป็น Cable Fly:
+header/tab/FinishReview/History โชว์ "Cable Fly" ตรงกันหมด · group Legs→Chest · label หาย · sets 40×10 + RPE 8 คงอยู่ ·
+`pnpm build` ผ่าน (113 modules)
+
+### ไม่ทำรอบนี้
+- ไม่แตะ `addExerciseToWorkout` (ไม่เคยตั้ง name/label อยู่แล้ว ไม่มีบั๊ก) · ไม่แตะ picker ใน `CreateProgramPage` (คนละ flow)
 
 ---
 
