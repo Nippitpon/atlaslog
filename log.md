@@ -1,8 +1,37 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-07-15 (รอบ 32 — ✅ SHIPPED, deploy main: Swap Exercise ชื่อไม่อัปเดต)
+> อัปเดตล่าสุด: 2026-07-20 (รอบ 33 — ✅ SHIPPED, deploy main: ย้าย Deadlift day เสาร์→ศุกร์)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-07-20 — รอบ 33 (✅ SHIPPED, deploy main): ย้าย Deadlift Focus day ของ 12-week เสาร์ → ศุกร์
+
+commit `513c16d` (feat)
+
+โปรแกรม built-in `12 Weeks SBD Peaking` (`sbd-12w`) ย้ายวันฝึกที่ 4 (Deadlift Focus ทุกสัปดาห์ +
+Competition Day ใน Week 12) จากวันเสาร์เป็น**วันศุกร์**ทุกสัปดาห์ ตามที่ผู้ใช้ขอ (ยืนยันให้ย้าย Week 12 ด้วย)
+
+### ทำอะไร
+- `twelveWeekProgram.ts` — helper `sat()` → `fri()` + `dayOfWeek: 'Sat'` → `'Fri'` (จุดเดียวคุมทั้ง 12 สัปดาห์) · แทน call site `sat([` → `fri([` ทั้ง 12 จุด · อัปเดตคอมเมนต์โครงสร้าง `Sat=DL+SquatVol` → `Fri=`
+- **คง `id: 'day-4'` ไว้เหมือนเดิม** — เป็น key ที่ progress/accessories ที่ persist ผูกอยู่
+
+### ผลกระทบ (จัดการแล้ว)
+- Progress / custom accessories / config เดิม **ไม่หลุด** — ทุกอย่าง key ด้วย `dayId = 'day-4'` ไม่ใช่ชื่อวัน (ไม่มี migration ผูกกับ dayOfWeek)
+- น้ำหนักคำนวณสดจาก `exerciseId:rpe` ทุกครั้ง (ท่า built-in ไม่มี `ex.id`) → ไม่มี override ค้าง · id แบบ `w{week}-{Day}-e{idx}` ใช้เฉพาะโปรแกรม import Excel ไม่ใช่ built-in
+- ลำดับวันในหน้า Week ยังเรียง Mon → Tue → Thu → Fri (ตาม array order พอดี ไม่ต้องจัดใหม่)
+- Dashboard reminder banner เด้งวันศุกร์แทนเสาร์ (ผลที่ตั้งใจ) · `DAY_SHORT`/`DAY_FULL` มี Fri อยู่แล้ว ไม่ต้องแก้
+- ประวัติ session เก่าที่จดไว้ยังโชว์ชื่อ freeze `"Sat — Deadlift Focus"` = cosmetic เท่านั้น ไม่กระทบการทำงาน
+
+### verify
+`pnpm build` ผ่าน (113 modules) · ESLint ผ่าน · ทดสอบ output จริงโดย transpile โมดูลแล้วเรียก `dayToProgram`
+กับทั้ง 12 สัปดาห์ → day-4 ขึ้น `"Fri — Deadlift Focus"` (Week 12 = `"Fri — Competition Day"`), `id: 'day-4'`
+คงเดิม, ไม่เหลือ `'Sat'` · **ยังไม่ได้ click-through e2e ใน browser** (ติด login gate ที่ต้องมี Supabase session จริง —
+เลือกทดสอบระดับโมดูลแทนเพราะเป็นการแก้ค่า string ที่ไหลเข้า template literal ตรง ๆ)
+
+### ไม่ทำรอบนี้
+- ไม่แตะ Excel importer (`excelImport.ts`) — คนละ flow, id ที่ฝังชื่อวันใช้กับ import เท่านั้น · ไม่ commit `Hybrid_Powerlifting-Template.xlsx` (ไฟล์ local ไม่เกี่ยวรอบนี้)
 
 ---
 
