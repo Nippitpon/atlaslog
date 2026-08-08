@@ -1,8 +1,70 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-07-20 (รอบ 33 — ✅ SHIPPED, deploy main: ย้าย Deadlift day เสาร์→ศุกร์)
+> อัปเดตล่าสุด: 2026-08-08 (รอบ 34 — ✅ SHIPPED, deploy main: ปรับลำดับท่าในวันซ้อมได้อิสระ)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-08-08 — รอบ 34 (✅ SHIPPED, deploy main): ปรับลำดับท่าในวันซ้อมได้อิสระ (main + accessory)
+
+commit `97dd9f1` (feat)
+
+เดิมสลับลำดับได้เฉพาะหน้า Create/Edit Program ส่วน `AccessoryEditSheet` มีแค่เพิ่ม (ต่อท้ายเสมอ) / ลบ
+และ `WeekDays.handleStart` บังคับเรียง main-ก่อน-acc ตอนส่งเข้า logger รอบนี้ทำให้**ลากสลับได้ทุกแถวทั้งวัน** —
+accessory ขึ้นก่อน main หรือแทรกกลางได้ ทั้งตอนวางแผนและระหว่างเทรน โดย**ไม่แตะ schema Supabase เลย**
+
+### ทำอะไร
+
+- **`components/ReorderList.tsx` (ใหม่)** — drag-to-reorder กลาง (pointer events, touch + mouse, ไม่ใช้ lib)
+  ยกมาจากที่ `CreateProgramPage` เขียน inline · props `items/getKey/onReorder/renderRow/groupId/rowStyle` ·
+  `groupId` กันลากข้ามลิสต์ (เช่นข้ามวันในหน้า Create) · `onReorder` เก็บใน ref + `useEffect` (กัน lint `react-hooks/refs`)
+- **`lib/dayLayout.ts` (ใหม่)** — `dayRowKey(ex, i)` + `resolveDayExercises(day, stored)`
+  รวมลำดับที่ผู้ใช้บันทึกเข้ากับท่าในโปรแกรม · แถว main **ดึงค่าสดจากโปรแกรมเสมอ** (เก็บแค่ลำดับ) ·
+  running ไม่เข้าลำดับ · ทุกแถวที่คืนมาถูก stamp `id` เพื่อใช้เป็น key ของ `weightOverrides`
+- **`DayEditSheet.tsx`** (rename จาก `AccessoryEditSheet.tsx`) — แสดง main ด้วย ลากได้ทุกแถว ·
+  ปุ่มลบเฉพาะ accessory (main ลากได้แต่ลบไม่ได้ คงสัญญาเดิม) · pill `MAIN`/`ACC` · หัวข้อเปลี่ยนเป็น `Exercises`
+- **`logger/ReorderSheet.tsx` (ใหม่)** — ปุ่ม `IconGrip` ข้างปุ่ม Swap เปิด sheet ลากสลับระหว่างเทรน ·
+  บันทึกแล้ว `currentIdx` วิ่งตามท่าที่กำลังทำ (match ด้วย `ex.id`) · ลำดับนี้ ephemeral ไม่เขียนทับ layout ของโปรแกรม
+- **`WeekDays.tsx`** — `handleStart` ตัด `[...mains, ...customAcc]` ทิ้ง ใช้ `ordered` ตรง ๆ ·
+  `DayCard` รวม MAIN/ACCESSORIES เป็นลิสต์เดียว eyebrow `EXERCISES` (จุด accent = main) preview 5 แถว + `+N more`
+- **`useProgramStore.ts`** — rename action → `getDayLayout`/`setDayLayout`
+- **`CreateProgramPage.tsx` / `utils.ts`** — ใช้ `ReorderList` + `moveItem` ร่วมกัน ลบ drag ที่เขียนซ้ำ (~35 บรรทัด)
+
+### ผลกระทบ (จัดการแล้ว)
+
+- **ไม่ต้องทำอะไรใน Supabase** — ชื่อ state ที่ persist ยังเป็น `customAccessories` เหมือนเดิม
+  (localStorage `atlas:v1:program-progress` + คอลัมน์ `custom_accessories jsonb`) เปลี่ยนแค่ "เนื้อใน" ของ JSON
+  คือมีแถว `type:'main'` ปนได้ · `syncQueue.ts:89` / `useAuthStore.ts:98` / RLS ไม่ต้องแตะ
+- **ข้อมูลเก่าปลอดภัย** — `resolveDayExercises` เช็คว่ามีแถว `main` ไหม ถ้าไม่มี = payload เก่า → เรียง main-ก่อน-acc เหมือนเดิมเป๊ะ
+- **built-in 12-week ไม่มี `ex.id`** (`twelveWeekProgram.ts` สร้าง object เปล่า) → `dayRowKey` fallback เป็น
+  `exerciseId|name|index` ซึ่งแยก "Back Squat" กับ "Back Squat Back-off" ได้
+- **แก้โปรแกรมหลังจัดลำดับ** — main ที่ถูกลบจะ drop, main ที่เพิ่งเพิ่มไปต่อท้าย
+  ⚠️ กด SAVE CHANGES ในหน้า Edit Program จะ **reassign exercise id ใหม่แบบ positional** (`${dayId}-e${idx}`)
+  → layout ที่จัดไว้ของวันนั้นจะ reset กลับเป็นลำดับตามโปรแกรม (ไม่พัง ไม่ซ้ำ แค่ต้องจัดใหม่)
+- **weightOverrides ไม่ปนกัน** — ยังคีย์ด้วย `ex.id ?? exerciseId:rpe` เหมือนเดิม Top set + Back-off ของท่าเดียวกันได้น้ำหนักคนละค่า
+
+### verify
+
+- `pnpm build` ผ่าน (116 modules) · ESLint ผ่าน exit 0
+- **logic test 10 เคสผ่านหมด** (`resolveDayExercises`): ไม่มี layout / payload เก่า / interleaved order /
+  main ถูกลบ+เพิ่ม / ค่า main สดจากโปรแกรม / excel id สลับไม่ปน / running ถูกกรอง / ทุกแถวมี id
+- **e2e 390px, 0 console errors** (Playwright + inject auth ตามวิธีในหน่วยความจำรอบ 26 — revert `main.tsx` แล้ว):
+  - Create/Edit Program (`Hybrid Powerlifting Template`, 4 วัน 9 แถว) → ลาก Squat Top set จาก idx 0 → 2 สำเร็จ ·
+    ลากข้ามวัน (day-0 → day-1) **ถูกบล็อก** ตามที่ตั้งใจ · SAVE CHANGES แล้ว per-week scheme วิ่งตามท่าที่ย้าย
+    (w1 `1x5@0.75` = w6 `1x2@0.88` ยังอยู่แถวเดียวกัน) · วันอื่นไม่กระทบ
+  - Day Edit sheet → เพิ่ม Face Pull → ลากขึ้นบนสุด → Save → การ์ดแสดง Face Pull ก่อน main ·
+    Start → logger เรียง `Face Pull / Squat 135kg / Squat 125kg / Deadlift 155kg` (น้ำหนักแยกถูกต้อง)
+  - Logger reorder → ติ๊ก 2 เซ็ตของ Face Pull → ลาก Deadlift ขึ้นบนสุด → Save → `currentIdx` 0→1 หัวข้อยัง Face Pull ·
+    เซ็ตที่ติ๊กครบ `2/11 SETS`
+- ล้างข้อมูลทดสอบแล้ว (ลบ layout ของ `custom-1783938627466/week-1/day-1`, คืนลำดับโปรแกรมเดิม, cancel workout)
+
+### ไม่ทำรอบนี้
+
+- **touch-drag e2e** — Playwright ยิงได้แค่ mouse pointer; `touchAction:'none'` + pointer events เป็นโค้ดชุดเดียวกับที่ ship ไปแล้วรอบก่อน
+- **ลบ main ออกจาก DayEditSheet** — คงสัญญาเดิมว่าแก้โครงสร้างโปรแกรมต้องไปหน้า Edit Program
+- **จำลำดับ logger กลับเข้า layout ของโปรแกรม** — เจตนาให้เป็นของ session นั้น ๆ
+- **แก้คอมเมนต์ `SUPABASE_SETUP.md:111`** ที่ยังเขียนว่า "custom accessories" (ความหมายกว้างขึ้นเป็น "ลำดับท่าในวัน")
 
 ---
 
