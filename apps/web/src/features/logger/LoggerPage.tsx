@@ -4,9 +4,10 @@ import { useAppStore } from '../../store/useAppStore.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { getExercise, muscleColor } from '../../lib/utils.js'
 import { SwapSheet } from './SwapSheet.js'
+import { ReorderSheet } from './ReorderSheet.js'
 import { FinishReview } from './FinishReview.js'
 import {
-  IconX, IconCheck, IconPlus, IconChevronLeft, IconChevronRight, IconSwap,
+  IconX, IconCheck, IconPlus, IconChevronLeft, IconChevronRight, IconSwap, IconGrip,
 } from '../../components/icons/index.js'
 import type { Workout } from '@atlaslog/shared'
 
@@ -14,6 +15,7 @@ export function LoggerPage() {
   const navigate = useNavigate()
   const { workout, updateWorkout, addExerciseToWorkout, finishWorkout, cancelWorkout, history } = useAppStore()
   const [showSwap, setShowSwap] = useState(false)
+  const [showReorder, setShowReorder] = useState(false)
   const [showAddExercise, setShowAddExercise] = useState(false)
   const [showCancel, setShowCancel] = useState(false)
   const [reviewNow, setReviewNow] = useState<number | null>(null)
@@ -185,9 +187,14 @@ export function LoggerPage() {
               </div>
             )}
           </div>
-          <button className="btn-icon" onClick={() => setShowSwap(true)} aria-label="Swap exercise">
-            <IconSwap size={18} />
-          </button>
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            <button className="btn-icon" onClick={() => setShowReorder(true)} aria-label="Reorder exercises">
+              <IconGrip size={18} />
+            </button>
+            <button className="btn-icon" onClick={() => setShowSwap(true)} aria-label="Swap exercise">
+              <IconSwap size={18} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -291,6 +298,19 @@ export function LoggerPage() {
             setShowSwap(false)
           }}
           onClose={() => setShowSwap(false)}
+        />
+      )}
+
+      {showReorder && (
+        <ReorderSheet
+          exercises={workout.exercises}
+          currentIdx={workout.currentIdx}
+          onSave={exercises => {
+            // Keep the exercise the user is on active, wherever it landed.
+            const idx = exercises.findIndex(e => e.id === cur.id)
+            updateWorkout({ ...workout, exercises, currentIdx: idx === -1 ? 0 : idx })
+          }}
+          onClose={() => setShowReorder(false)}
         />
       )}
 

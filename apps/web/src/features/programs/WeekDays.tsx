@@ -5,9 +5,10 @@ import { dayToProgram } from '../../lib/twelveWeekProgram.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAppStore } from '../../store/useAppStore.js'
 import { structuredWeight } from '../../lib/rpeTable.js'
+import { resolveDayExercises } from '../../lib/dayLayout.js'
 import { runTarget } from '../../lib/utils.js'
 import { IconCheck, IconPlay, IconChevronRight, IconEdit, IconRun } from '../../components/icons/index.js'
-import { AccessoryEditSheet } from './AccessoryEditSheet.js'
+import { DayEditSheet } from './DayEditSheet.js'
 
 const STATUS_CONFIG: Record<DayStatus, { label: string; bg: string; border: string; color: string }> = {
   not_started: { label: 'Not started', bg: 'var(--surface-2)', border: 'var(--border)',            color: 'var(--muted)' },
@@ -37,19 +38,21 @@ function StatusBadge({ status }: { status: DayStatus }) {
 }
 
 function DayCard({
-  day, status, accessories, oneRMs, onStart, onEditAccessories, onOpenRun,
+  day, status, exercises, oneRMs, onStart, onEditDay, onOpenRun,
 }: {
   day: StructuredDay
   status: DayStatus
-  accessories: StructuredExercise[]
+  // Full ordered lift list for the day (main + accessory, user order applied).
+  exercises: StructuredExercise[]
   oneRMs: { squat: number; bench: number; deadlift: number } | null
   onStart: () => void
-  onEditAccessories: () => void
+  onEditDay: () => void
   onOpenRun: () => void
 }) {
-  const mains = day.exercises.filter(e => e.type === 'main').slice(0, 4)
+  const PREVIEW = 5
+  const preview = exercises.slice(0, PREVIEW)
   const runs = day.exercises.filter(e => e.type === 'running')
-  const hasLifts = day.exercises.some(e => e.type === 'main') || accessories.length > 0
+  const hasLifts = exercises.length > 0
   const isDone = status === 'done'
   const isInProgress = status === 'in_progress'
 
@@ -87,65 +90,46 @@ function DayCard({
         <StatusBadge status={status} />
       </div>
 
-      {/* Main lifts */}
-      {mains.length > 0 && (
-        <div style={{ marginBottom: 8 }}>
-          <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 5 }}>MAIN</div>
+      {/* Lifts — one list in the order they'll be trained (main + accessory) */}
+      {exercises.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 5 }}>EXERCISES</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {mains.map((ex, i) => {
+            {preview.map((ex, i) => {
               const wt = getCalcWeight(ex)
+              const isMain = ex.type === 'main'
               return (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
+                <div key={ex.id ?? i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{
+                    width: 3, height: 3, borderRadius: '50%', flexShrink: 0,
+                    background: isMain ? 'var(--accent)' : 'var(--border-strong)',
+                  }} />
                   <div style={{ minWidth: 0 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{ex.name}</span>
+                    <span style={{
+                      fontSize: isMain ? 13 : 12,
+                      fontWeight: isMain ? 600 : 400,
+                      color: isMain ? 'var(--text)' : 'var(--text-2)',
+                    }}>{ex.name}</span>
                     {ex.label && (
                       <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', letterSpacing: '0.02em' }}>{ex.label}</div>
                     )}
                   </div>
                   <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 'auto', flexShrink: 0 }}>
                     {ex.sets}×{ex.reps}
-                    {ex.rpe !== undefined && ` @${ex.rpe}`}
+                    {isMain && ex.rpe !== undefined && ` @${ex.rpe}`}
                     {wt ? (
-                      <span style={{ color: 'var(--accent)', marginLeft: 6 }}>{wt}kg</span>
+                      <span style={{ color: isMain ? 'var(--accent)' : 'var(--text-2)', marginLeft: 6 }}>{wt}kg</span>
                     ) : null}
                   </span>
                 </div>
               )
             })}
-          </div>
-        </div>
-      )}
-
-      {/* Accessories */}
-      {accessories.length > 0 && (
-        <div style={{ marginBottom: 14 }}>
-          <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 5 }}>ACCESSORIES</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {accessories.slice(0, 3).map((ex, i) => {
-              const wt = getCalcWeight(ex)
-              return (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--border-strong)', flexShrink: 0 }} />
-                  <div style={{ minWidth: 0 }}>
-                    <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{ex.name}</span>
-                    {ex.label && (
-                      <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', letterSpacing: '0.02em' }}>{ex.label}</div>
-                    )}
-                  </div>
-                  <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 'auto', flexShrink: 0 }}>
-                    {ex.sets}×{ex.reps}
-                    {wt ? <span style={{ color: 'var(--text-2)', marginLeft: 5 }}>{wt}kg</span> : null}
-                  </span>
-                </div>
-              )
-            })}
-            {accessories.length > 3 && (
+            {exercises.length > PREVIEW && (
               <span style={{
                 fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)',
                 marginLeft: 11,
               }}>
-                +{accessories.length - 3} more
+                +{exercises.length - PREVIEW} more
               </span>
             )}
           </div>
@@ -186,11 +170,11 @@ function DayCard({
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
-            {day.exercises.filter(e => e.type === 'main').length + accessories.length} exercises
+            {exercises.length} exercises
             {runs.length > 0 && ` · ${runs.length} run`}
           </span>
           <button
-            onClick={e => { e.stopPropagation(); onEditAccessories() }}
+            onClick={e => { e.stopPropagation(); onEditDay() }}
             style={{
               background: 'transparent', border: '1px solid var(--border)',
               borderRadius: 6, padding: '2px 8px', cursor: 'pointer',
@@ -240,7 +224,7 @@ function DayCard({
 // profile's Personal 1RM (no setup needed); general programs show no weights.
 export function WeekDays({ program, week }: { program: StructuredProgram; week: StructuredWeek }) {
   const navigate = useNavigate()
-  const { getDayStatus, getConfig, getCustomAccessories, setCustomAccessories } = useProgramStore()
+  const { getDayStatus, getConfig, getDayLayout, setDayLayout } = useProgramStore()
   const { startWorkout, personalOneRMs } = useAppStore()
   const [editingDayId, setEditingDayId] = useState<string | null>(null)
 
@@ -250,21 +234,17 @@ export function WeekDays({ program, week }: { program: StructuredProgram; week: 
   const hasConfigRMs = !!configRMs && (configRMs.squat > 0 || configRMs.bench > 0 || configRMs.deadlift > 0)
   const calcRMs = isPowerlifting ? (hasConfigRMs ? configRMs! : personalOneRMs) : null
 
-  const handleStart = (day: StructuredDay) => {
+  const handleStart = (day: StructuredDay, exercises: StructuredExercise[]) => {
     const weightOverrides: Record<string, number> = {}
     if (calcRMs) {
-      day.exercises.forEach(ex => {
+      exercises.forEach(ex => {
         // structuredWeight is the single source of truth (pct → else rpe); key by the
         // per-row id so a top set + back-off (same exerciseId) never overwrite each other.
         const w = structuredWeight(ex, calcRMs)
         if (w) weightOverrides[ex.id ?? `${ex.exerciseId}:${ex.rpe}`] = w
       })
     }
-    const customAcc = getCustomAccessories(program.id, week.id, day.id)
-    const effectiveDay: StructuredDay = customAcc
-      ? { ...day, exercises: [...day.exercises.filter(e => e.type === 'main'), ...customAcc] }
-      : day
-    const p = dayToProgram(program.id, week.id, effectiveDay, weightOverrides)
+    const p = dayToProgram(program.id, week.id, { ...day, exercises }, weightOverrides)
     startWorkout(p)
     navigate('/workout')
   }
@@ -275,17 +255,16 @@ export function WeekDays({ program, week }: { program: StructuredProgram; week: 
     <>
       <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         {week.days.map(day => {
-          const customAcc = getCustomAccessories(program.id, week.id, day.id)
-          const accessories = customAcc ?? day.exercises.filter(e => e.type === 'accessory')
+          const exercises = resolveDayExercises(day, getDayLayout(program.id, week.id, day.id))
           return (
             <DayCard
               key={day.id}
               day={day}
               status={getDayStatus(program.id, week.id, day.id)}
-              accessories={accessories}
+              exercises={exercises}
               oneRMs={calcRMs}
-              onStart={() => handleStart(day)}
-              onEditAccessories={() => setEditingDayId(day.id)}
+              onStart={() => handleStart(day, exercises)}
+              onEditDay={() => setEditingDayId(day.id)}
               onOpenRun={() => navigate('/runs')}
             />
           )
@@ -293,12 +272,9 @@ export function WeekDays({ program, week }: { program: StructuredProgram; week: 
       </div>
 
       {editingDay && (
-        <AccessoryEditSheet
-          programId={program.id}
-          weekId={week.id}
-          dayId={editingDay.id}
-          accessories={getCustomAccessories(program.id, week.id, editingDay.id) ?? editingDay.exercises.filter(e => e.type === 'accessory')}
-          onSave={(exercises) => setCustomAccessories(program.id, week.id, editingDay.id, exercises)}
+        <DayEditSheet
+          exercises={resolveDayExercises(editingDay, getDayLayout(program.id, week.id, editingDay.id))}
+          onSave={(exercises) => setDayLayout(program.id, week.id, editingDay.id, exercises)}
           onClose={() => setEditingDayId(null)}
         />
       )}

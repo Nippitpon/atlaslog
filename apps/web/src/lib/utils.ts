@@ -106,3 +106,11 @@ export function getDayOfWeek() {
   const now = new Date()
   return `${days[now.getDay()].toUpperCase()} · ${formatDMY(now)}`
 }
+
+// Move one item within a list (used by every drag-to-reorder surface).
+export function moveItem<T>(list: T[], from: number, to: number): T[] {
+  const next = [...list]
+  const [moved] = next.splice(from, 1)
+  next.splice(to, 0, moved)
+  return next
+}

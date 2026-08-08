@@ -1,20 +1,19 @@
 import { useState } from 'react'
 import type { StructuredExercise } from '@atlaslog/shared'
 import { allExercises } from '../../lib/data.js'
-import { muscleColor } from '../../lib/utils.js'
+import { moveItem, muscleColor } from '../../lib/utils.js'
+import { ReorderList } from '../../components/ReorderList.js'
 import { IconX, IconPlus, IconCheck } from '../../components/icons/index.js'
 
 interface Props {
-  programId: string
-  weekId: string
-  dayId: string
-  accessories: StructuredExercise[]
+  // Full ordered day: main rows are reorderable but not removable, accessories are both.
+  exercises: StructuredExercise[]
   onSave: (exercises: StructuredExercise[]) => void
   onClose: () => void
 }
 
-export function AccessoryEditSheet({ accessories, onSave, onClose }: Props) {
-  const [list, setList] = useState<StructuredExercise[]>(accessories)
+export function DayEditSheet({ exercises, onSave, onClose }: Props) {
+  const [list, setList] = useState<StructuredExercise[]>(exercises)
   const [showPicker, setShowPicker] = useState(false)
   const [pickingSets, setPickingSets] = useState('3')
   const [pickingReps, setPickingReps] = useState('10')
@@ -23,6 +22,7 @@ export function AccessoryEditSheet({ accessories, onSave, onClose }: Props) {
   const [groupFilter, setGroupFilter] = useState('All')
 
   const remove = (idx: number) => setList(l => l.filter((_, i) => i !== idx))
+  const reorder = (from: number, to: number) => setList(l => moveItem(l, from, to))
 
   const addExercise = () => {
     if (!pickedId) return
@@ -60,44 +60,65 @@ export function AccessoryEditSheet({ accessories, onSave, onClose }: Props) {
         {!showPicker ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-              <h3 className="t-display" style={{ margin: 0, fontSize: 20 }}>Accessories</h3>
+              <h3 className="t-display" style={{ margin: 0, fontSize: 20 }}>Exercises</h3>
               <button className="btn-icon" onClick={onClose}><IconX size={18} /></button>
             </div>
             <p style={{ margin: '0 0 16px', color: 'var(--text-2)', fontSize: 12 }}>
-              เพิ่ม/ลบท่า accessory สำหรับวันนี้
+              ลากเพื่อสลับลำดับ · เพิ่ม/ลบท่า accessory
             </p>
 
             <div style={{ flex: 1, overflowY: 'auto', marginBottom: 16 }}>
               {list.length === 0 && (
                 <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 13, padding: '20px 0' }}>
-                  ยังไม่มีท่า accessory
+                  ยังไม่มีท่าในวันนี้
                 </div>
               )}
-              {list.map((ex, i) => (
-                <div key={ex.id ?? i} style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '10px 0',
-                  borderBottom: '1px solid var(--border)',
-                }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 15 }}>{ex.name}</div>
-                    <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
-                      {ex.sets}×{ex.reps}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => remove(i)}
-                    style={{
-                      background: 'transparent', border: '1px solid var(--border)',
-                      borderRadius: 8, width: 32, height: 32, cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: 'var(--danger)',
-                    }}
-                  >
-                    <IconX size={14} />
-                  </button>
-                </div>
-              ))}
+              <ReorderList
+                items={list}
+                getKey={(ex, i) => ex.id ?? String(i)}
+                onReorder={reorder}
+                groupId="day-edit"
+                gap={0}
+                rowStyle={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}
+                renderRow={(ex, i, handle) => {
+                  const isMain = ex.type === 'main'
+                  return (
+                    <>
+                      {handle}
+                      <span className="pill" style={{
+                        fontSize: 8, flexShrink: 0,
+                        ...(isMain ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : null),
+                      }}>
+                        {isMain ? 'MAIN' : 'ACC'}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{
+                          fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 15,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>{ex.name}</div>
+                        <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                          {ex.sets}×{ex.reps}{ex.label ? ` · ${ex.label}` : ''}
+                        </div>
+                      </div>
+                      {isMain ? (
+                        <div style={{ width: 32, flexShrink: 0 }} />
+                      ) : (
+                        <button
+                          onClick={() => remove(i)}
+                          style={{
+                            background: 'transparent', border: '1px solid var(--border)',
+                            borderRadius: 8, width: 32, height: 32, cursor: 'pointer', flexShrink: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: 'var(--danger)',
+                          }}
+                        >
+                          <IconX size={14} />
+                        </button>
+                      )}
+                    </>
+                  )
+                }}
+              />
             </div>
 
             <button

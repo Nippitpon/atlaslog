@@ -4,6 +4,10 @@ import type { DayStatus, ProgramProgressState, ProgramConfig, StructuredExercise
 import { syncProgramUpsert, syncProgramDelete, syncProgramState } from '../lib/syncQueue.js'
 import { useAppStore } from './useAppStore.js'
 
+// Per-user override of a program day's exercise list. Historically accessories
+// only; now it may also carry `main` rows so the whole day can be reordered.
+// The persisted key stays `customAccessories` (localStorage + the
+// `custom_accessories` cloud column) — see lib/dayLayout.ts for how it's read.
 type CustomAccessories = {
   [programId: string]: {
     [weekId: string]: {
@@ -26,8 +30,8 @@ interface ProgramStore {
   setConfig: (programId: string, config: ProgramConfig) => void
   getConfig: (programId: string) => ProgramConfig | null
 
-  setCustomAccessories: (programId: string, weekId: string, dayId: string, exercises: StructuredExercise[]) => void
-  getCustomAccessories: (programId: string, weekId: string, dayId: string) => StructuredExercise[] | null
+  setDayLayout: (programId: string, weekId: string, dayId: string, exercises: StructuredExercise[]) => void
+  getDayLayout: (programId: string, weekId: string, dayId: string) => StructuredExercise[] | null
 
   addCustomProgram: (program: StructuredProgram) => void
   updateCustomProgram: (program: StructuredProgram) => void
@@ -112,7 +116,7 @@ export const useProgramStore = create<ProgramStore>()(
         return get().configs[programId] ?? null
       },
 
-      setCustomAccessories: (programId, weekId, dayId, exercises) => {
+      setDayLayout: (programId, weekId, dayId, exercises) => {
         set(state => ({
           customAccessories: {
             ...state.customAccessories,
@@ -128,7 +132,7 @@ export const useProgramStore = create<ProgramStore>()(
         queueStateSync(get)
       },
 
-      getCustomAccessories: (programId, weekId, dayId) => {
+      getDayLayout: (programId, weekId, dayId) => {
         return get().customAccessories[programId]?.[weekId]?.[dayId] ?? null
       },
 
