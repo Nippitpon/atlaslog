@@ -1,8 +1,134 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-08-08 (รอบ 34 — ✅ SHIPPED, deploy main: ปรับลำดับท่าในวันซ้อมได้อิสระ)
+> อัปเดตล่าสุด: 2026-08-10 (รอบ 35 — ✅ SHIPPED: Quick Session เริ่มเทรนจากหน้า Library ได้ทันที)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-08-10 — รอบ 35 (✅ SHIPPED, deploy main): Quick Session — เริ่มเทรนจากหน้า EXERCISES ได้ทันที
+
+commit `fdab3bb` (feat)
+
+เดิมจะเริ่มเทรนต้องผ่านโปรแกรมเสมอ (เลือกโปรแกรม → สัปดาห์ → วัน → START) หรือกด Quick Template
+ที่หน้า Programs ซึ่งเป็นชุดตายตัว 3 แบบ. รอบนี้เพิ่มปุ่ม **QUICK** ที่หัวหน้า Library → กดแล้ว
+**เริ่มเซสชันเปล่าทันที** แล้วค่อยหยิบท่าเติมระหว่างเทรน — เหมาะกับวันที่เข้ายิมแล้วค่อยคิดว่าจะทำอะไร
+
+### ทำอะไร
+
+- **`lib/data.ts`** — `QUICK_PROGRAM` template เปล่า (`exercises: []`)
+  ⚠️ **id ต้องเป็น `'quick'` ห้ามมี `/`** — `LoggerPage.tsx:47` ทำ `programId.split('/')` แล้วถ้าได้ 3 ชิ้น
+  จะไปเขียน `setDayStatus()` ของโปรแกรมจริง · `'quick'` แตกได้ 1 ชิ้น → ข้าม branch นั้นพอดี
+- **`logger/EmptyWorkout.tsx` (ใหม่)** — สถานะที่ `LoggerPage` ไม่เคยมีจอรองรับ: workout รันอยู่แต่ยังไม่มีท่า
+  header + ● RECORDING · ปุ่ม **Add Exercise** (เปิด `SwapSheet` ตัวเดิม) · ปุ่ม Browse Library · X = ทิ้งเลยไม่ต้อง confirm (ยังไม่มีอะไรให้เสีย)
+- **`logger/LoggerPage.tsx`** — แยก guard เดิม `if (!workout || !cur) return null` เป็น 2 เคส:
+  ไม่มี workout → `<Navigate to="/" replace/>` · มีแต่ยังว่าง → `<EmptyWorkout/>`
+  (**ปิดบั๊กเก่าไปด้วย** — ข้อ "`/workout` เมื่อไม่มี workout = จอว่างตัน" ใน review รอบ 30)
+- **`library/LibraryPage.tsx`** — ปุ่ม `IconBolt` **QUICK / RESUME** (ทุกคนเห็น ไม่ใช่แค่ coach)
+  handler กัน 3 เคส: quick ค้างอยู่ → resume · โปรแกรมอื่นค้างอยู่ → `confirm()` ก่อนทับ · ไม่มีอะไร → เริ่มใหม่
+  (ปิดข้อ "ปุ่ม START ทับ workout ค้าง ไม่มี confirm" ของ review รอบ 30 เฉพาะทางเข้านี้)
+- **`logger/FinishReview.tsx`** — `disabled={setCount === 0}` + opacity 0.4 กัน session ว่างที่ลบไม่ได้ใน History
+
+### ได้ฟรี ไม่ต้องเขียน
+
+- **เพิ่มท่าจากหน้ารายละเอียด** — `ExerciseDetailPage.tsx:122` เช็ค `{workout ? ...}` อยู่แล้ว
+  พอมี quick session ปุ่ม "Add to current workout" โผล่เอง → **ไม่ได้แตะไฟล์นี้เลย**
+- **`addExerciseToWorkout` / ปุ่ม + Add ใน logger / `SwapSheet`** — มีครบอยู่แล้วตั้งแต่รอบก่อน
+- **Dashboard / History** — quick session เข้า `history` ปกติ นับ volume/calories เอง ·
+  `DashboardPage.tsx:117` วนจาก `configs` ไม่ใช่ `session.programId` → `'quick'` ไม่โผล่ผิดที่ในการ์ดโปรแกรม
+
+### ผลกระทบ (จัดการแล้ว)
+
+- **ไม่ต้องแตะ Supabase** — `sessions.program_id` เป็น `text` เฉย ๆ **ไม่มี FK constraint**
+  (`SUPABASE_SETUP.md:18`) → `program_id = 'quick'` upsert ผ่าน ไม่ต้อง migration
+- **progress โปรแกรมจริงไม่ขยับ** — ยืนยันด้วย e2e ว่า `split('/')` branch ไม่โดน trigger
+- **`prevSets` ได้ผลพลอยได้** — `history.find(h => h.programId === workout.programId)` ทำให้ quick session
+  ครั้งถัดไปเห็นน้ำหนักครั้งก่อนเป็น reference อัตโนมัติ
+
+### verify
+
+`pnpm build` ผ่าน (117 modules) · ESLint ผ่าน exit 0 ·
+**e2e จริง Playwright 390px, 0 console errors ทุกหน้า** (inject auth ตามวิธีรอบ 26 — revert `main.tsx` แล้ว diff ว่าง):
+
+1. กด QUICK → เข้า `/workout` เห็นหน้า "ยังไม่มีท่า" **ไม่ใช่จอขาว**
+2. Add Exercise → Bench Press → เข้า logger ปกติ `0/1 SETS`
+3. ไป `/library/squat` → ปุ่ม "Add to current workout" โผล่ → กด → 2 ท่า `programId: 'quick'`
+4. กลับ Library กด **RESUME** → เซ็ตที่ติ๊กไว้อยู่ครบ ไม่รีเซ็ต · `startTime` เดิม
+5. มีโปรแกรมจริงค้าง (`custom-999/week-1/day-1`) → กด QUICK → เด้ง confirm ·
+   **Cancel = เวิร์กเอาต์เดิมอยู่ครบ ไม่ navigate** · Accept = ทับตามที่สั่ง
+6. 0 เซ็ต → FINISH → ปุ่ม Confirm `disabled: true, opacity 0.4`
+7. ติ๊ก 90kg×8 → Confirm → History ขึ้น "Quick Session" `volume 720, setCount 1` · Dashboard WEEKLY VOLUME 720
+8. progress โปรแกรมจริงก่อน/หลังเหมือนเดิมเป๊ะ ไม่มีคีย์ `quick` โผล่ใน progress
+
+ล้างข้อมูลทดสอบแล้ว (cancel workout + ลบ session ทดสอบออกจาก history)
+
+### ไม่ทำรอบนี้
+
+- **ไม่ได้ verify row จริงในตาราง `sessions` บน Supabase** — e2e ใช้ user ปลอมที่ inject เข้าไป
+  ไม่มี session จริงให้ sync · ยืนยันได้แค่ระดับ schema ว่า `program_id text` ไม่มี FK
+  → ถ้าจะปิดข้อนี้ต้อง login จริงแล้วเทรน quick 1 รอบ แล้วดูตารางใน Supabase dashboard
+- **ไม่เซฟ quick session เป็น template** — ตัดสินใจแล้วว่าลง History อย่างเดียว
+- ไม่มีปุ่ม QUICK ที่ Dashboard/BottomNav — เข้าทาง Library ทางเดียวก่อน
+
+---
+
+## 2026-08-10 — รอบ 36 (✅ SHIPPED, deploy main): ปิดงานค้าง — layout ไม่รีเซ็ตตอน Save โปรแกรม + ลบไฟล์ขยะที่หลุดเข้า build
+
+commit `7fcaabe` (fix)
+
+เก็บ **WIP ที่ค้างใน working tree ตั้งแต่ 8 ส.ค.** (เขียนไว้หลัง ship รอบ 34 แล้วไม่ได้ test/commit)
+คือแก้ ⚠️ caveat ที่รอบ 34 จดไว้เอง: *"กด SAVE CHANGES ในหน้า Edit Program จะ reassign exercise id
+ใหม่แบบ positional → layout ที่จัดไว้ของวันนั้นจะ reset"* พร้อมลบไฟล์ขยะ e2e ที่หลุดเข้า `dist/`
+
+### ทำอะไร
+
+- **`CreateProgramPage.tsx`** — `ExerciseDraft` เพิ่ม `originIdx` (index ของแถวในโปรแกรมที่กำลังแก้)
+  ตอน save หา id เดิมจาก `editing.weeks[wi].days.find(d => d.id === ...).exercises[originIdx].id`
+  → **หา id ใน week นั้น ๆ ไม่ใช่ week 1 เสมอ** เพราะ Excel import ใส่ id คนละตัวต่อสัปดาห์
+  (`w1-Mon-e0` vs `w2-Mon-e0`) · fallback: `ex.id` (id ของ week 1) → mint ใหม่ `${dayId}-n${stamp}-${ei}` สำหรับแถวที่เพิ่งเพิ่ม
+- **`lib/dayLayout.ts`** — `sameRow(a, b)` guard: ถ้า id ที่ layout เก็บไว้ไม่ได้ชี้ไปท่าเดิมแล้ว
+  ให้ตกไปเรียงตามโปรแกรมท้ายลิสต์ แทนที่จะ**สลับเงียบ ๆ เป็นท่าผิด**
+  ⚠️ เทียบ `exerciseId` + `name` + `label` — **`exerciseId` อย่างเดียวไม่พอ** เพราะ top set กับ back-off ใช้ร่วมกัน
+- **`.gitignore`** — เพิ่ม `apps/web/public/__*.json` + ลบ `apps/web/public/__restore.json` (23 KB)
+  ไฟล์ restore ที่ใช้ตอน e2e รอบ 34 วางไว้ใน `public/` → **ถูกก็อปเข้า `dist/` ทุกครั้งที่ build**
+  ถ้า deploy ไปจะเปิดสาธารณะที่ `https://<domain>/__restore.json` โดยไม่ต้องล็อกอิน
+
+### verify
+
+`pnpm build` ผ่าน (117 modules) · ESLint ผ่าน exit 0 · `ls dist/` ยืนยันว่า `__restore.json` หายแล้ว ·
+**e2e จริง Playwright 390px, 0 console errors** กับ `Hybrid Powerlifting Template` (Excel, 12 สัปดาห์):
+
+- ตั้ง layout ของ `week-1/day-1` เป็น `[Deadlift, Squat Top set, Squat Back-off]` (สลับจากลำดับโปรแกรม)
+  → เปิด Edit Program → **Save changes** → หน้า Week ยังโชว์ **Deadlift ขึ้นก่อน** ตามที่จัดไว้
+  น้ำหนักแยกถูก 135kg / 125kg (weightOverrides ไม่ปนกัน) · วัน Tue/Thu/Fri ไม่กระทบ
+- **id รอดทุกสัปดาห์** — week 1 = `w1-Mon-e0/e1/e2`, week 2 = `w2-Mon-*`, week 12 = `w12-Mon-*`
+  (ไม่ถูก re-mint เป็น `day-1-e*` แบบเดิม และแต่ละสัปดาห์ยังเก็บ id ของตัวเอง = จุดที่ `weeks[wi]` lookup แก้)
+- **`sameRow` guard** — จงใจแก้ layout ให้ `w1-Mon-e0` อ้างว่าเป็น bench → แถวนั้นถูกปฏิเสธ
+  แล้วท่าจริง (Squat Top set) ไปต่อท้าย · ยังครบ **3 exercises** ไม่หาย ไม่ซ้ำ ไม่โชว์ท่าผิด
+
+ล้างข้อมูลทดสอบแล้ว (ลบ layout ของ `custom-1783938627466/week-1/day-1` → กลับเป็นลำดับโปรแกรมเดิม)
+
+### ไม่ทำรอบนี้
+
+- **ไม่ได้แก้ `exercises[originIdx]` กรณีสัปดาห์มีจำนวนท่าไม่เท่ากัน** — ถ้า week N มีท่าน้อยกว่า week 1
+  จะ fallback ไปใช้ id ของ week 1 (ไม่ชนกันเพราะ id ฝัง week number) แต่ยังไม่ได้ทดสอบเคสนี้จริง
+- ไม่แตะข้อ 🔴 ที่เหลือใน `docs/code-review-2026-07-13.md` — ดูรายการค้างข้างล่าง
+
+---
+
+## 📌 งานค้าง — ตรวจกับโค้ดปัจจุบันแล้ว 2026-08-10 (ยังไม่ตัดสินใจว่าจะทำรอบไหน)
+
+> ⚠️ `docs/code-review-2026-07-13.md` **stale** — รอบ 31 เขียน `excelImport.ts` ใหม่ ทำให้ข้อ 🔴 เรื่อง Excel
+> (sets/reps/pct/id ชนกัน) **ปิดไปแล้วทั้งหมด** แต่ไม่มีใครติ๊ก · รายการข้างล่างคือที่ verify แล้วว่ายังเปิดอยู่จริง
+
+| ระดับ | ข้อ | ผลกระทบถ้าไม่ทำ |
+|---|---|---|
+| 🔴 | reps ทศนิยมจาก **Create Program** → `rpeTable.ts:21` `RPE_TABLE[1.5]` = undefined | **จอขาวถาวร** บนหน้า Week + Dashboard (ทางเข้า Excel ปิดแล้ว แต่ input `type="number"` ไม่มี `step` ยังพิมพ์ `2.5` ได้ · `CreateProgramPage.tsx:579,588` `Number(reps)` ไม่กรองจำนวนเต็ม) — แก้ 2 ชั้น: `Math.round()` ใน `getRpePct` + validate ฝั่ง input |
+| 🔴 | sync data-loss 4 ตัว | (a) `syncQueue.ts:211/236` flush เขียนทับ op ที่ต่อคิวระหว่าง flush · (b) `:149/225` entry `userId: null` ยังไปโผล่บัญชีคนถัดไป · (c) `useProgramStore.ts:46` debounce timer ยิงหลัง sign-out → snapshot ว่าง (รวมกับ (b) = ทับ progress คนถัดไป) · (d) `useAuthStore.ts:166/182` `loadUserData` แข่ง `flushQueue` → `setHistory` ทับเซ็ตที่ log offline (`[]` ก็ truthy) |
+| 🟡 | แก้โปรแกรม Excel → periodization ของ **accessory** หาย | `weekly[]` เก็บรายสัปดาห์เฉพาะ `powerlifting && type === 'main'` · accessory ที่ pct ไต่รายสัปดาห์ + วัน/ท่าที่มีเฉพาะสัปดาห์หลัง + โปรแกรม `general` หายตอนกด Save |
+| 🟡 | ลบ custom program ไม่ confirm — `ProgramsPage.tsx:274` | แตะพลาดบนมือถือ = โปรแกรม + progress + cloud หายถาวร (`LibraryPage` มี confirm แล้ว หน้านี้ไม่มี) |
+| 🟡 | persist ไม่มี `version`/`migrate` — `useAppStore.ts:198`, `useProgramStore.ts:233` | วันนี้ยังไม่พัง แต่**ใส่ทีหลังไม่ได้** (zustand ถือ state ที่ไม่มี version = version 0) |
+| ⚠️ | coach edge function เปิดให้ harvest อีเมล — `supabase/functions/coach/index.ts:47-59` | **ยืนยันว่าเปิดอยู่จริงบน prod**: `resolveUser` match ด้วย prefix ของ UUID (`startsWith`) + ทั้งไฟล์ไม่เช็ค `profiles.role` เลย + `add-athlete` คืน `athleteEmail` เสมอ → authed คนไหนก็ไล่ prefix ดึงอีเมลได้ · **ตัดสินใจแล้วว่ายังไม่แตะ** (ต้อง deploy edge function แยก) |
 
 ---
 
