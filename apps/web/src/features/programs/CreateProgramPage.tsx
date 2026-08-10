@@ -14,7 +14,10 @@ type Visibility = 'private' | 'code' | 'public'
 // Authoring-only: a powerlifting main lift carries a per-week Set/Rep/% scheme
 // (index 0 = week 1). Expanded into each week's StructuredExercise on save.
 type WeekCell = { sets?: number; reps?: number; pct?: number; rpe?: number }
-type ExerciseDraft = StructuredExercise & { weekly?: WeekCell[] }
+// originIdx = this row's index in the program being edited. Kept so a save can
+// look up the row's existing id in EVERY week (ids differ per week on Excel
+// imports) instead of minting a positional one — see handleCreate.
+type ExerciseDraft = StructuredExercise & { weekly?: WeekCell[]; originIdx?: number }
 type DayDraft = { id?: string; dayOfWeek: StructuredDay['dayOfWeek']; focus: string; exercises: ExerciseDraft[] }
 
 const WEEKDAYS: StructuredDay['dayOfWeek'][] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -61,12 +64,13 @@ export function CreateProgramPage() {
         editing && editing.programType === 'powerlifting' && editing.weeks.length > 1 && ex.type === 'main'
           ? {
               ...ex,
+              originIdx: ei,
               weekly: editing.weeks.map(w => {
                 const x = w.days[di]?.exercises[ei]
                 return { sets: x?.sets, reps: typeof x?.reps === 'number' ? x.reps : undefined, pct: x?.pct, rpe: x?.rpe }
               }),
             }
-          : ex
+          : { ...ex, originIdx: ei }
       ),
     }))
   )
@@ -131,11 +135,20 @@ export function CreateProgramPage() {
           id: dayIds[di],
           dayOfWeek: d.dayOfWeek,
           focus: d.focus.trim() || `${d.dayOfWeek} Training`,
-          // Expand per-week Set/Rep/% into each week + assign a per-row id (so two
+          // Expand per-week Set/Rep/% into each week + carry a per-row id (so two
           // same-exerciseId main rows never collide in the logger's weight map).
           exercises: d.exercises.map((ex, ei) => {
-            const { weekly, ...base } = ex
-            const id = `${dayIds[di]}-e${ei}`
+            const { weekly, originIdx, ...base } = ex
+            // The id must follow the EXERCISE, not its position: the day layout a
+            // user drags into place (useProgramStore.customAccessories) references
+            // these ids, so re-minting them positionally would point that saved
+            // order at the wrong lifts. Look the row's id up in this very week
+            // (Excel imports carry a different id per week), then fall back to the
+            // week-1 id, then mint a fresh one for a row that was just added.
+            const srcDay = editing?.weeks[wi]?.days.find(x => x.id === d.id)
+            const id = (originIdx !== undefined ? srcDay?.exercises[originIdx]?.id : undefined)
+              ?? ex.id
+              ?? `${dayIds[di]}-n${stamp}-${ei}`
             if (!weekly) return { ...base, id } as StructuredExercise
             // In-range blank cells fall back to the base value; weeks past the array clamp to last.
             const c = wi < weekly.length ? weekly[wi] : weekly[weekly.length - 1]

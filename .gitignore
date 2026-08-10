@@ -15,3 +15,6 @@ test-screenshots/
 
 # Supabase CLI local artifacts
 supabase/.temp/
+
+# e2e scratch files — anything under public/ ships in the build
+apps/web/public/__*.json
