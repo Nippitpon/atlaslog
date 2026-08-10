@@ -119,7 +119,8 @@ export function FinishReview({ workout, now, onConfirm, onCancel }: FinishReview
           <button className="btn btn-secondary" style={{ flex: 1, height: 52 }} onClick={onCancel}>
             Keep editing
           </button>
-          <button className="btn btn-primary" style={{ flex: 1, height: 52 }} onClick={onConfirm}>
+          <button className="btn btn-primary" style={{ flex: 1, height: 52, opacity: setCount === 0 ? 0.4 : 1 }}
+            disabled={setCount === 0} onClick={onConfirm}>
             Confirm &amp; Finish
           </button>
         </div>

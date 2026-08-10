@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Navigate } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { getExercise, muscleColor } from '../../lib/utils.js'
 import { SwapSheet } from './SwapSheet.js'
 import { ReorderSheet } from './ReorderSheet.js'
 import { FinishReview } from './FinishReview.js'
+import { EmptyWorkout } from './EmptyWorkout.js'
 import {
   IconX, IconCheck, IconPlus, IconChevronLeft, IconChevronRight, IconSwap, IconGrip,
 } from '../../components/icons/index.js'
@@ -30,7 +31,10 @@ export function LoggerPage() {
     return e ? e.sets : null
   }, [history, workout, cur])
 
-  if (!workout || !cur) return null
+  // No workout at all → deep link / stale tab; bounce home instead of a blank screen.
+  if (!workout) return <Navigate to="/" replace />
+  // Workout running but still empty (fresh Quick Session) → its own screen.
+  if (!cur) return <EmptyWorkout name={workout.name} />
 
   const exMeta = getExercise(cur.exerciseId)
 

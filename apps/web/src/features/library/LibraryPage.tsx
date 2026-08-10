@@ -1,11 +1,11 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Exercise } from '@atlaslog/shared'
-import { EXERCISES, MUSCLE_GROUPS, EXERCISE_GROUPS, EQUIPMENT_OPTIONS, makeExerciseId } from '../../lib/data.js'
+import { EXERCISES, MUSCLE_GROUPS, EXERCISE_GROUPS, EQUIPMENT_OPTIONS, makeExerciseId, QUICK_PROGRAM } from '../../lib/data.js'
 import { muscleColor, exerciseGifUrl } from '../../lib/utils.js'
 import { useAppStore } from '../../store/useAppStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
-import { IconSearch, IconX, IconDumbbell, IconChevronRight, IconPlus, IconTrash, IconCheck } from '../../components/icons/index.js'
+import { IconSearch, IconX, IconDumbbell, IconChevronRight, IconPlus, IconTrash, IconCheck, IconBolt } from '../../components/icons/index.js'
 
 const PAGE = 50
 
@@ -30,7 +30,8 @@ function ExThumb({ ex, size }: { ex: Exercise; size: number }) {
 
 export function LibraryPage() {
   const navigate = useNavigate()
-  const { customExercises, dbExercises, addCustomExercise, removeCustomExercise } = useAppStore()
+  const { customExercises, dbExercises, addCustomExercise, removeCustomExercise, workout, startWorkout } = useAppStore()
+  const quickRunning = workout?.programId === QUICK_PROGRAM.id
   const { isCoach, isAdmin } = useAuthStore()
   const canManage = isCoach || isAdmin
 
@@ -73,6 +74,18 @@ export function LibraryPage() {
     if (window.confirm(`Delete "${ex.name}" from the library?`)) removeCustomExercise(ex.id)
   }
 
+  // startWorkout always replaces the active workout, so an unfinished one is either
+  // resumed (when it's already a Quick Session) or confirmed away first.
+  const handleQuick = () => {
+    if (workout) {
+      if (workout.programId !== QUICK_PROGRAM.id
+        && !window.confirm(`"${workout.name}" ยังเทรนค้างอยู่ — เริ่ม Quick Session ใหม่จะทิ้งเซ็ตที่บันทึกไว้`)) return
+      if (workout.programId === QUICK_PROGRAM.id) return navigate('/workout')
+    }
+    startWorkout(QUICK_PROGRAM)
+    navigate('/workout')
+  }
+
   return (
     <div className="atlas-screen screen-enter">
       <div className="scr-header">
@@ -80,11 +93,25 @@ export function LibraryPage() {
           <div className="sub">{allEx.length} EXERCISES</div>
           <h1>Library</h1>
         </div>
-        {canManage && (
-          <button className="btn-icon" onClick={() => setShowCreate(true)} aria-label="Add exercise">
-            <IconPlus size={18} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={handleQuick} aria-label="Quick session"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5, height: 36, padding: '0 12px',
+              background: quickRunning ? 'var(--surface-3)' : 'var(--accent)',
+              color: quickRunning ? 'var(--accent)' : 'var(--accent-ink)',
+              border: `1px solid ${quickRunning ? 'var(--accent)' : 'transparent'}`,
+              borderRadius: 10, cursor: 'pointer', flexShrink: 0,
+              fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 12, letterSpacing: '0.05em',
+            }}>
+            <IconBolt size={15} />
+            {quickRunning ? 'RESUME' : 'QUICK'}
           </button>
-        )}
+          {canManage && (
+            <button className="btn-icon" onClick={() => setShowCreate(true)} aria-label="Add exercise">
+              <IconPlus size={18} />
+            </button>
+          )}
+        </div>
       </div>
 
       <div style={{ padding: '0 20px 14px' }}>

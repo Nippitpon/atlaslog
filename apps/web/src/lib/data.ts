@@ -49,6 +49,13 @@ export function makeExerciseId(name: string, taken: Set<string>): string {
   return id
 }
 
+// Ad-hoc session started from the Library — begins with no exercises and is filled
+// in as the user trains. The id must stay slash-free: LoggerPage treats a programId
+// of `programId/weekId/dayId` as a real program day and writes progress for it.
+export const QUICK_PROGRAM: Program = {
+  id: 'quick', name: 'Quick Session', focus: 'Freestyle', duration: 0, exercises: [],
+}
+
 export const PROGRAMS: Program[] = [
   {
     id: 'push', name: 'Push Day', focus: 'Chest · Shoulders · Triceps', duration: 62,
