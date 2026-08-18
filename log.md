@@ -1,8 +1,102 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-08-10 (รอบ 35 — ✅ SHIPPED: Quick Session เริ่มเทรนจากหน้า Library ได้ทันที)
+> อัปเดตล่าสุด: 2026-08-18 (รอบ 37 — ✅ SHIPPED: ติดดาว + เรียงตามล่าสุด + สถานะ/พักโปรแกรม)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-08-18 — รอบ 37 (✅ SHIPPED, deploy main): MY PROGRAMS — ติดดาว + เรียงตามล่าสุด + สถานะ/พักโปรแกรม
+
+commit `0e7f7b1` (feat)
+
+เดิม **MY PROGRAMS ไม่มีการเรียงลำดับเลย** (`customPrograms.map()` ตรง ๆ) → `updateCustomProgram`
+ใช้ `[...filter(id), program]` ทำให้**แก้โปรแกรมทีไรตกไปท้ายลิสต์** และ cloud hydrate ไม่มี `.order()`
+→ **ลำดับหลัง login มั่ว ไม่คงที่** · ทั้งแอปยังไม่มีคอนเซปต์ "โปรแกรมที่ใช้อยู่" จริง —
+Dashboard เดาจาก **key แรกใน `configs` ที่ยังไม่จบ** = ถ้า setup ไว้หลายอันมันสุ่มเลือก
+
+รอบนี้ทำให้ **ติดดาวปักหมุดได้ · เรียงตามเล่น/แก้ล่าสุด · มีป้ายสถานะ · พักโปรแกรมได้**
+(ซึ่งปิดบั๊ก "Dashboard สุ่มโปรแกรม" ไปในตัว)
+
+### ⚠️ ต้องรัน SQL ก่อน deploy — **รันแล้ว 2026-08-18** ("Success. No rows returned")
+
+```sql
+alter table program_state
+  add column if not exists program_meta jsonb not null default '{}'::jsonb;
+```
+
+ถ้าไม่รันก่อน → `program_state` upsert **400 ทั้งก้อน** (`syncQueue.ts` ระบุคอลัมน์แบบ explicit)
+= progress/configs/customAccessories หยุด sync — **ยืนยันด้วยตาแล้วระหว่าง e2e**: ก่อนรัน SQL
+console ขึ้น 400 ทุกครั้งและค่าดาว/พักหายทุก reload (เพราะ `setProgramState` เขียนทับด้วย `{}` จาก cloud)
+
+### ทำอะไร
+
+- **`packages/shared/src/types.ts`** — `ProgramMeta { favorite?, paused?, updatedAt?, activatedAt? }`
+  + `ProgramMetaState` (map keyed by programId) · `ProgramStateSnapshot` += `programMeta?`
+  ⚠️ **เก็บเป็น map แยก ไม่ใช่ field ใน `StructuredProgram`** — เพราะ built-in (`sbd-12w`) เป็น
+  module constant ใน `twelveWeekProgram.ts` แก้ไม่ได้ → ถ้าเก็บในตัว program จะติดดาว/พัก built-in ไม่ได้เลย
+- **`lib/programStatus.ts` (ใหม่)** — logic กลางใช้ร่วม 3 หน้า
+  `getProgramStatus` (`completed` → `paused` → `active` → `not_setup`) · `sortPrograms` ·
+  `pickCurrentProgramId` · `lastPlayedAt` · `PROGRAM_STATUS_STYLE`
+  - **`countDoneWeeks` แก้การนับให้ถูก** — เดิมหน้า Programs ใช้ `Object.values(week).every(s => 'done')`
+    ซึ่งนับสัปดาห์ 4 วันว่า "จบ" ทันทีที่วันแรกที่ log ไว้เสร็จ → **% พองเกินจริง** ตอนนี้ต้องครบทุกวัน
+    (⚠️ ผลข้างเคียงที่ตั้งใจ: % ของบางโปรแกรมจะ**ลดลง** = ค่าที่ถูกต้อง ไม่ใช่ regress)
+- **`store/useProgramStore.ts`** — state `programMeta` + `toggleFavorite` / `setProgramPaused` +
+  helper `mergeMeta` · **ไม่ต้องเขียน `migrate`** เพราะเป็น top-level key ใหม่ในสโตร์ที่ไม่มี `partialize`
+  → zustand merge ตื้นทับ initializer, user เดิม rehydrate ได้ `{}` เอง
+  - `setConfig` stamp `activatedAt` + `paused: false` (**setup = เริ่มใช้ → active ทันที**)
+  - `addCustomProgram`/`updateCustomProgram` stamp `updatedAt` · `addCustomProgram` **เพิ่ม `queueStateSync`**
+    (เดิมไม่มี → `updatedAt` จะไม่ขึ้น cloud)
+  - `removeCustomProgram`/`resetProgram` ลบ `programMeta[id]` ตาม cascade เดิม
+  - `setProgramState` รับ `programMeta` → **sign-out ที่ `ProfilePage.tsx:32` เคลียร์ให้เอง ไม่ต้องแก้ไฟล์นั้น**
+- **`lib/syncQueue.ts`** — `program_meta: op.payload.programMeta ?? {}`
+- **`store/useAuthStore.ts`** — hydrate `programMeta: s.program_meta ?? {}` + เพิ่ม `.order('id')`
+  ให้ query `custom_programs` (เดิมเป็น query เดียวในไฟล์ที่ไม่มี order)
+- **`components/icons/index.tsx`** — `IconStar` (รับ `fill` → ทึบ=ติดดาว) + `IconPause`
+  (ไม่ใช้ `lucide-react` ที่อยู่ใน `package.json` — ทั้ง repo ไม่เคย import และ stroke ไม่เข้าชุด custom)
+- **`features/programs/ProgramsPage.tsx`** — sort + ดาว + ป้ายสถานะ + ปุ่มพัก **ทั้ง MY PROGRAMS และ
+  STRUCTURED PROGRAMS** · local component `StatusPill`/`FavoriteButton`/`PauseButton` + const `CARD_BTN`
+  · การ์ด built-in เปลี่ยนจาก `<button>` ครอบทั้งใบ → `div role="button"` (จะมีปุ่มซ้อนข้างใน)
+  · **ปุ่มลบเพิ่ม `confirm()`** — ปิดงานค้าง 🟡
+- **`features/dashboard/DashboardPage.tsx`** — memo `currentProgram` (เลือกตัว `activatedAt` ใหม่สุด
+  **โดยรวมตัวที่ paused ด้วย**) + การ์ด **PROGRAM PAUSED** (ปุ่ม ทำต่อ / Programs) · `todayReminder` เงียบตอนพัก
+- **`features/programs/ProgramOverviewPage.tsx`** — ป้ายสถานะในแถว pill + ปุ่มดาว/พักใน header
+
+### ผลกระทบ (จัดการแล้ว)
+
+- **กฎที่ผู้ใช้กำหนดเอง:** *"พักแล้วยังไม่ต้อง active โปรแกรมอื่น แต่ถ้าเริ่มโปรแกรมใหม่ต้อง active"*
+  → `pickCurrentProgramId` **ไม่กรอง paused ออก** (ถ้ากรอง Dashboard จะเด้งไปโปรแกรมถัดไปทันที)
+  แล้วให้ Dashboard เรนเดอร์การ์ด paused แทน · `setConfig` stamp `activatedAt` ใหม่สุด = ตัวใหม่ชนะเอง
+- **user เดิมไม่มี `activatedAt`** → `pickCurrentProgramId` fallback ไปวน `Object.keys(configs)` แบบเดิมเป๊ะ
+  = อัปเกรดแล้ว Dashboard ไม่ขยับ
+- **weekly routine** ยังไม่ถูกเลือกเป็น current (ไม่มี config) — คงพฤติกรรมเดิมโดยตั้งใจ ไม่ใช่ regress
+- **`programMeta` โดนทับตอน login ถ้า cloud ยังไม่มีค่า** — เป็นพฤติกรรมเดียวกับ progress/configs
+  (cloud เป็น source of truth ตอน login) ไม่ใช่บั๊กใหม่ แต่หมายความว่า**ต้องรัน SQL ก่อน deploy จริง ๆ**
+
+### verify
+
+`pnpm build` ผ่าน (118 modules) · ESLint exit 0 · **e2e Playwright 390px, 0 console errors**
+(บัญชีจริง 9 custom programs + built-in `12 Weeks SBD`)
+
+- `POST program_state` **400 → 200** หลังรัน SQL · ติดดาว+พัก → **reload แล้วรอดครบ** (ดึงกลับจาก cloud)
+- ติดดาว `Public PPL` (ตัวล่างสุด) → **เด้งขึ้นอันดับ 1 ทันที**
+- ติดดาว **`12 Weeks SBD` (built-in)** ได้ → `programMeta['sbd-12w'].favorite = true` — **ข้อพิสูจน์ว่า map แยกจำเป็น**
+- พัก `General Fitness 1W` → Dashboard โชว์ **PROGRAM PAUSED** และ **ไม่เด้งไป `Hybrid`/`PL Test 6wk`
+  ที่เป็น ACTIVE อยู่** · แบนเนอร์ today reminder หาย
+- Setup `PL Test 6wk` → Dashboard สลับเป็น **ACTIVE PROGRAM | PL Test 6wk** ทันที
+- กด **ทำต่อ** → กลับ ACTIVE + re-stamp `activatedAt`
+- Edit `Public PPL` → Save → **ท้ายสุด → อันดับ 2** (เดิมตกไปท้ายลิสต์)
+- ปุ่มลบ → `confirm()` ขึ้น · กด Cancel → โปรแกรมอยู่ครบ 9 ตัว
+- ลำดับสุดท้าย: `★ PL Squat` → `Public PPL` (เพิ่งแก้) → `PL Test 6wk` (เพิ่ง setup) → ที่เหลือเรียงชื่อคงที่
+
+### ไม่ทำรอบนี้
+
+- **ไม่แตก `ProgramCard` component** — การ์ด built-in/custom ยังเป็นสำเนากันอยู่ (ดึงแค่บล็อกคำนวณ
+  เข้า `programStatus.ts`) · หน้าเดียวมีการ์ด 4 แบบ เสี่ยง regress เกินคุ้มในรอบนี้
+- **ไม่มี flow "เลือกโปรแกรมหลัก" แบบ explicit** — ตัดสินใจร่วมกับผู้ใช้ว่าใช้สถานะที่**คำนวณอัตโนมัติ**
+  + ปุ่มพัก ก็พอ ไม่ต้องเพิ่ม `activeProgramId`
+- **ไม่แตะ `version`/`migrate` ของ persist** (งานค้าง 🟡 ยังเปิดอยู่) — รอบนี้เลี่ยงได้เพราะเป็น top-level key ใหม่
+- `Hybrid_Powerlifting-Template.xlsx` ที่ค้าง untracked ใน repo root **ไม่ได้ commit** (ไม่เกี่ยวกับรอบนี้)
 
 ---
 
@@ -116,7 +210,7 @@ commit `7fcaabe` (fix)
 
 ---
 
-## 📌 งานค้าง — ตรวจกับโค้ดปัจจุบันแล้ว 2026-08-10 (ยังไม่ตัดสินใจว่าจะทำรอบไหน)
+## 📌 งานค้าง — ตรวจกับโค้ดปัจจุบันแล้ว 2026-08-10 · อัปเดตสถานะ 2026-08-18 (รอบ 37)
 
 > ⚠️ `docs/code-review-2026-07-13.md` **stale** — รอบ 31 เขียน `excelImport.ts` ใหม่ ทำให้ข้อ 🔴 เรื่อง Excel
 > (sets/reps/pct/id ชนกัน) **ปิดไปแล้วทั้งหมด** แต่ไม่มีใครติ๊ก · รายการข้างล่างคือที่ verify แล้วว่ายังเปิดอยู่จริง
@@ -126,7 +220,7 @@ commit `7fcaabe` (fix)
 | 🔴 | reps ทศนิยมจาก **Create Program** → `rpeTable.ts:21` `RPE_TABLE[1.5]` = undefined | **จอขาวถาวร** บนหน้า Week + Dashboard (ทางเข้า Excel ปิดแล้ว แต่ input `type="number"` ไม่มี `step` ยังพิมพ์ `2.5` ได้ · `CreateProgramPage.tsx:579,588` `Number(reps)` ไม่กรองจำนวนเต็ม) — แก้ 2 ชั้น: `Math.round()` ใน `getRpePct` + validate ฝั่ง input |
 | 🔴 | sync data-loss 4 ตัว | (a) `syncQueue.ts:211/236` flush เขียนทับ op ที่ต่อคิวระหว่าง flush · (b) `:149/225` entry `userId: null` ยังไปโผล่บัญชีคนถัดไป · (c) `useProgramStore.ts:46` debounce timer ยิงหลัง sign-out → snapshot ว่าง (รวมกับ (b) = ทับ progress คนถัดไป) · (d) `useAuthStore.ts:166/182` `loadUserData` แข่ง `flushQueue` → `setHistory` ทับเซ็ตที่ log offline (`[]` ก็ truthy) |
 | 🟡 | แก้โปรแกรม Excel → periodization ของ **accessory** หาย | `weekly[]` เก็บรายสัปดาห์เฉพาะ `powerlifting && type === 'main'` · accessory ที่ pct ไต่รายสัปดาห์ + วัน/ท่าที่มีเฉพาะสัปดาห์หลัง + โปรแกรม `general` หายตอนกด Save |
-| 🟡 | ลบ custom program ไม่ confirm — `ProgramsPage.tsx:274` | แตะพลาดบนมือถือ = โปรแกรม + progress + cloud หายถาวร (`LibraryPage` มี confirm แล้ว หน้านี้ไม่มี) |
+| ~~🟡~~ | ~~ลบ custom program ไม่ confirm~~ | ✅ **ปิดแล้วรอบ 37** — เพิ่ม `confirm()` ใน `ProgramsPage` |
 | 🟡 | persist ไม่มี `version`/`migrate` — `useAppStore.ts:198`, `useProgramStore.ts:233` | วันนี้ยังไม่พัง แต่**ใส่ทีหลังไม่ได้** (zustand ถือ state ที่ไม่มี version = version 0) |
 | ⚠️ | coach edge function เปิดให้ harvest อีเมล — `supabase/functions/coach/index.ts:47-59` | **ยืนยันว่าเปิดอยู่จริงบน prod**: `resolveUser` match ด้วย prefix ของ UUID (`startsWith`) + ทั้งไฟล์ไม่เช็ค `profiles.role` เลย + `add-athlete` คืน `athleteEmail` เสมอ → authed คนไหนก็ไล่ prefix ดึงอีเมลได้ · **ตัดสินใจแล้วว่ายังไม่แตะ** (ต้อง deploy edge function แยก) |
 
