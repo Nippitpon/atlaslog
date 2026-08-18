@@ -36,6 +36,8 @@ export const IconUser = (p: IconProps) => <Icon {...p} d={<>
   <path d="M4 21c0-4 4-7 8-7s8 3 8 7"/>
 </>} />
 export const IconPlay = (p: IconProps) => <Icon {...p} fill="currentColor" stroke="none" d="M6 4l14 8-14 8V4z" />
+export const IconPause = (p: IconProps) => <Icon {...p} d={<><path d="M9 5v14"/><path d="M15 5v14"/></>} />
+export const IconStar = (p: IconProps) => <Icon {...p} d="M12 3.2l2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3.2z" />
 export const IconPlus = (p: IconProps) => <Icon {...p} d={<><path d="M12 5v14"/><path d="M5 12h14"/></>} />
 export const IconCheck = (p: IconProps) => <Icon {...p} stroke={p.stroke ?? 3} d="M4 12l5 5L20 6" />
 export const IconX = (p: IconProps) => <Icon {...p} d={<><path d="M6 6l12 12"/><path d="M18 6L6 18"/></>} />

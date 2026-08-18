@@ -60,7 +60,7 @@ async function fetchAllExercises() {
 async function loadUserData(userId: string) {
   const [sessionsRes, programsRes, stateRes, bodyRes, runsRes, exRes, dbExRes] = await Promise.all([
     supabase.from('sessions').select('*').eq('user_id', userId).order('date', { ascending: false }),
-    supabase.from('custom_programs').select('*').eq('user_id', userId),
+    supabase.from('custom_programs').select('*').eq('user_id', userId).order('id', { ascending: true }),
     supabase.from('program_state').select('*').eq('user_id', userId).maybeSingle(),
     supabase.from('body_metrics').select('*').eq('user_id', userId).order('date', { ascending: false }),
     supabase.from('runs').select('*').eq('user_id', userId).order('date', { ascending: false }),
@@ -96,6 +96,7 @@ async function loadUserData(userId: string) {
       progress: s.progress ?? {},
       configs: s.configs ?? {},
       customAccessories: s.custom_accessories ?? {},
+      programMeta: s.program_meta ?? {},
     })
     if (s.bio) useAppStore.setState({ bio: s.bio })
     if (s.personal_one_rms) useAppStore.setState({ personalOneRMs: s.personal_one_rms })

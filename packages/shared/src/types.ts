@@ -212,6 +212,20 @@ export interface ProgramCustomAccessories {
   }
 }
 
+// Per-user, per-program preferences. Keyed by program id rather than stored on
+// StructuredProgram so it covers built-in programs too — those objects are
+// module constants (twelveWeekProgram.ts) and can't carry per-user state.
+export interface ProgramMeta {
+  favorite?: boolean
+  paused?: boolean
+  updatedAt?: number    // epoch ms — last create/import/edit of the program
+  activatedAt?: number  // epoch ms — last time the program was set up / resumed
+}
+
+export interface ProgramMetaState {
+  [programId: string]: ProgramMeta
+}
+
 // Full per-user program state synced to cloud (one row per user)
 export interface ProgramStateSnapshot {
   progress: ProgramProgressState
@@ -220,6 +234,7 @@ export interface ProgramStateSnapshot {
   // User settings synced in the same 1-row/user blob (optional for back-compat).
   bio?: UserBio
   personalOneRMs?: ProgramOneRMs
+  programMeta?: ProgramMetaState
 }
 
 // ─── Phase 4 — Social (Coach-Athlete / Sharing / Notifications) ────────────────

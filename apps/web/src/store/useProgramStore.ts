@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { DayStatus, ProgramProgressState, ProgramConfig, StructuredExercise, StructuredProgram, ProgramStateSnapshot } from '@atlaslog/shared'
+import type { DayStatus, ProgramProgressState, ProgramConfig, ProgramMeta, ProgramMetaState, StructuredExercise, StructuredProgram, ProgramStateSnapshot } from '@atlaslog/shared'
 import { syncProgramUpsert, syncProgramDelete, syncProgramState } from '../lib/syncQueue.js'
 import { useAppStore } from './useAppStore.js'
 
@@ -21,6 +21,7 @@ interface ProgramStore {
   configs: { [programId: string]: ProgramConfig }
   customAccessories: CustomAccessories
   customPrograms: StructuredProgram[]
+  programMeta: ProgramMetaState
 
   getDayStatus: (programId: string, weekId: string, dayId: string) => DayStatus
   getWeekStatus: (programId: string, weekId: string, dayCount: number) => DayStatus
@@ -33,6 +34,9 @@ interface ProgramStore {
   setDayLayout: (programId: string, weekId: string, dayId: string, exercises: StructuredExercise[]) => void
   getDayLayout: (programId: string, weekId: string, dayId: string) => StructuredExercise[] | null
 
+  toggleFavorite: (programId: string) => void
+  setProgramPaused: (programId: string, paused: boolean) => void
+
   addCustomProgram: (program: StructuredProgram) => void
   updateCustomProgram: (program: StructuredProgram) => void
   removeCustomProgram: (programId: string) => void
@@ -42,15 +46,19 @@ interface ProgramStore {
   syncSettings: () => void
 }
 
+function mergeMeta(current: ProgramMetaState, programId: string, patch: ProgramMeta): ProgramMetaState {
+  return { ...current, [programId]: { ...current[programId], ...patch } }
+}
+
 // Debounce cloud sync of the full program-state blob; coalesces rapid edits
 let stateSyncTimer: ReturnType<typeof setTimeout> | null = null
 function queueStateSync(get: () => ProgramStore) {
   if (stateSyncTimer) clearTimeout(stateSyncTimer)
   stateSyncTimer = setTimeout(() => {
-    const { progress, configs, customAccessories } = get()
+    const { progress, configs, customAccessories, programMeta } = get()
     // User settings (bio + 1RM) live in useAppStore but share this 1-row blob.
     const { bio, personalOneRMs } = useAppStore.getState()
-    void syncProgramState({ progress, configs, customAccessories, bio, personalOneRMs })
+    void syncProgramState({ progress, configs, customAccessories, programMeta, bio, personalOneRMs })
   }, 800)
 }
 
@@ -61,6 +69,7 @@ export const useProgramStore = create<ProgramStore>()(
       configs: {},
       customAccessories: {},
       customPrograms: [],
+      programMeta: {},
 
       getDayStatus: (programId, weekId, dayId) => {
         return get().progress[programId]?.[weekId]?.[dayId] ?? 'not_started'
@@ -100,14 +109,19 @@ export const useProgramStore = create<ProgramStore>()(
           delete nextConfigs[programId]
           const nextCustom = { ...state.customAccessories }
           delete nextCustom[programId]
-          return { progress: nextProgress, configs: nextConfigs, customAccessories: nextCustom }
+          const nextMeta = { ...state.programMeta }
+          delete nextMeta[programId]
+          return { progress: nextProgress, configs: nextConfigs, customAccessories: nextCustom, programMeta: nextMeta }
         })
         queueStateSync(get)
       },
 
+      // Setting up a program IS starting it: stamp it as the newest activation
+      // and clear any pause, so the Dashboard switches to it.
       setConfig: (programId, config) => {
         set(state => ({
           configs: { ...state.configs, [programId]: config },
+          programMeta: mergeMeta(state.programMeta, programId, { activatedAt: Date.now(), paused: false }),
         }))
         queueStateSync(get)
       },
@@ -136,11 +150,32 @@ export const useProgramStore = create<ProgramStore>()(
         return get().customAccessories[programId]?.[weekId]?.[dayId] ?? null
       },
 
+      toggleFavorite: (programId) => {
+        set(state => ({
+          programMeta: mergeMeta(state.programMeta, programId, {
+            favorite: !state.programMeta[programId]?.favorite,
+          }),
+        }))
+        queueStateSync(get)
+      },
+
+      // Resuming re-stamps activatedAt so the resumed program becomes the
+      // Dashboard's current one again.
+      setProgramPaused: (programId, paused) => {
+        set(state => ({
+          programMeta: mergeMeta(state.programMeta, programId,
+            paused ? { paused: true } : { paused: false, activatedAt: Date.now() }),
+        }))
+        queueStateSync(get)
+      },
+
       addCustomProgram: (program) => {
         set(state => ({
           customPrograms: [...state.customPrograms.filter(p => p.id !== program.id), program],
+          programMeta: mergeMeta(state.programMeta, program.id, { updatedAt: Date.now() }),
         }))
         void syncProgramUpsert(program)
+        queueStateSync(get)
       },
 
       // Edit an existing program in place (same id): upsert + prune progress/
@@ -191,6 +226,7 @@ export const useProgramStore = create<ProgramStore>()(
             progress,
             customAccessories,
             configs,
+            programMeta: mergeMeta(state.programMeta, program.id, { updatedAt: Date.now() }),
           }
         })
         void syncProgramUpsert(program)
@@ -205,11 +241,14 @@ export const useProgramStore = create<ProgramStore>()(
           delete nextConfigs[programId]
           const nextCustom = { ...state.customAccessories }
           delete nextCustom[programId]
+          const nextMeta = { ...state.programMeta }
+          delete nextMeta[programId]
           return {
             customPrograms: state.customPrograms.filter(p => p.id !== programId),
             progress: nextProgress,
             configs: nextConfigs,
             customAccessories: nextCustom,
+            programMeta: nextMeta,
           }
         })
         void syncProgramDelete(programId)
@@ -224,6 +263,7 @@ export const useProgramStore = create<ProgramStore>()(
         progress: snapshot.progress ?? {},
         configs: snapshot.configs ?? {},
         customAccessories: snapshot.customAccessories ?? {},
+        programMeta: snapshot.programMeta ?? {},
       }),
 
       // Trigger a debounced cloud sync when user settings (bio/1RM) change

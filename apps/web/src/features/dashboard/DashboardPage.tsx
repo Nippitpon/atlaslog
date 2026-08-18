@@ -10,7 +10,8 @@ import { structuredWeight } from '../../lib/rpeTable.js'
 import { weeklyVolume, getDayOfWeek, runTarget } from '../../lib/utils.js'
 import { latestWeightKg, weeklyCalories } from '../../lib/calories.js'
 import { CalorieRing } from './CalorieRing.js'
-import { IconDumbbell, IconSearch, IconCheck, IconBell, IconRun, IconUsers, IconX } from '../../components/icons/index.js'
+import { pickCurrentProgramId } from '../../lib/programStatus.js'
+import { IconDumbbell, IconSearch, IconCheck, IconBell, IconRun, IconUsers, IconX, IconPlay } from '../../components/icons/index.js'
 
 const DAY_SHORT = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 
@@ -50,7 +51,7 @@ const PHASE_COLOR: Record<string, string> = {
 export function DashboardPage() {
   const navigate = useNavigate()
   const { history, personalOneRMs, bodyMetrics, runs } = useAppStore()
-  const { configs, getDayStatus, customPrograms, progress } = useProgramStore()
+  const { configs, getDayStatus, customPrograms, progress, programMeta, setProgramPaused } = useProgramStore()
   const { notifications, refreshNotifications } = useAuthStore()
 
   const [showNotifs, setShowNotifs] = useState(false)
@@ -109,47 +110,56 @@ export function DashboardPage() {
     return { bestSquat, bestBench, bestDeadlift, total: bestSquat + bestBench + bestDeadlift }
   }, [history])
 
-  // Active program: first program with a config that isn't fully done
-  // If calendar-based week is already done, advance to first not-done week
+  // The program the user is currently on: most recently set up / resumed, and
+  // NOT skipped when paused — pausing must never silently promote another
+  // program (the paused card below is shown instead).
+  const currentProgram = useMemo(() => {
+    const allPrograms = [...STRUCTURED_PROGRAMS, ...customPrograms]
+    const id = pickCurrentProgramId(allPrograms, configs, programMeta, progress)
+    if (!id) return null
+    const program = allPrograms.find(p => p.id === id)
+    if (!program) return null
+    return { program, paused: !!programMeta[id]?.paused }
+  }, [configs, customPrograms, programMeta, progress])
+
+  // Current week of the current program (null while it's paused).
+  // If the calendar week is already done, advance to the first not-done week.
   const activeProgramInfo = useMemo(() => {
     const { getWeekStatus } = useProgramStore.getState()
-    const allPrograms = [...STRUCTURED_PROGRAMS, ...customPrograms]
-    for (const programId of Object.keys(configs)) {
-      const program = allPrograms.find(p => p.id === programId)
-      const config = configs[programId]
-      if (!program || !config) continue
+    if (!currentProgram || currentProgram.paused) return null
 
-      const doneWeeks = program.weeks.filter(w =>
-        getWeekStatus(programId, w.id, w.days.length) === 'done'
-      ).length
+    const program = currentProgram.program
+    const programId = program.id
+    const config = configs[programId]
+    if (!config) return null
 
-      if (doneWeeks === program.totalWeeks) continue // all weeks done
+    const doneWeeks = program.weeks.filter(w =>
+      getWeekStatus(programId, w.id, w.days.length) === 'done'
+    ).length
 
-      const today = new Date()
-      const start = new Date(config.startDate)
-      const diffDays = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-      const calendarWeekNum = Math.min(Math.max(Math.floor(diffDays / 7) + 1, 1), program.totalWeeks)
+    const today = new Date()
+    const start = new Date(config.startDate)
+    const diffDays = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+    const calendarWeekNum = Math.min(Math.max(Math.floor(diffDays / 7) + 1, 1), program.totalWeeks)
 
-      // Advance past done weeks starting from calendar week
-      let displayWeekNum = calendarWeekNum
-      for (let w = calendarWeekNum; w <= program.totalWeeks; w++) {
-        const wk = program.weeks[w - 1]
-        if (!wk) break
-        if (getWeekStatus(programId, wk.id, wk.days.length) !== 'done') {
-          displayWeekNum = w
-          break
-        }
+    // Advance past done weeks starting from calendar week
+    let displayWeekNum = calendarWeekNum
+    for (let w = calendarWeekNum; w <= program.totalWeeks; w++) {
+      const wk = program.weeks[w - 1]
+      if (!wk) break
+      if (getWeekStatus(programId, wk.id, wk.days.length) !== 'done') {
+        displayWeekNum = w
+        break
       }
-
-      const currentWeek = program.weeks[displayWeekNum - 1]
-      if (!currentWeek) continue
-
-      const weekStatus = getWeekStatus(programId, currentWeek.id, currentWeek.days.length)
-      return { program, config, currentWeek, currentWeekNum: displayWeekNum, doneWeeks, weekStatus }
     }
-    return null
+
+    const currentWeek = program.weeks[displayWeekNum - 1]
+    if (!currentWeek) return null
+
+    const weekStatus = getWeekStatus(programId, currentWeek.id, currentWeek.days.length)
+    return { program, config, currentWeek, currentWeekNum: displayWeekNum, doneWeeks, weekStatus }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- progress triggers recompute; getWeekStatus reads it internally via store.get()
-  }, [configs, customPrograms, progress])
+  }, [currentProgram, configs, progress])
 
   // Today's scheduled training day (pure client, no push) — reminder banner
   const todayReminder = useMemo(() => {
@@ -364,8 +374,37 @@ export function DashboardPage() {
         </div>
       </div>
 
+      {/* Paused program — deliberately does NOT fall through to another program */}
+      {currentProgram?.paused && (
+        <div style={{ padding: '0 20px', marginBottom: 16 }}>
+          <div className="card" style={{ borderLeft: '3px solid #f59e0b', paddingLeft: 14 }}>
+            <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 3, color: '#f59e0b' }}>PROGRAM PAUSED</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, lineHeight: 1.1, marginBottom: 6 }}>
+              {currentProgram.program.name}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 16, lineHeight: 1.5 }}>
+              พักโปรแกรมนี้ไว้ — กดทำต่อเมื่อพร้อมกลับไปซ้อม หรือเลือกโปรแกรมใหม่
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className="btn btn-primary"
+                style={{ flex: 1 }}
+                onClick={() => setProgramPaused(currentProgram.program.id, false)}
+              >
+                <IconPlay size={14} />
+                ทำต่อ
+              </button>
+              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => navigate('/programs')}>
+                <IconDumbbell size={16} />
+                Programs
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* No active program CTA */}
-      {!activeProgramInfo && (
+      {!activeProgramInfo && !currentProgram?.paused && (
         <div style={{ padding: '0 20px', marginBottom: 16 }}>
           <div className="card" style={{ textAlign: 'center', padding: '28px 20px' }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🏋️</div>

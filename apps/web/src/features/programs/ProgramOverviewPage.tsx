@@ -4,7 +4,8 @@ import type { DayStatus } from '@atlaslog/shared'
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
-import { IconChevronLeft, IconChevronRight, IconCheck, IconSettings, IconEdit } from '../../components/icons/index.js'
+import { IconChevronLeft, IconChevronRight, IconCheck, IconSettings, IconEdit, IconStar, IconPause, IconPlay } from '../../components/icons/index.js'
+import { getProgramStatus, PROGRAM_STATUS_STYLE } from '../../lib/programStatus.js'
 import { ProgramSetupSheet } from './ProgramSetupSheet.js'
 import { WeekDays } from './WeekDays.js'
 import { formatDMY } from '../../lib/utils.js'
@@ -42,7 +43,7 @@ function StatusBadge({ status }: { status: DayStatus }) {
 export function ProgramOverviewPage() {
   const { programId } = useParams<{ programId: string }>()
   const navigate = useNavigate()
-  const { getWeekStatus, getConfig, customPrograms } = useProgramStore()
+  const { getWeekStatus, getConfig, customPrograms, progress, programMeta, toggleFavorite, setProgramPaused } = useProgramStore()
   const { isCoach, isAdmin } = useAuthStore()
   const [showSetup, setShowSetup] = useState(false)
 
@@ -56,6 +57,9 @@ export function ProgramOverviewPage() {
   const canEdit = (isCoach || isAdmin) && customPrograms.some(p => p.id === program.id) && program.source !== 'coach'
 
   const config = getConfig(program.id)
+  const meta = programMeta[program.id]
+  const status = getProgramStatus(program, config, meta, progress)
+  const statusStyle = status === 'not_setup' ? null : PROGRAM_STATUS_STYLE[status]
 
   const formatDate = formatDMY
 
@@ -80,6 +84,25 @@ export function ProgramOverviewPage() {
             </p>
           </div>
           <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            <button
+              className="btn-icon"
+              onClick={() => toggleFavorite(program.id)}
+              style={{ color: meta?.favorite ? 'var(--accent)' : undefined }}
+              aria-label={meta?.favorite ? 'Remove from favourites' : 'Add to favourites'}
+              aria-pressed={!!meta?.favorite}
+            >
+              <IconStar size={18} fill={meta?.favorite ? 'currentColor' : 'none'} />
+            </button>
+            {(status === 'active' || status === 'paused') && (
+              <button
+                className="btn-icon"
+                onClick={() => setProgramPaused(program.id, status !== 'paused')}
+                style={{ color: status === 'paused' ? '#f59e0b' : undefined }}
+                aria-label={status === 'paused' ? 'Resume program' : 'Pause program'}
+              >
+                {status === 'paused' ? <IconPlay size={15} /> : <IconPause size={18} />}
+              </button>
+            )}
             {canEdit && (
               <button className="btn-icon" onClick={() => navigate(`/programs/${program.id}/edit`)} aria-label="Edit program">
                 <IconEdit size={18} />
@@ -93,6 +116,12 @@ export function ProgramOverviewPage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {statusStyle && (
+            <span className="pill" style={{ fontSize: 10, background: statusStyle.bg,
+              borderColor: statusStyle.border, color: statusStyle.color }}>
+              {statusStyle.label}
+            </span>
+          )}
           {(program.weekly
             ? ['Weekly routine', `${program.daysPerWeek} days/week`, program.focus]
             : [`${program.totalWeeks} weeks`, `${program.daysPerWeek} days/week`, program.focus]

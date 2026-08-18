@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Program } from '@atlaslog/shared'
 import { useAppStore } from '../../store/useAppStore.js'
@@ -10,8 +10,12 @@ import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { ImportProgramSheet } from './ImportProgramSheet.js'
 import { createShare, importShare, listPublicPrograms, type PublicProgram } from '../../lib/shareApi.js'
 import {
+  countDoneWeeks, hasStarted as programHasStarted, getProgramStatus, sortPrograms,
+  PROGRAM_STATUS_STYLE, type ProgramStatus,
+} from '../../lib/programStatus.js'
+import {
   IconSearch, IconClock, IconTrendingUp, IconChevronRight, IconUpload, IconTrash,
-  IconShare, IconCopy, IconLink, IconX, IconPlus, IconEdit,
+  IconShare, IconCopy, IconLink, IconX, IconPlus, IconEdit, IconStar, IconPause, IconPlay,
 } from '../../components/icons/index.js'
 
 const PHASE_COLOR: Record<string, string> = {
@@ -21,13 +25,73 @@ const PHASE_COLOR: Record<string, string> = {
   Taper:           '#4ade80',
 }
 
+// On-card action button — transparent, muted, sits inside the card's click target
+const CARD_BTN: CSSProperties = {
+  background: 'transparent', border: 'none', cursor: 'pointer',
+  color: 'var(--muted)', padding: 4, borderRadius: 6,
+  display: 'flex', alignItems: 'center',
+}
+
+function StatusPill({ status }: { status: ProgramStatus }) {
+  if (status === 'not_setup') return null
+  const s = PROGRAM_STATUS_STYLE[status]
+  return (
+    <span className="pill" style={{ fontSize: 8, background: s.bg, borderColor: s.border, color: s.color }}>
+      {s.label}
+    </span>
+  )
+}
+
+function FavoriteButton({ programId, on, onToggle }: { programId: string; on: boolean; onToggle: (id: string) => void }) {
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); onToggle(programId) }}
+      style={{ ...CARD_BTN, color: on ? 'var(--accent)' : 'var(--muted)' }}
+      aria-label={on ? 'Remove from favourites' : 'Add to favourites'}
+      aria-pressed={on}
+    >
+      <IconStar size={14} fill={on ? 'currentColor' : 'none'} />
+    </button>
+  )
+}
+
+function PauseButton({ programId, status, onSetPaused }: {
+  programId: string; status: ProgramStatus; onSetPaused: (id: string, paused: boolean) => void
+}) {
+  if (status !== 'active' && status !== 'paused') return null
+  const paused = status === 'paused'
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); onSetPaused(programId, !paused) }}
+      style={{ ...CARD_BTN, color: paused ? '#f59e0b' : 'var(--muted)' }}
+      aria-label={paused ? 'Resume program' : 'Pause program'}
+    >
+      {paused ? <IconPlay size={12} /> : <IconPause size={14} />}
+    </button>
+  )
+}
+
 export function ProgramsPage() {
   const navigate = useNavigate()
-  const { startWorkout } = useAppStore()
-  const { progress, customPrograms, removeCustomProgram, addCustomProgram } = useProgramStore()
+  const { startWorkout, history } = useAppStore()
+  const {
+    progress, configs, customPrograms, programMeta,
+    removeCustomProgram, addCustomProgram, toggleFavorite, setProgramPaused,
+  } = useProgramStore()
   const { isCoach, isAdmin } = useAuthStore()
   const canCreate = isCoach || isAdmin
   const [showImport, setShowImport] = useState(false)
+
+  // Favourites first, then most recently trained / edited / set up
+  const myPrograms = useMemo(
+    () => sortPrograms(customPrograms, programMeta, history),
+    [customPrograms, programMeta, history],
+  )
+
+  const handleDelete = (sp: typeof customPrograms[number]) => {
+    if (!confirm(`ลบโปรแกรม "${sp.name}"?\nความคืบหน้าและการตั้งค่าของโปรแกรมนี้จะหายถาวร`)) return
+    removeCustomProgram(sp.id)
+  }
 
   const [publicPrograms, setPublicPrograms] = useState<PublicProgram[]>([])
   const [importingCode, setImportingCode] = useState<string | null>(null)
@@ -125,25 +189,28 @@ export function ProgramsPage() {
       <div style={{ padding: '0 20px', marginBottom: 28 }}>
         <div className="t-eyebrow" style={{ marginBottom: 12 }}>STRUCTURED PROGRAMS</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {STRUCTURED_PROGRAMS.map(sp => {
-            const programProgress = progress[sp.id] ?? {}
-            const doneWeeks = Object.values(programProgress).filter(week =>
-              Object.values(week).length > 0 && Object.values(week).every(s => s === 'done')
-            ).length
-            const hasStarted = Object.values(programProgress).some(week =>
-              Object.values(week).some(s => s !== 'not_started')
-            )
+          {sortPrograms(STRUCTURED_PROGRAMS, programMeta, history).map(sp => {
+            const doneWeeks = countDoneWeeks(sp, progress)
+            const started = programHasStarted(sp, progress)
             const pct = Math.round((doneWeeks / sp.totalWeeks) * 100)
+            const status = getProgramStatus(sp, configs[sp.id], programMeta[sp.id], progress)
 
             // Find current phase
-            const doneCount = doneWeeks
-            const currentWeek = sp.weeks[doneCount] ?? sp.weeks[sp.totalWeeks - 1]
+            const currentWeek = sp.weeks[doneWeeks] ?? sp.weeks[sp.totalWeeks - 1]
             const phaseColor = PHASE_COLOR[currentWeek.phase]
 
             return (
-              <button key={sp.id}
+              <div key={sp.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => navigate(`/programs/${sp.id}`)}
-                style={{ all: 'unset', cursor: 'pointer', display: 'block' }}>
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    navigate(`/programs/${sp.id}`)
+                  }
+                }}
+                style={{ cursor: 'pointer', display: 'block', width: '100%' }}>
                 <div className="card" style={{ position: 'relative', overflow: 'hidden' }}>
                   {/* Accent stripe */}
                   <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0,
@@ -152,13 +219,20 @@ export function ProgramsPage() {
                     <div style={{ display: 'flex', alignItems: 'flex-start',
                       justifyContent: 'space-between', marginBottom: 8 }}>
                       <div>
-                        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700,
-                          fontSize: 20, letterSpacing: '-0.02em', marginBottom: 3 }}>
-                          {sp.name}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
+                          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700,
+                            fontSize: 20, letterSpacing: '-0.02em' }}>
+                            {sp.name}
+                          </div>
+                          <StatusPill status={status} />
                         </div>
                         <div style={{ fontSize: 12, color: 'var(--text-2)' }}>{sp.focus}</div>
                       </div>
-                      <IconChevronRight size={18} style={{ color: 'var(--muted)', marginTop: 2 }} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                        <FavoriteButton programId={sp.id} on={!!programMeta[sp.id]?.favorite} onToggle={toggleFavorite} />
+                        <PauseButton programId={sp.id} status={status} onSetPaused={setProgramPaused} />
+                        <IconChevronRight size={18} style={{ color: 'var(--muted)' }} />
+                      </div>
                     </div>
 
                     <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
@@ -176,9 +250,9 @@ export function ProgramsPage() {
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
                         <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
-                          {hasStarted ? `Week ${doneWeeks + 1}/${sp.totalWeeks}` : 'Not started'}
+                          {started ? `Week ${doneWeeks + 1}/${sp.totalWeeks}` : 'Not started'}
                         </span>
-                        {hasStarted && (
+                        {started && (
                           <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
                             {pct}%
                           </span>
@@ -191,7 +265,7 @@ export function ProgramsPage() {
                     </div>
                   </div>
                 </div>
-              </button>
+              </div>
             )
           })}
         </div>
@@ -202,15 +276,11 @@ export function ProgramsPage() {
         <div style={{ padding: '0 20px', marginBottom: 28 }}>
           <div className="t-eyebrow" style={{ marginBottom: 12 }}>MY PROGRAMS</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {customPrograms.map(sp => {
-              const programProgress = progress[sp.id] ?? {}
-              const doneWeeks = Object.values(programProgress).filter(week =>
-                Object.values(week).length > 0 && Object.values(week).every(s => s === 'done')
-              ).length
-              const hasStarted = Object.values(programProgress).some(week =>
-                Object.values(week).some(s => s !== 'not_started')
-              )
+            {myPrograms.map(sp => {
+              const doneWeeks = countDoneWeeks(sp, progress)
+              const started = programHasStarted(sp, progress)
               const pct = Math.round((doneWeeks / sp.totalWeeks) * 100)
+              const status = getProgramStatus(sp, configs[sp.id], programMeta[sp.id], progress)
 
               return (
                 <div key={sp.id} style={{ position: 'relative' }}>
@@ -232,7 +302,7 @@ export function ProgramsPage() {
                         <div style={{ display: 'flex', alignItems: 'flex-start',
                           justifyContent: 'space-between', marginBottom: 8 }}>
                           <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
                               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700,
                                 fontSize: 18, letterSpacing: '-0.02em' }}>
                                 {sp.name}
@@ -241,18 +311,17 @@ export function ProgramsPage() {
                                 borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }}>
                                 {sp.source === 'coach' ? 'FROM COACH' : sp.source === 'manual' ? 'CUSTOM' : 'EXCEL'}
                               </span>
+                              <StatusPill status={status} />
                             </div>
                             <div style={{ fontSize: 12, color: 'var(--text-2)' }}>{sp.focus}</div>
                           </div>
                           <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                            <FavoriteButton programId={sp.id} on={!!programMeta[sp.id]?.favorite} onToggle={toggleFavorite} />
+                            <PauseButton programId={sp.id} status={status} onSetPaused={setProgramPaused} />
                             {sp.source !== 'coach' && (
                               <button
                                 onClick={e => { e.stopPropagation(); navigate(`/programs/${sp.id}/edit`) }}
-                                style={{
-                                  background: 'transparent', border: 'none', cursor: 'pointer',
-                                  color: 'var(--muted)', padding: 4, borderRadius: 6,
-                                  display: 'flex', alignItems: 'center',
-                                }}
+                                style={CARD_BTN}
                                 aria-label="Edit program"
                               >
                                 <IconEdit size={14} />
@@ -261,22 +330,14 @@ export function ProgramsPage() {
                             <button
                               onClick={e => { e.stopPropagation(); void handleShare(sp) }}
                               disabled={sharing}
-                              style={{
-                                background: 'transparent', border: 'none', cursor: 'pointer',
-                                color: 'var(--muted)', padding: 4, borderRadius: 6,
-                                display: 'flex', alignItems: 'center',
-                              }}
+                              style={CARD_BTN}
                               aria-label="Share program"
                             >
                               <IconShare size={14} />
                             </button>
                             <button
-                              onClick={e => { e.stopPropagation(); removeCustomProgram(sp.id) }}
-                              style={{
-                                background: 'transparent', border: 'none', cursor: 'pointer',
-                                color: 'var(--muted)', padding: 4, borderRadius: 6,
-                                display: 'flex', alignItems: 'center',
-                              }}
+                              onClick={e => { e.stopPropagation(); handleDelete(sp) }}
+                              style={CARD_BTN}
                               aria-label="Remove program"
                             >
                               <IconTrash size={14} />
@@ -297,9 +358,9 @@ export function ProgramsPage() {
                         <div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
                             <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
-                              {hasStarted ? `Week ${doneWeeks + 1}/${sp.totalWeeks}` : 'Not started'}
+                              {started ? `Week ${doneWeeks + 1}/${sp.totalWeeks}` : 'Not started'}
                             </span>
-                            {hasStarted && (
+                            {started && (
                               <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
                                 {pct}%
                               </span>

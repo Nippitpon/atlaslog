@@ -87,6 +87,7 @@ async function runOp(op: SyncOp, userId: string): Promise<void> {
       progress: op.payload.progress,
       configs: op.payload.configs,
       custom_accessories: op.payload.customAccessories,
+      program_meta: op.payload.programMeta ?? {},
       bio: op.payload.bio ?? {},
       personal_one_rms: op.payload.personalOneRMs ?? null,
       updated_at: new Date().toISOString(),
