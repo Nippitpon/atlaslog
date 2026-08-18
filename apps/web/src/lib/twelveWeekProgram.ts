@@ -1,5 +1,6 @@
-import type { StructuredDay, StructuredExercise, StructuredProgram, StructuredWeek, ProgramPhase } from '@atlaslog/shared'
+import type { StructuredDay, StructuredExercise, StructuredProgram, StructuredWeek, ProgramPhase, ProgramOneRMs } from '@atlaslog/shared'
 import type { Program } from '@atlaslog/shared'
+import { structuredWeight } from './rpeTable.js'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -335,4 +336,26 @@ export function dayToProgram(
       })),
     })),
   }
+}
+
+// A day + the user's resolved exercise list → a logger-ready Program with each
+// row's working weight baked in. Shared by the Week view's Start button and the
+// Dashboard's "Today's session" card so both start an identical workout.
+export function buildDayProgram(
+  programId: string,
+  weekId: string,
+  day: StructuredDay,
+  exercises: StructuredExercise[],
+  calcRMs: ProgramOneRMs | null,
+): Program {
+  const weightOverrides: Record<string, number> = {}
+  if (calcRMs) {
+    exercises.forEach(ex => {
+      // structuredWeight is the single source of truth (pct → else rpe); key by the
+      // per-row id so a top set + back-off (same exerciseId) never overwrite each other.
+      const w = structuredWeight(ex, calcRMs)
+      if (w) weightOverrides[ex.id ?? `${ex.exerciseId}:${ex.rpe}`] = w
+    })
+  }
+  return dayToProgram(programId, weekId, { ...day, exercises }, weightOverrides)
 }

@@ -60,3 +60,18 @@ export function structuredWeight(ex: StructuredExercise, oneRMs: ProgramOneRMs |
   if (ex.rpe === undefined || typeof ex.reps !== 'number') return null
   return calcWeight(rm, ex.reps, ex.rpe)
 }
+
+// Which 1RM set drives a program's weights: the program's own config if it was
+// set up with real numbers, else the profile's Personal 1RM (no setup needed).
+// General programs get null — no weight calc at all. Shared by the Week view and
+// the Dashboard "Today's session" card so the two can never disagree.
+export function resolveCalcRMs(
+  program: { programType?: 'general' | 'powerlifting' },
+  config: { oneRMs: ProgramOneRMs } | null | undefined,
+  personalOneRMs: ProgramOneRMs,
+): ProgramOneRMs | null {
+  if ((program.programType ?? 'powerlifting') !== 'powerlifting') return null
+  const configRMs = config?.oneRMs
+  const hasConfigRMs = !!configRMs && (configRMs.squat > 0 || configRMs.bench > 0 || configRMs.deadlift > 0)
+  return hasConfigRMs ? configRMs : personalOneRMs
+}

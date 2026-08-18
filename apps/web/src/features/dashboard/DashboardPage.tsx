@@ -5,8 +5,9 @@ import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
 import { markAllRead, markRead } from '../../lib/notificationsApi.js'
 import { respondCoachRequest } from '../../lib/coachApi.js'
-import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
-import { structuredWeight } from '../../lib/rpeTable.js'
+import { STRUCTURED_PROGRAMS, buildDayProgram } from '../../lib/twelveWeekProgram.js'
+import { structuredWeight, resolveCalcRMs } from '../../lib/rpeTable.js'
+import { resolveDayExercises } from '../../lib/dayLayout.js'
 import { weeklyVolume, getDayOfWeek, runTarget } from '../../lib/utils.js'
 import { latestWeightKg, weeklyCalories } from '../../lib/calories.js'
 import { CalorieRing } from './CalorieRing.js'
@@ -14,6 +15,9 @@ import { pickCurrentProgramId } from '../../lib/programStatus.js'
 import { IconDumbbell, IconSearch, IconCheck, IconBell, IconRun, IconUsers, IconX, IconPlay } from '../../components/icons/index.js'
 
 const DAY_SHORT = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+
+// Matches the Week page's DayCard preview cap
+const PREVIEW_ROWS = 5
 
 function notificationText(n: { type: string; data: Record<string, unknown> | null }): string {
   if (n.type === 'coach_linked') {
@@ -50,8 +54,8 @@ const PHASE_COLOR: Record<string, string> = {
 
 export function DashboardPage() {
   const navigate = useNavigate()
-  const { history, personalOneRMs, bodyMetrics, runs } = useAppStore()
-  const { configs, getDayStatus, customPrograms, progress, programMeta, setProgramPaused } = useProgramStore()
+  const { history, personalOneRMs, bodyMetrics, runs, workout, startWorkout } = useAppStore()
+  const { configs, getDayStatus, getDayLayout, customPrograms, progress, programMeta, setProgramPaused } = useProgramStore()
   const { notifications, refreshNotifications } = useAuthStore()
 
   const [showNotifs, setShowNotifs] = useState(false)
@@ -115,15 +119,18 @@ export function DashboardPage() {
   // program (the paused card below is shown instead).
   const currentProgram = useMemo(() => {
     const allPrograms = [...STRUCTURED_PROGRAMS, ...customPrograms]
-    const id = pickCurrentProgramId(allPrograms, configs, programMeta, progress)
+    const id = pickCurrentProgramId(allPrograms, configs, programMeta, progress, history)
     if (!id) return null
     const program = allPrograms.find(p => p.id === id)
     if (!program) return null
     return { program, paused: !!programMeta[id]?.paused }
-  }, [configs, customPrograms, programMeta, progress])
+  }, [configs, customPrograms, programMeta, progress, history])
 
   // Current week of the current program (null while it's paused).
-  // If the calendar week is already done, advance to the first not-done week.
+  // Driven by what's actually FINISHED, not the calendar: this used to start at
+  // the calendar week and only ever scan forward, so a program set up 5 weeks ago
+  // but never trained jumped straight to week 6 and skipped its accumulation
+  // block. The calendar now only says whether you're behind schedule.
   const activeProgramInfo = useMemo(() => {
     const { getWeekStatus } = useProgramStore.getState()
     if (!currentProgram || currentProgram.paused) return null
@@ -137,14 +144,9 @@ export function DashboardPage() {
       getWeekStatus(programId, w.id, w.days.length) === 'done'
     ).length
 
-    const today = new Date()
-    const start = new Date(config.startDate)
-    const diffDays = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-    const calendarWeekNum = Math.min(Math.max(Math.floor(diffDays / 7) + 1, 1), program.totalWeeks)
-
-    // Advance past done weeks starting from calendar week
-    let displayWeekNum = calendarWeekNum
-    for (let w = calendarWeekNum; w <= program.totalWeeks; w++) {
+    // First week that isn't finished — never points at a week you already did.
+    let displayWeekNum = program.totalWeeks
+    for (let w = 1; w <= program.totalWeeks; w++) {
       const wk = program.weeks[w - 1]
       if (!wk) break
       if (getWeekStatus(programId, wk.id, wk.days.length) !== 'done') {
@@ -156,12 +158,21 @@ export function DashboardPage() {
     const currentWeek = program.weeks[displayWeekNum - 1]
     if (!currentWeek) return null
 
+    // Where the plan says you should be by now, purely informational.
+    const today = new Date()
+    const start = new Date(config.startDate)
+    const diffDays = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+    const scheduledWeekNum = Math.min(Math.max(Math.floor(diffDays / 7) + 1, 1), program.totalWeeks)
+    const weeksBehind = scheduledWeekNum - displayWeekNum
+
     const weekStatus = getWeekStatus(programId, currentWeek.id, currentWeek.days.length)
-    return { program, config, currentWeek, currentWeekNum: displayWeekNum, doneWeeks, weekStatus }
+    return { program, config, currentWeek, currentWeekNum: displayWeekNum, doneWeeks, weekStatus, weeksBehind }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- progress triggers recompute; getWeekStatus reads it internally via store.get()
   }, [currentProgram, configs, progress])
 
-  // Today's scheduled training day (pure client, no push) — reminder banner
+  // Today's scheduled training day (pure client, no push) — reminder banner.
+  // `exercises` is the user's resolved list (saved order + edits), the same one
+  // the Week page shows and starts, so the two views can't disagree.
   const todayReminder = useMemo(() => {
     if (!activeProgramInfo) return null
     const todayShort = DAY_SHORT[new Date().getDay()]
@@ -170,8 +181,26 @@ export function DashboardPage() {
     const day = currentWeek.days.find(d => d.dayOfWeek === todayShort)
     if (!day) return null
     if (getDayStatus(program.id, currentWeek.id, day.id) === 'done') return null
-    return { day, program, currentWeek }
-  }, [activeProgramInfo, getDayStatus])
+    const exercises = resolveDayExercises(day, getDayLayout(program.id, currentWeek.id, day.id))
+    return { day, exercises, program, currentWeek }
+  }, [activeProgramInfo, getDayStatus, getDayLayout])
+
+  // Start today's session straight from Home. startWorkout always replaces the
+  // active workout, so an unfinished one is either resumed or confirmed away.
+  const handleStartToday = () => {
+    if (!todayReminder) return
+    const { day, exercises, program, currentWeek } = todayReminder
+    const p = buildDayProgram(
+      program.id, currentWeek.id, day, exercises,
+      resolveCalcRMs(program, configs[program.id], personalOneRMs),
+    )
+    if (workout) {
+      if (workout.programId === p.id) return navigate('/workout')
+      if (!confirm(`"${workout.name}" ยังเทรนค้างอยู่ — เริ่มวันนี้ใหม่จะทิ้งเซ็ตที่บันทึกไว้`)) return
+    }
+    startWorkout(p)
+    navigate('/workout')
+  }
 
 
   return (
@@ -204,14 +233,12 @@ export function DashboardPage() {
 
       {/* Today's training reminder */}
       {todayReminder && (() => {
-        const { day, program, currentWeek } = todayReminder
+        const { day, exercises, program, currentWeek } = todayReminder
+        // resolveDayExercises drops running rows, so those still come off the raw
+        // program day — same split DayCard uses on the Week page.
         const runs = day.exercises.filter(e => e.type === 'running')
-        const mains = day.exercises.filter(e => e.type === 'main')
-        const hasLifts = mains.length > 0 || day.exercises.some(e => e.type === 'accessory')
-        const isPowerlifting = (program.programType ?? 'powerlifting') === 'powerlifting'
-        const configRMs = configs[program.id]?.oneRMs
-        const hasConfigRMs = !!configRMs && (configRMs.squat > 0 || configRMs.bench > 0 || configRMs.deadlift > 0)
-        const calcRMs = isPowerlifting ? (hasConfigRMs ? configRMs! : personalOneRMs) : null
+        const hasLifts = exercises.length > 0
+        const calcRMs = resolveCalcRMs(program, configs[program.id], personalOneRMs)
         const weekHref = `/programs/${program.id}/week/${currentWeek.id}`
 
         // Running-only day → the whole card opens the /runs logger
@@ -244,28 +271,47 @@ export function DashboardPage() {
         return (
           <div style={{ padding: '0 20px', marginBottom: 16 }}>
             <div className="card card-tight">
-              <button
-                style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, width: '100%', boxSizing: 'border-box' }}
-                onClick={() => navigate(weekHref)}
-              >
-                <div style={{ fontSize: 22 }}>🗓️</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>TODAY'S SESSION</div>
-                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>
-                    {day.focus}
+              {/* Two tap targets: the body opens the week, START begins the workout */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', boxSizing: 'border-box' }}>
+                <button
+                  style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}
+                  onClick={() => navigate(weekHref)}
+                >
+                  <div style={{ fontSize: 22 }}>🗓️</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>TODAY'S SESSION</div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>
+                      {day.focus}
+                    </div>
                   </div>
-                </div>
-                <span className="t-mono" style={{ fontSize: 11, color: 'var(--accent)' }}>START →</span>
-              </button>
+                </button>
+                <button
+                  className="t-mono"
+                  style={{
+                    background: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0,
+                    fontSize: 11, color: 'var(--accent)', padding: '6px 2px 6px 10px',
+                  }}
+                  onClick={handleStartToday}
+                >
+                  START →
+                </button>
+              </div>
 
-              {/* Main lifts — RPE + working weight (powerlifting) */}
-              {mains.length > 0 && (
+              {/* The day's lifts in the user's own order — capped like the Week
+                  page's DayCard so a long day can't take over the dashboard. */}
+              {exercises.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 10, paddingLeft: 34 }}>
-                  {mains.map((ex, i) => {
+                  {exercises.slice(0, PREVIEW_ROWS).map((ex, i) => {
                     const wt = structuredWeight(ex, calcRMs)
                     return (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 12, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.name}</span>
+                      <div key={ex.id ?? i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {ex.name}
+                          {/* Without the label a top set and its back-off read as the same row */}
+                          {ex.label && (
+                            <span style={{ color: 'var(--muted)', fontSize: 10 }}> · {ex.label}</span>
+                          )}
+                        </span>
                         <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 'auto', flexShrink: 0 }}>
                           {ex.sets != null && `${ex.sets}×${ex.reps}`}
                           {ex.rpe !== undefined && ` @${ex.rpe}`}
@@ -274,6 +320,11 @@ export function DashboardPage() {
                       </div>
                     )
                   })}
+                  {exercises.length > PREVIEW_ROWS && (
+                    <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
+                      +{exercises.length - PREVIEW_ROWS} more
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -424,7 +475,7 @@ export function DashboardPage() {
 
       {/* Active program current-week card */}
       {activeProgramInfo && (() => {
-        const { program, currentWeek, currentWeekNum, doneWeeks } = activeProgramInfo
+        const { program, currentWeek, currentWeekNum, doneWeeks, weeksBehind } = activeProgramInfo
         const phaseColor = PHASE_COLOR[currentWeek.phase] ?? 'var(--accent)'
         const pct = Math.round((doneWeeks / program.totalWeeks) * 100)
         return (
@@ -451,6 +502,18 @@ export function DashboardPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Schedule drift — the plan's dates vs the week you're actually on */}
+                {weeksBehind !== 0 && (
+                  <div className="t-mono" style={{
+                    fontSize: 10, marginBottom: 10,
+                    color: weeksBehind > 0 ? '#f59e0b' : 'var(--muted)',
+                  }}>
+                    {weeksBehind > 0
+                      ? `⚠ ช้ากว่าแผน ${weeksBehind} สัปดาห์`
+                      : `เร็วกว่าแผน ${-weeksBehind} สัปดาห์`}
+                  </div>
+                )}
 
                 {/* Day status row */}
                 <div style={{ display: 'flex', gap: 5, marginBottom: 12 }}>

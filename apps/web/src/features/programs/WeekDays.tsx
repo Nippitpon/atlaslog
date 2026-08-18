@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { DayStatus, StructuredDay, StructuredExercise, StructuredProgram, StructuredWeek } from '@atlaslog/shared'
-import { dayToProgram } from '../../lib/twelveWeekProgram.js'
+import { buildDayProgram } from '../../lib/twelveWeekProgram.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAppStore } from '../../store/useAppStore.js'
-import { structuredWeight } from '../../lib/rpeTable.js'
+import { structuredWeight, resolveCalcRMs } from '../../lib/rpeTable.js'
 import { resolveDayExercises } from '../../lib/dayLayout.js'
 import { runTarget } from '../../lib/utils.js'
 import { IconCheck, IconPlay, IconChevronRight, IconEdit, IconRun } from '../../components/icons/index.js'
@@ -228,24 +228,10 @@ export function WeekDays({ program, week }: { program: StructuredProgram; week: 
   const { startWorkout, personalOneRMs } = useAppStore()
   const [editingDayId, setEditingDayId] = useState<string | null>(null)
 
-  const config = getConfig(program.id)
-  const isPowerlifting = (program.programType ?? 'powerlifting') === 'powerlifting'
-  const configRMs = config?.oneRMs
-  const hasConfigRMs = !!configRMs && (configRMs.squat > 0 || configRMs.bench > 0 || configRMs.deadlift > 0)
-  const calcRMs = isPowerlifting ? (hasConfigRMs ? configRMs! : personalOneRMs) : null
+  const calcRMs = resolveCalcRMs(program, getConfig(program.id), personalOneRMs)
 
   const handleStart = (day: StructuredDay, exercises: StructuredExercise[]) => {
-    const weightOverrides: Record<string, number> = {}
-    if (calcRMs) {
-      exercises.forEach(ex => {
-        // structuredWeight is the single source of truth (pct → else rpe); key by the
-        // per-row id so a top set + back-off (same exerciseId) never overwrite each other.
-        const w = structuredWeight(ex, calcRMs)
-        if (w) weightOverrides[ex.id ?? `${ex.exerciseId}:${ex.rpe}`] = w
-      })
-    }
-    const p = dayToProgram(program.id, week.id, { ...day, exercises }, weightOverrides)
-    startWorkout(p)
+    startWorkout(buildDayProgram(program.id, week.id, day, exercises, calcRMs))
     navigate('/workout')
   }
 

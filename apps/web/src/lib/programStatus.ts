@@ -46,13 +46,24 @@ export function lastPlayedAt(programId: string, history: Session[]): number {
   return 0
 }
 
-// Newest interaction of any kind: trained, edited, or set up.
+// Newest interaction of any kind: trained, edited, or set up. Used for list order.
 export function programRecency(
   program: StructuredProgram,
   meta: ProgramMeta | undefined,
   history: Session[],
 ): number {
   return Math.max(lastPlayedAt(program.id, history), meta?.updatedAt ?? 0, meta?.activatedAt ?? 0)
+}
+
+// Newest sign that the user is actually RUNNING this program — trained it, or
+// deliberately set it up / resumed it. Editing deliberately doesn't count: tweaking
+// a program you aren't training shouldn't take over the Dashboard.
+export function programActivity(
+  programId: string,
+  meta: ProgramMeta | undefined,
+  history: Session[],
+): number {
+  return Math.max(lastPlayedAt(programId, history), meta?.activatedAt ?? 0)
 }
 
 // Favourites pinned on top, then most-recently-touched, then name so the order
@@ -81,6 +92,7 @@ export function pickCurrentProgramId(
   configs: { [programId: string]: ProgramConfig },
   metas: ProgramMetaState,
   progress: ProgramProgressState,
+  history: Session[],
 ): string | null {
   // Config-only, matching the Dashboard's existing scope — weekly routines have
   // no config and still can't drive the current-week card (see log.md round 24).
@@ -90,14 +102,14 @@ export function pickCurrentProgramId(
   })
   if (!candidates.length) return null
 
-  const stamped = candidates.filter(p => metas[p.id]?.activatedAt)
-  if (stamped.length) {
-    return stamped.reduce((best, p) =>
-      (metas[p.id]!.activatedAt! > metas[best.id]!.activatedAt!) ? p : best
-    ).id
+  const active = candidates
+    .map(p => ({ p, at: programActivity(p.id, metas[p.id], history) }))
+    .filter(x => x.at > 0)
+  if (active.length) {
+    return active.reduce((best, x) => (x.at > best.at ? x : best)).p.id
   }
-  // Pre-existing users have no activatedAt yet — keep the old behaviour
-  // (first configured program in insertion order) so nothing shifts on upgrade.
+  // Pre-existing users have neither a session nor activatedAt — keep the old
+  // behaviour (first configured program in insertion order) so nothing shifts.
   for (const programId of Object.keys(configs)) {
     const found = candidates.find(p => p.id === programId)
     if (found) return found.id
