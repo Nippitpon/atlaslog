@@ -1,8 +1,119 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-08-18 (รอบ 37 — ✅ SHIPPED: ติดดาว + เรียงตามล่าสุด + สถานะ/พักโปรแกรม)
+> อัปเดตล่าสุด: 2026-08-18 (รอบ 38 — ✅ SHIPPED: Today session ตามโปรแกรมที่เทรนจริง + สัปดาห์คิดจาก progress)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-08-18 — รอบ 38 (✅ SHIPPED, deploy main): Home/TODAY'S SESSION — ยึดโปรแกรมที่เทรนจริง + สัปดาห์คิดจาก progress
+
+commit `310618c` (fix)
+
+ผู้ใช้ทักว่า *"Today session ต้องแสดงข้อมูลตามโปรแกรมล่าสุด"* พอไล่ state จริงเจอ **3 เรื่องแยกกัน**
+และเรื่องที่ 3 คือบั๊กที่หนักที่สุดเท่าที่เจอมาในหน้า Dashboard
+
+### 🔴 บั๊กหลัก — Dashboard ข้ามสัปดาห์ 1–5 ทิ้ง
+
+`DashboardPage.tsx` เดิมคำนวณสัปดาห์ปัจจุบัน **จากปฏิทินล้วน ๆ** แล้ว loop
+`for (w = calendarWeekNum; w <= totalWeeks; w++)` **สแกนไปข้างหน้าอย่างเดียว ไม่เคยถอยกลับ**
+
+state จริงตอนเจอ: `Hybrid` startDate `13/07` → ผ่านมา 36 วัน → `calendarWeekNum = 6` ·
+แต่ `progress` ของโปรแกรมนี้ = `{}` (**ยังไม่เคยเล่นจบวันไหนเลย**)
+
+| | ก่อน | หลัง |
+|---|---|---|
+| Dashboard | **W6** ACCUMULATION | **W1** ACCUMULATION |
+| หน้า Programs | "Not started" (`doneWeeks + 1`) | เท่ากัน = W1 |
+| TODAY'S SESSION | 1×2 **@8.5 105kg** / 4×2 @8 100kg | 1×5 **@7 90kg** / 4×5 @6 85kg |
+
+คือ 2 หน้าขัดกันเอง และแอป**สั่งให้เบนช์ 105kg @8.5 ทั้งที่ยังไม่ได้ทำ accumulation block เลย**
+
+> 💡 ผู้ใช้เสนอว่า "เก็บวันที่เล่นจริงจาก History ไหม" — **สรุปว่าไม่ต้องเก็บอะไรเพิ่ม และ
+> วันเริ่มจริงก็ไม่ใช่ตัวแก้ที่ถูก** เพราะต่อให้ใช้ `firstPlayedAt` ก็ยังข้ามสัปดาห์อยู่ดี (แค่ข้ามน้อยลง)
+> ตัวแก้จริงคือ **เลิกคิดสัปดาห์จากวันที่ แล้วคิดจาก progress**
+
+### ทำอะไร
+
+- **`DashboardPage.tsx` — สัปดาห์ปัจจุบัน = สัปดาห์แรกที่ยังไม่จบ** (วนจาก `w = 1`)
+  ไม่ชี้ไปสัปดาห์ที่ทำจบแล้วเด็ดขาด · ตรงกับสูตร `doneWeeks + 1` ที่หน้า Programs ใช้
+  · วันที่เหลือหน้าที่แค่คำนวณ `weeksBehind = scheduledWeekNum - displayWeekNum` → ป้าย
+  **⚠ ช้ากว่าแผน N สัปดาห์** (เหลือง) / **เร็วกว่าแผน N สัปดาห์** (เทา) / ตรงแผน = ไม่มีป้าย
+- **`lib/programStatus.ts`** — `programActivity(programId, meta, history)` = `max(lastPlayedAt, activatedAt)`
+  · `pickCurrentProgramId()` รับ `history` เพิ่มแล้วจัดอันดับด้วยตัวนี้แทน `activatedAt` เดี่ยว ๆ
+  → **เทรนโปรแกรมไหน โปรแกรมนั้นขึ้นเป็นปัจจุบันทันที** (เดิมเทรนกี่ครั้งก็ไม่มีผล)
+  ⚠️ **จงใจไม่นับ `updatedAt`** — แค่แก้โปรแกรมที่ไม่ได้เทรน ไม่ควรยึด Dashboard
+- **การ์ด TODAY'S SESSION ใช้ `resolveDayExercises()`** — เดิมอ่าน `day.exercises` ดิบจากโปรแกรม
+  (`resolveDayExercises` ถูก import ที่ `WeekDays.tsx` ที่เดียว) → ท่าที่ผู้ใช้เพิ่ม/ลบ/สลับลำดับ**ไม่โผล่**
+  ⚠️ `runs` ยัง filter จาก `day.exercises` ดิบต่อไป เพราะ `resolveDayExercises` ตัด `type === 'running'` ทิ้ง
+  (`DayCard` ก็แยกแบบนี้)
+- **ปุ่ม START เริ่มเทรนจริง** — เดิมเขียน `START →` แต่ `navigate(weekHref)` เฉย ๆ ต้องกด Start ซ้ำอีกที
+  · แยกการ์ดเป็น **2 tap target** (เนื้อการ์ด → หน้า Week · ปุ่ม → `/workout`) ต้องเปลี่ยนตัวครอบเป็น `div`
+  เพราะ nested `<button>` ผิด HTML (precedent เดียวกับ commit `e0409b6`)
+  · กัน workout ค้างแบบ `LibraryPage.tsx:79-87` — วันเดียวกัน = ไปต่อไม่ถาม · คนละอัน = `confirm()` ก่อนทับ
+- **การ์ดโชว์ accessory + label** (นอกแผน แต่จำเป็นเมื่อดึงรายการจริงมาแสดง) — เดิมโชว์แค่ `type === 'main'`
+  ท่าที่เพิ่มเองเลยไม่ขึ้น · และ top set กับ back-off กลายเป็น "Bench Press" เหมือนกัน 2 แถว แยกไม่ออก
+  → โชว์ `ex.label` ต่อท้ายชื่อ + จำกัด `PREVIEW_ROWS = 5` + `+N more` เท่า `DayCard`
+- **ดึงโค้ดซ้ำออกมาใช้ร่วม** — `DashboardPage` เคยก็อป expression เลือก 1RM มาจาก `WeekDays` แบบคำต่อคำ
+  · `lib/rpeTable.ts` += `resolveCalcRMs(program, config, personalOneRMs)`
+  · `lib/twelveWeekProgram.ts` += `buildDayProgram(programId, weekId, day, exercises, calcRMs)`
+  (ย้าย body ของ `WeekDays.handleStart` มา) → 2 หน้าคำนวณน้ำหนัก/สร้าง workout จากที่เดียวกัน เถียงกันไม่ได้อีก
+
+### ผลกระทบ (จัดการแล้ว)
+
+- **กฎรอบ 37 ทั้ง 2 ข้อยังอยู่ครบ** — `max()` เลือกไว้แทน "เคยเทรนชนะเสมอ" เพราะแบบหลังจะพัง
+  กฎ *"เริ่มโปรแกรมใหม่ต้อง active"* (พักตัวเก่าที่มี history แล้ว setup ตัวใหม่ที่ยังไม่มี history
+  → การ์ด paused จะค้าง ตัวใหม่ไม่มีวันขึ้น) · ยังไม่กรอง `paused` ออกจาก candidates เหมือนเดิม
+- **user เก่าไม่ขยับ** — ไม่มีทั้ง session และ `activatedAt` → fallback วน `Object.keys(configs)` แบบเดิม
+- **`weeksBehind` ใช้ `config.startDate`** ที่ผู้ใช้กรอกเอง = ยังเป็นแผน ไม่ได้ไปเขียนทับด้วยวันเล่นจริง
+  (ตั้งใจ — startDate เป็น "แผน" ของ periodization/peaking ไม่ควรถูกแก้เงียบ ๆ)
+- **สัปดาห์ที่เลือกอาจต่างจาก `doneWeeks + 1`** เฉพาะเคสข้ามไปเล่นสัปดาห์หลังก่อน
+  (เช่นจบ week 2 แต่ยังไม่จบ week 1 → รอบนี้ชี้ week 1 = สิ่งที่ควรทำจริง ส่วนหน้า Programs ชี้ week 3)
+  เคสปกติเรียงตามลำดับ = เท่ากันเป๊ะ
+
+### verify
+
+`pnpm build` ผ่าน (118 modules) · ESLint exit 0 · **e2e Playwright 390px, 0 console errors** (บัญชีจริง)
+
+**logic การเลือกโปรแกรม** — เทสต์ตรงที่ฟังก์ชันด้วยข้อมูลสังเคราะห์ (dev `import()` ไม่แตะข้อมูลจริง):
+
+| เคส | ได้ |
+|---|---|
+| เทรน Hybrid วันนี้ vs PL Test setup 3 วันก่อน | **Hybrid** ← ช่องโหว่ที่ผู้ใช้ชี้ ปิดแล้ว |
+| setup PL Test เดี๋ยวนี้ vs เทรน Hybrid 2 วันก่อน | PL Test ← กฎรอบ 37 ยังอยู่ |
+| Hybrid พักอยู่ แต่ activity ใหม่สุด | Hybrid ← ไม่เด้งไปตัวอื่น ยังอยู่ |
+| ไม่มี history + ไม่มี `activatedAt` | fallback เดิม |
+
+**สัปดาห์ + ป้ายช้า/เร็ว** — inject progress แบบ local ล้วน (ยืนยันจาก network ว่ามีแต่ GET ไม่มี POST):
+
+| จบไปถึง | สัปดาห์ | ป้าย |
+|---|---|---|
+| ยังไม่เล่น | W1 | ช้ากว่าแผน 5 สัปดาห์ |
+| สัปดาห์ 1 | W2 | ช้ากว่าแผน 4 สัปดาห์ |
+| สัปดาห์ 1–5 | W6 | **ไม่มีป้าย** (ตรงแผนพอดี) |
+| สัปดาห์ 1–8 | W9 | เร็วกว่าแผน 3 สัปดาห์ |
+
+**UI** — เทียบการ์ด Home กับหน้า Week วันเดียวกัน: ท่า/ลำดับ/น้ำหนักตรงกันเป๊ะ (105kg top set · 100kg back-off) ·
+บันทึกสลับลำดับ + เพิ่ม accessory → การ์ด Home อัปเดตตามทันที · กด START → เข้า `/workout` id
+`custom-…/week-6/day-2` ครบ 3 ส่วน (progress ยังทำงาน) · workout วันเดียวกันค้าง → ไปต่อไม่ถาม ·
+Quick Session ค้าง → `confirm()` · Cancel แล้วของเดิมไม่หาย · กดเนื้อการ์ด → ไปหน้า Week ·
+วันไม่มีวันซ้อม / โปรแกรมพัก → ไม่มีการ์ด · **regression รอบ 37 ผ่าน** (การ์ด PROGRAM PAUSED + ไม่เด้งไปตัวอื่น)
+
+### ไม่ทำรอบนี้
+
+- **ไม่แก้สูตรของหน้า Programs** (`doneWeeks + 1`, `ProgramsPage.tsx:253,361`) — เคสปกติเท่ากันอยู่แล้ว
+  ต่างกันเฉพาะเคสข้ามสัปดาห์ ซึ่งอยู่ข้าง ๆ progress bar ที่ขับด้วย `doneWeeks` อยู่ ถ้าแก้จะดูขัดกันเอง
+- **ไม่ทำการ์ด "REST DAY" / "NEXT SESSION"** — ผู้ใช้เลือกว่าวันที่ไม่มีวันซ้อมให้เงียบไปเลย
+- **ไม่ auto-แก้ `config.startDate` จาก session แรก** — เขียนทับค่าที่ผู้ใช้ตั้งเองแบบเงียบ ๆ ไม่ควรทำ
+
+### ⚠️ หนี้จาก e2e รอบ 37 (ตกลงกับผู้ใช้แล้วว่าปล่อยไว้)
+
+- **`PL Test 6wk` config โดนทับ** ตอน e2e รอบ 37 (กด Start Program ทดสอบข้อ "setup ใหม่ → active")
+  → `startDate` เป็น `2026-08-18` · 1RM `180/120/220` (บังเอิญตรงกับ config ของ `Hybrid` ที่ตั้งไว้เอง
+  เพราะกรอกตาม placeholder) · **ค่าเดิมกู้ไม่ได้** แต่รอบนี้ทำให้ startDate แทบไม่มีผลแล้ว
+  (เหลือแค่ช่วงวันที่ที่โชว์ + ตัวเลขในป้ายช้า/เร็ว) → ผู้ใช้เลือก "ปล่อยไว้"
+- **`General Fitness 1W` ค้างสถานะ `paused`** จาก e2e รอบ 37 — ไม่กระทบอะไร (Hybrid เป็นตัวปัจจุบันอยู่แล้ว)
+  ผลเดียวคือถ้าวันหลังถึงคิวมัน จะขึ้นการ์ด PROGRAM PAUSED ต้องกดทำต่อก่อน · กดปุ่ม ▶ 1 คลิกก็จบ
 
 ---
 
