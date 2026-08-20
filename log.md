@@ -1,12 +1,15 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-08-20 (รอบ 39 — ✅ VERIFIED ครบ รอ commit: ประวัติ 1RM แบบมีวันที่ + กราฟความก้าวหน้า + RPE ต่อเซ็ต)
+> อัปเดตล่าสุด: 2026-08-20 (รอบ 39 — ✅ SHIPPED: ประวัติ 1RM แบบมีวันที่ + กราฟความก้าวหน้า + RPE ต่อเซ็ต)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
 
 ---
 
-## 2026-08-20 — รอบ 39 (✅ VERIFIED ครบ — SQL 2k รันแล้ว, รอ commit): ประวัติ 1RM มีวันที่ + กราฟ progression + RPE ต่อเซ็ต
+## 2026-08-20 — รอบ 39 (✅ SHIPPED, deploy main): ประวัติ 1RM มีวันที่ + กราฟ progression + RPE ต่อเซ็ต
+
+commit `5c78b62` (feat: 1RM history + chart) · `3909684` (feat: Logger RPE — แยกไว้ revert ง่าย) ·
+`836c0ec` (docs) — แยก 3 ก้อนเพราะ Logger เป็นจอที่ใช้บ่อยสุด ถ้า layout พังจะถอยได้โดยไม่เสียกราฟ
 
 ผู้ใช้ถามว่า Personal 1RM เก็บยังไง มี record วันที่ไหม เอาไปทำ line chart ได้ไหม —
 **ตรวจแล้วไม่มีวันที่และไม่มีประวัติเลย** (`setPersonalOneRMs` เขียนทับทันที · `program_state.updated_at`
