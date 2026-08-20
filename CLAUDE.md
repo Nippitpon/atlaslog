@@ -15,7 +15,7 @@ Target users: powerlifting athletes and coaches who want to track SBD training.
 |-------|-----------|-------|
 | Frontend | React 19, TypeScript 6, Vite 8 | |
 | Routing | React Router v7 | |
-| State | Zustand 5 + localStorage persist | keys: `atlas:v1`, `atlas:v1:program-progress` |
+| State | Zustand 5 + localStorage persist | keys: `atlas:v2`, `atlas:v1:program-progress`, `atlas:v1:sync-queue` |
 | Data fetching | TanStack Query 5 | wired up when API exists |
 | Excel import | SheetJS (`xlsx`) | parse .xlsx in-browser, MIT license |
 | Styling | CSS custom properties + inline styles | theme via CSS vars |
@@ -45,12 +45,18 @@ apps/web/src/
   lib/
     twelveWeekProgram.ts            → Built-in 12-week SBD periodized program
     rpeTable.ts                     → RPE → % of 1RM conversion table (Tuchscherer)
+    oneRM.ts                        → e1RM estimation + 1RM progression series (pure)
     excelImport.ts                  → Excel (.xlsx) → StructuredProgram parser
     data.ts                         → Exercise seed data (23 exercises)
     utils.ts                        → Volume calc, date format, color helpers
+  components/charts/                → Hand-rolled SVG/div charts (no chart library)
+    MiniBars.tsx                    → Normalized bar sparkline (weight trend)
+    oneRMScale.ts                   → Lift colors/labels + time-linear scale math
+    OneRMChart.tsx                  → Full 1RM progression chart (Profile)
+    OneRMSparkline.tsx              → Compact 1RM line (Dashboard)
   store/
     useProgramStore.ts              → Program progress, ProgramConfig (1RMs + dates), custom programs
-    useAppStore.ts                  → Theme, workout history, active workout state
+    useAppStore.ts                  → Theme, workout history, active workout state, oneRMHistory
   features/
     programs/
       ProgramsPage.tsx              → Program library + Import from Excel button
@@ -60,7 +66,9 @@ apps/web/src/
     dashboard/DashboardPage.tsx     → Weekly stats, SBD total, quick start
     history/HistoryPage.tsx         → Completed session list
     library/LibraryPage.tsx         → Exercise database
-    profile/ProfilePage.tsx         → User settings
+    profile/ProfilePage.tsx         → User settings (1RM is a link out, not inline)
+    profile/OneRMPage.tsx           → `/one-rm` — 1RM progression chart + dated history
+    profile/LogOneRMSheet.tsx       → Log a dated 1RM test (lift + date + weight)
 
 packages/shared/src/
   types.ts                          → All TypeScript interfaces (source of truth)
@@ -140,7 +148,22 @@ StructuredWeek      → id, weekNumber, phase, days[]
 StructuredProgram   → id, name, description, totalWeeks, daysPerWeek, focus, weeks[], isCustom?, source?
 ProgramConfig       → startDate, endDate, oneRMs: { squat, bench, deadlift }
 Session             → completed workout record (date, volume, duration, sets)
+WorkoutSet          → w, r, done, rpe?   ← rpe = ACTUAL reported effort (≠ targetRpe = prescription)
+OneRMEntry          → id, date, lift, weightKg, source?  — dated 1RM log, append-only
 ```
+
+### 1RM: two sources, one live value
+
+- `personalOneRMs` (`useAppStore` → `program_state.personal_one_rms`) is the **live** value every
+  weight calc reads via `resolveCalcRMs`. Undated, single value.
+- `oneRMHistory: OneRMEntry[]` (→ table `one_rm_records`) is the **dated log** that draws the chart.
+- Invariant: `personalOneRMs[lift]` = newest entry for that lift. Maintained in the store, never in a page.
+  Backdating does **not** promote; deleting the newest does **not** rewind (see comments in `useAppStore`).
+- **e1RM is never stored** — derived from `Session[]` on the fly by `buildLiftSeries`. Fallback formula is
+  **Brzycki** (returns exactly `w` at 1 rep; Epley inflates by 3.3%), reps clamped to 10.
+- ⚠️ For **RPE-prescribed** rows, logging `rpe === targetRpe` makes e1RM equal the entered 1RM exactly —
+  the estimate line is flat by construction. PCT-prescribed rows (incl. the built-in 12-week program,
+  where `pct` wins over `rpe`) do carry real signal. Never prefill `rpe` from `targetRpe`.
 
 ---
 

@@ -315,6 +315,51 @@ select muscle_group, count(*) from public.exercises group by 1 order by 2 desc;
 > ถ้าต้อง re-gen seed หลัง dataset อัปเดต: clone `hasaneyldrm/exercises-dataset` แล้ว
 > `node scripts/build-exercises.mjs <path/to/data/exercises.json>` → commit ไฟล์ seed ใหม่
 
+## 2k. ประวัติ 1RM — one_rm_records (รอบ 39) (2026-08-20)
+
+> เดิม 1RM เก็บเป็น `personal_one_rms` ใน `program_state` = ค่าเดียว ทับทุกครั้ง **ไม่มีวันที่/ประวัติ**
+> → วาดกราฟความก้าวหน้าไม่ได้เพราะไม่มีแกน X. ตารางนี้เก็บ **ประวัติแบบมีวันที่ (append-only)**
+> 1 แถว/ท่า/ครั้งที่ทดสอบ · `program_state.personal_one_rms` **ยังอยู่เหมือนเดิม** = ค่าปัจจุบันที่ใช้
+> คำนวณน้ำหนักในโปรแกรม (= ค่าจากแถวล่าสุดของแต่ละท่า) · ส่วน e1RM คำนวณสดจาก `sessions` **ไม่เก็บลงตารางนี้**
+
+```sql
+create table public.one_rm_records (
+  id text primary key,
+  user_id uuid references auth.users(id) on delete cascade,
+  date timestamptz not null,
+  lift text not null check (lift in ('squat','bench','deadlift')),
+  weight_kg numeric not null,
+  source text not null default 'manual' check (source in ('manual','test')),
+  note text,
+  created_at timestamptz default now()
+);
+alter table public.one_rm_records enable row level security;
+
+-- own rows — with check ด้วย (กัน client ยัด user_id คนอื่นตอน insert)
+create policy "own one rm records" on public.one_rm_records
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- โค้ชอ่านของลูกศิษย์ที่ active (pattern เดียวกับ body_metrics ใน 2h)
+create policy "coach reads athlete one rm records" on public.one_rm_records for select using (
+  user_id in (select athlete_id from public.coach_athlete
+              where coach_id = auth.uid() and status = 'active'));
+
+create index one_rm_records_user_date_idx on public.one_rm_records(user_id, date desc);
+```
+
+> **`id text primary key` (client generate)** เหมือน `body_metrics`/`runs` → offline-first upsert-by-id
+> ไม่ต้องรอ server คืน id
+>
+> **`with check` เข้มกว่า `body_metrics`/`runs` โดยตั้งใจ** — policy `for all using (...)` เฉย ๆ
+> **ไม่คุม INSERT** (`using` ไม่ apply กับ INSERT) → client ยัด `user_id` คนอื่นได้ ·
+> `push_subscriptions` (2i) ใช้รูปแบบเข้มนี้อยู่แล้ว · ช่องโหว่เดียวกันของ `body_metrics`/`runs`
+> เป็นงานค้าง 🟡 แยกรอบ
+>
+> **ไม่ใส่ unique `(user_id, lift, date)`** — วันเดียวกันทดสอบ 2 ครั้งได้ (พลาดแล้วขึ้นใหม่)
+>
+> 🚨 **ต้องรัน SQL นี้ก่อน deploy client** — ไม่งั้น `one-rm-upsert` จะ 404 → `attempt()` catch →
+> re-enqueue และ `flushQueue` **ไม่มี retry limit** → คิวใน localStorage โตไม่หยุด
+
 ## 3. Get API Keys
 
 ไปที่ **Settings → API**:

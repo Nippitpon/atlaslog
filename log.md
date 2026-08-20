@@ -1,8 +1,155 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-08-18 (รอบ 38 — ✅ SHIPPED: Today session ตามโปรแกรมที่เทรนจริง + สัปดาห์คิดจาก progress)
+> อัปเดตล่าสุด: 2026-08-20 (รอบ 39 — ✅ VERIFIED ครบ รอ commit: ประวัติ 1RM แบบมีวันที่ + กราฟความก้าวหน้า + RPE ต่อเซ็ต)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-08-20 — รอบ 39 (✅ VERIFIED ครบ — SQL 2k รันแล้ว, รอ commit): ประวัติ 1RM มีวันที่ + กราฟ progression + RPE ต่อเซ็ต
+
+ผู้ใช้ถามว่า Personal 1RM เก็บยังไง มี record วันที่ไหม เอาไปทำ line chart ได้ไหม —
+**ตรวจแล้วไม่มีวันที่และไม่มีประวัติเลย** (`setPersonalOneRMs` เขียนทับทันที · `program_state.updated_at`
+เป็นเวลา sync ของทั้ง blob) → ทำกราฟไม่ได้เพราะไม่มีแกน X. รอบนี้เพิ่มมิติเวลาแล้ววาดกราฟ 2 เส้น
+
+> ✅ **เจ้าของรัน SQL section 2k แล้ว 2026-08-20** (ก่อนหน้านั้น e2e เจอ 404 จริง 4 ครั้งตอน `loadUserData`
+> — ถ้า ship ก่อนรัน SQL คิวจะโตไม่หยุดเพราะ `flushQueue` ไม่มี retry limit)
+
+### ทำอะไร
+
+**ชั้นข้อมูล**
+- `types.ts` — `WorkoutSet.rpe?: number` (RPE ที่ยกได้จริง คนละตัวกับ `targetRpe` ที่เป็นค่าสั่ง) ·
+  `OneRMLift` / `OneRMSource` / `OneRMEntry { id, date, lift, weightKg, source?, note? }`
+  — **1 แถว/ท่า/ครั้ง** ไม่ใช่ 1 แถวเก็บครบ 3 (เส้น e1RM เป็น per-lift อยู่แล้ว → shape เดียวกัน ลบแยกท่าได้)
+- `lib/oneRM.ts` (ใหม่, pure) — `setE1RM` / `buildLiftSeries` / `latestOneRMs` / `latestEntryFor` ·
+  `rpeTable.getRpePct` เปลี่ยนเป็น `export` เพื่อ **invert ตาราง RPE ของแอปเอง** (ไม่ duplicate)
+- `lib/utils.ts` — `todayYMD()` / `isoFromYMD()` (local calendar + local noon)
+- `syncQueue.ts` — op `one-rm-upsert` / `one-rm-delete` + `syncOneRM` / `syncOneRMDelete`
+  (**แทรกก่อน `else` ปิดท้าย** ที่เป็น `program-delete` แบบ implicit)
+- `useAppStore.ts` — `oneRMHistory` + `addOneRMEntry(ies)` / `removeOneRMEntry` / `setOneRMHistory` ·
+  helper ภายใน `appendOneRMs` (append+sync **ไม่ promote**) แยกจาก `addOneRMEntries` (append+promote)
+- `useAuthStore.ts` — fetch `one_rm_records` เป็น promise ที่ 8 + reconcile ด้วย `useAppStore.setState`
+  (ไม่ใช่ action → ไม่เรียก `syncSettings()` → ไม่ write-back loop)
+- `SUPABASE_SETUP.md` section **2k** — ตาราง `one_rm_records` + RLS (`with check` ด้วย) + coach-read + index
+
+**UI**
+- `components/charts/` (ใหม่) — `MiniBars.tsx` (ดึง WEIGHT TREND ที่ซ้ำใน `ProfilePage` + `AthleteDetailPage`
+  ออกมาที่เดียว) · `oneRMScale.ts` (สีท่า + scale เวลาเชิงเส้น) · `OneRMChart.tsx` · `OneRMSparkline.tsx`
+- **หน้าแยก `/one-rm`** (`features/profile/OneRMPage.tsx`, route ใหม่ใน `router.tsx`) — กราฟ +
+  pill `ALL/SQUAT/BENCH/DEAD` + legend 3 ท่า + ปุ่ม `Log a 1RM test` + ประวัติเต็มลบได้
+  (`window.confirm` ตาม `RunsPage`) + ชีต `Edit current →` (ค่า 1RM ปัจจุบันที่โปรแกรมใช้คำนวณ)
+  - **ตอนแรกทำเป็น section ในหน้า Profile แต่ผู้ใช้บอกว่ารก** → ย้ายออกมาทั้งก้อน
+    Profile เหลือ **การ์ดปุ่มแถวเดียว** (`Personal 1RM · 200/120/220 kg · TOTAL 540 · PROGRESSION →`)
+    ตาม pattern ปุ่มเมนูเดิม · หน้า Profile สั้นลงเหลือ scrollHeight 1492px
+  - โครงหน้าลอก `RunsPage` (back button + form/list + delete) ซึ่งเป็น precedent เดียวในแอป
+- `LogOneRMSheet.tsx` (ใหม่) — เลือกท่า + `DateField` (default วันนี้, `max` กันอนาคต) + น้ำหนัก + delta
+- Dashboard — การ์ด sparkline ระหว่างการ์ดสถิติกับการ์ดโปรแกรมพัก กดแล้วไป `/one-rm` (`VIEW →` ไม่ใช่ตัวเลข
+  เพราะเหนือขึ้นไป 200px มี "SBD TOTAL (WEEK)" ที่คนละความหมาย)
+- Logger — คอลัมน์ RPE: grid `36px 1fr 1fr 60px` → `30px 1fr 1fr 56px 56px` ·
+  `FinishReview` โชว์ `@8.5` ท้ายบรรทัดเซ็ต
+
+### การตัดสินใจที่สำคัญ (อย่าย้อน)
+
+- **Brzycki ไม่ใช่ Epley** — ที่ 1 rep Brzycki คืน `w` เป๊ะ (162.5→162.5) ส่วน Epley คืน `w×1.0333`
+  (162.5→167.9) = bias +3.3% ทุกซิงเกิล บนกราฟที่มีไว้ดูเทรนด์ = ตัดทิ้ง · clamp `r` ที่ 10 ทั้งสองทาง
+- **ไม่ prefill `rpe` จาก `targetRpe` ใช้ `placeholder` แทน** — ค่าที่ prefill แยกไม่ออกจากค่าที่รู้สึกจริง
+  = แอปผลิตข้อมูล "actual" เอง แล้วไปป้อน `calcWeight` ต่อ · `targetRpe` ยังเป็น per-exercise ไม่ใช่ per-set ·
+  `addSet` / `startWorkout` ก็ห้าม copy `rpe`
+- **backdate ไม่ promote / ลบไม่ rewind** — ย้อนวันที่ใส่ของเก่าต้องไม่ทับน้ำหนักที่โปรแกรมกำลังใช้
+  และการลบจุดบนกราฟต้องไม่เปลี่ยนน้ำหนักที่สั่งทั้งโปรแกรมเงียบ ๆ
+- **`ALL` โชว์เส้น manual อย่างเดียว** — 3 ท่า × 2 เส้น = 6 polyline บน plot 284px อ่านไม่ออก
+- **ไม่ seed แถวย้อนหลังให้ค่าที่มีอยู่แล้ว** — เคยเขียนไว้แล้วถอดออก: เราไม่รู้ว่า 1RM เดิมวัดวันไหน
+  การประทับ "วันนี้" คือการกุวันที่ (หลักการเดียวกับข้อ prefill RPE) · ผู้ใช้เก่าจะเห็นค่าปัจจุบันใน legend
+  แต่กราฟยังว่างจนกว่าจะกด Log a 1RM test
+
+### ผลกระทบ (จัดการแล้ว)
+
+- **ช่อง RPE ว่างต้องไม่ดูเหมือนมีข้อมูล** — `.set-row.complete .input-num` ทาสี lime ตอนติ๊กเซ็ต →
+  เพิ่ม `.set-row.complete .input-rpe:placeholder-shown` override ให้คงสีกลาง (ยืนยันด้วย e2e:
+  KG = `rgba(212,255,58,0.08)` แต่ RPE = `rgb(28,28,28)`)
+- **แก้บั๊กเก่าไปด้วย** — `.set-row` เปลี่ยนเป็น `align-items: end` + `.set-num` สูง 56px:
+  เดิม hint `prev` ทำให้ช่อง KG/REPS สูง 68px แต่ปุ่ม ✓ 56px จัดกึ่งกลาง → ปุ่มต่ำไป ~6px
+- **2 session วันเดียวกัน → เส้นตั้งฉาก** — เจอตอน e2e (บัญชีทดสอบมี 3 session ลงวันที่ 23/06 เหมือนกัน)
+  จุด e1RM 2 จุดอยู่ x เดียวกัน → `thinEstimated` ยุบเหลือ **max ต่อวัน** ก่อน แล้วค่อยยุบเป็นรายสัปดาห์
+  เมื่อเกิน 120 จุด
+- **guard ของ sparkline ต้องนับต่อท่า** — เดิมนับจุด manual รวมทุกท่า → คนที่ log squat 1 + bench 1
+  วันเดียวกันเห็นการ์ดเปล่า · แก้เป็น `series.some(s => s.manual.length >= 2)` ทั้งใน `DashboardPage`
+  และในตัว component เอง
+- **ชื่อไฟล์ชนกันบน Windows** — `OneRMChart.tsx` กับ `oneRMChart.ts` ต่างกันแค่ case → TS1149/TS1261
+  เปลี่ยนชื่อ primitives เป็น `oneRMScale.ts`
+- `components/charts/*` **ห้าม import store** — รับ `LiftSeries[]` ทาง props อย่างเดียว เพื่อให้หน้าโค้ช
+  เสียบใช้ได้ทันทีเมื่อ `coachApi` คืนข้อมูลมา (policy coach-read เตรียมไว้ใน 2k แล้ว)
+- persist ไม่มี `version`/`migrate` — `oneRMHistory` เป็น **key ใหม่** จึงปลอดภัย (zustand shallow-merge
+  blob ที่ persist ทับ initializer → blob เดิมที่ไม่มี key นี้ได้ `[]`) เหตุผลเดียวกับตอนเพิ่ม `programMeta` รอบ 37
+
+### ⚠️ e1RM วนกลับหาตัวเองบางส่วน — จดไว้กันลืม
+
+`w` ที่ log ถูก prebake จาก 1RM ที่กรอก (`twelveWeekProgram.ts:344-361` → `weightOverrides`)
+
+- แถวสั่งด้วย **RPE ล้วน** + log `rpe === targetRpe` → `e1RM = w ÷ pct = oneRM` **เป๊ะ** → เส้นแบนโดยโครงสร้าง
+  (ยืนยันด้วยเลข: 1RM 200 @RPE8×5 → สั่ง 155kg → e1RM 200.3)
+- แถวสั่งด้วย **PCT** → **ไม่แบน** เพราะ `w = oneRM × pct` แต่หารด้วย `getRpePct(r, rpeจริง)`
+  (80% ของ 200 = 160kg → log @8×5 ได้ 206.7 · @9.5×5 ได้ 188.2 = สัญญาณจริง)
+- โปรแกรม 12 สัปดาห์ในตัวใส่ทั้ง `pct` และ `rpe` และ `structuredWeight` เลือก **pct ก่อน** → เส้นมีความหมาย ·
+  Excel import ที่เว้นคอลัมน์ PCT จะได้เส้นแบน
+- `OneRMPoint` เก็บ `basis` / `reps` / `rpe` ไว้แล้ว → ทำ filter "ซ่อนจุด echo ล้วน" ทีหลังได้โดยไม่แก้ schema
+
+### verify
+
+- `pnpm build` ผ่าน (124 modules) · `pnpm --filter web lint` ผ่าน
+- **สูตร e1RM ตรวจแยกด้วย node** — Brzycki r=1 คืน `w` เป๊ะ · clamp r>10 · RPE table invert ถูก ·
+  ยืนยันเคส circularity ทั้ง RPE-ล้วนและ PCT ตามตัวเลขข้างบน
+- **e2e Playwright 390×844, login จริง (`athlete.a`), 0 console errors** (นอกจาก 404 ของตารางที่ยังไม่สร้าง):
+  - DateField default = **วันนี้ตาม local** (`2026-08-20`) + `max` กันอนาคต ✅
+  - กด Save ทั้งที่ไม่แก้อะไร → ปุ่ม disabled → ไม่เกิดแถวซ้ำ ✅
+  - log 205 วันนี้ → promote เป็น `personalOneRMs.squat = 205` ✅
+  - backdate 180 (01/05) → **squat ยังเป็น 205** ✅
+  - ลบ entry → **squat ยังเป็น 205** (ไม่ rewind) ✅
+  - Logger: placeholder = `7` (targetRpe), `step 0.5 / min 6 / max 10 / inputMode decimal`, ค่าเริ่มต้นว่าง ✅
+  - ติ๊กเซ็ตโดยไม่กรอก RPE → ช่องคงสีกลาง ✅ · พิมพ์ `8.5` แล้วลบ → `rpe` **หายจาก object ไม่กลายเป็น 0** ✅
+  - ความกว้าง KG ที่ 390px: cell 88px / content `102.5` = 86px → **ไม่ตัด** ✅
+  - `FinishReview` โชว์ `@9` ✅
+  - Dashboard: 1 จุด/ท่า → การ์ด**ซ่อน** ✅ · squat 3 จุด → การ์ดโผล่ + มีเส้น + กดไป `/profile` ✅
+  - empty state / จุดเดียว / estimate-only (เส้นประอย่างเดียว) ครบ ✅ (ทดสอบผ่าน hook `window.__store` ชั่วคราวใน
+    `main.tsx` — **ถอดออกแล้ว**)
+  - light theme: เส้น + gridline + label อ่านออก ✅
+- **cloud e2e หลังรัน SQL 2k — ผ่านครบ**:
+  - write → `POST 201` ขึ้น `one_rm_records` ทันที คิวเหลือ 0 ✅
+  - **sign out → sign in**: `clearMetrics` ล้าง `oneRMHistory` เกลี้ยง แล้วดึงกลับจาก cloud ครบ +
+    `personalOneRMs.squat` = แถวล่าสุด (207.5) ตาม invariant ✅
+  - **offline → online**: กด Save ตอน offline → op เข้าคิว 2 ตัว → `dispatchEvent('online')` →
+    flush หมด → ยืนยันด้วยการอ่าน cloud ตรง ๆ ว่าค่า 213 ขึ้นจริง ✅
+  - **RLS isolation**: login เป็น `athlete.b` แล้ว `select * from one_rm_records` ได้ **0 แถว** ✅
+  - cleanup: ลบแถวทดสอบทั้ง 4 + restore `personal_one_rms` ของ athlete.a กลับเป็น 200/120/220 ·
+    ยืนยัน athlete.b ไม่มีแถวหลงเหลือ (พิสูจน์ว่า entry `userId: null` ไม่ได้ไหลข้ามบัญชีในรอบนี้)
+- ⚠️ **สังเกตจาก e2e offline**: `syncOneRM` เข้าคิวด้วย `userId: null` เพราะ
+  `supabase.auth.getUser()` ตอน offline คืน `{user: null}` (พร้อม console error `Failed to fetch`)
+  ไม่ได้ throw · นี่คือข้อ (b) ใน "sync data-loss 4 ตัว" ที่จดไว้แล้ว (`log.md` งานค้าง) —
+  op ใหม่ของรอบนี้ไปอยู่บนพื้นผิวเดียวกัน **ไม่ได้ทำให้แย่ลง** แต่ก็ยังไม่ได้แก้
+- **หลังย้ายเป็นหน้า `/one-rm` เทสต์ซ้ำ ผ่านหมด**: Profile ไม่เหลือกราฟ · การ์ดปุ่มกดเข้าหน้าใหม่ได้ ·
+  log test จากหน้าใหม่ → กราฟ + ประวัติขึ้น · `Edit current →` เปิดชีต 3 ช่องได้ · back กลับ `/profile` ·
+  การ์ด Dashboard เด้งไป `/one-rm` · light theme อ่านออก · 0 console errors
+- ⚠️ **เจอ quirk ของ `.scr-header`**: มัน `justify-content: space-between` อยู่แล้วใน `index.css:121`
+  การใส่ inline `display:flex` ทับไม่ได้ override ตัวนี้ → title ถูกดันไปชิดขวาห่างจากปุ่ม back
+  **`RunsPage` ก็เป็นแบบเดียวกัน** (วัดได้ `h1` อยู่ที่ x=234 แทนที่จะเป็น 20) — หน้าใหม่ใส่
+  `justifyContent: 'flex-start'` แก้แล้ว แต่ **ไม่ได้แตะ RunsPage** (นอก scope ที่ผู้ใช้สั่ง)
+- ⚠️ **บทเรียนตอนทำ cleanup**: อย่าเปิด 2 บัญชีใน browser context เดียวกัน — Supabase session
+  อยู่ใน localStorage ต่อ origin การ login athlete.b ทับ session ของ athlete.a ทั้ง context
+  ทำให้ `delete().eq('user_id', ...)` ไปลงบัญชีผิด (รอบแรกรายงาน "0 rows left" ทั้งที่ยังเหลือ 4 แถว)
+  → ต้องแยก `browser.newContext()` ต่อบัญชี
+
+### ไม่ทำรอบนี้
+
+- toggle `MANUAL / ALL` ในรายการประวัติ (ตอนนี้โชว์เฉพาะ manual — แถวที่ทุกอันเขียน "MANUAL" ไม่ให้ข้อมูลอะไร
+  และ estimate ~120 แถวคือ noise; ถ้าจะทำให้แทรกเฉพาะ **estimated PR**)
+- แก้ UTC-today อีก 3 จุด (`ImportProgramSheet:59`, `ProgramSetupSheet:54`, `RunsPage:13`) —
+  `todayYMD()` มีแล้ว เหลือแค่เปลี่ยนที่เรียก
+- ปิดช่อง `with check` ของ `body_metrics` / `runs` (policy `for all using(...)` ไม่คุม INSERT) — 🟡 แยกรอบ
+- `coachApi.getAthleteOneRMs()` + กราฟในหน้าโค้ช — policy พร้อมแล้วใน 2k
+- ยุบ 6-week volume bars ของ `AthleteDetailPage` เข้า `MiniBars` (normalization คนละสูตร + มี `isCurrent`)
+- เปลี่ยน `DashboardPage.tsx:108-110` ให้ใช้ `SBD_IDS` แทน string literal
+- edit-in-place ของ entry (ลบแล้วเพิ่มใหม่ เหมือน Runs)
+- แก้ `.scr-header` ของ `RunsPage` ให้ title ชิดซ้าย (quirk เดียวกับที่แก้ในหน้า `/one-rm`)
 
 ---
 
