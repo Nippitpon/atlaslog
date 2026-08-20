@@ -101,6 +101,9 @@ export function FinishReview({ workout, now, onConfirm, onCancel }: FinishReview
                           <span style={{ color: 'var(--muted)', margin: '0 4px' }}>×</span>
                           <span>{s.r}</span>
                           <span style={{ fontSize: 9, color: 'var(--muted)', marginLeft: 1 }}>reps</span>
+                          {s.rpe != null && (
+                            <span style={{ fontSize: 9, color: 'var(--muted)', marginLeft: 4 }}>@{s.rpe}</span>
+                          )}
                         </div>
                       </div>
                     ))}

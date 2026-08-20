@@ -330,9 +330,11 @@ body {
 
 .set-row {
   display: grid;
-  grid-template-columns: 36px 1fr 1fr 60px;
+  grid-template-columns: 30px 1fr 1fr 56px 56px;
   gap: 8px;
-  align-items: center;
+  /* Bottom-aligned: the "prev" hint makes the KG/REPS cells taller than the
+     56px check button, so centring left the button sitting low. */
+  align-items: end;
   padding: 8px 0;
 }
 .set-row .set-num {
@@ -341,12 +343,24 @@ body {
   font-size: 18px;
   text-align: center;
   color: var(--text-2);
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .set-row.complete .set-num { color: var(--accent); }
 .set-row.complete .input-num {
   background: rgba(212, 255, 58, 0.08);
   border-color: rgba(212, 255, 58, 0.3);
   color: var(--text);
+}
+
+/* RPE is optional. An empty box tinted lime by .complete would read as
+   "0 recorded" — keep it neutral until something is actually typed. */
+.set-row .input-rpe::placeholder { color: var(--muted-2); }
+.set-row.complete .input-rpe:placeholder-shown {
+  background: var(--surface-2);
+  border-color: var(--border);
 }
 
 .check-btn {

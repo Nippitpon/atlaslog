@@ -10,7 +10,7 @@ import { EmptyWorkout } from './EmptyWorkout.js'
 import {
   IconX, IconCheck, IconPlus, IconChevronLeft, IconChevronRight, IconSwap, IconGrip,
 } from '../../components/icons/index.js'
-import type { Workout } from '@atlaslog/shared'
+import type { Workout, WorkoutSet } from '@atlaslog/shared'
 
 export function LoggerPage() {
   const navigate = useNavigate()
@@ -43,7 +43,7 @@ export function LoggerPage() {
   const volume = workout.exercises.reduce((s, e) =>
     s + e.sets.filter(x => x.done).reduce((ss, st) => ss + (st.w * st.r), 0), 0)
 
-  const updateSet = (setIdx: number, patch: Partial<{ w: number; r: number; done: boolean }>) => {
+  const updateSet = (setIdx: number, patch: Partial<Pick<WorkoutSet, 'w' | 'r' | 'rpe' | 'done'>>) => {
     // Set day to in_progress on first checked set
     if (patch.done === true) {
       const noSetsDoneYet = workout.exercises.every(e => e.sets.every(s => !s.done))
@@ -203,10 +203,11 @@ export function LoggerPage() {
       </div>
 
       <div style={{ padding: '0 20px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 1fr 60px', gap: 8, padding: '4px 0 8px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '30px 1fr 1fr 56px 56px', gap: 8, padding: '4px 0 8px' }}>
           <div className="t-eyebrow" style={{ textAlign: 'center', fontSize: 9 }}>SET</div>
           <div className="t-eyebrow" style={{ textAlign: 'center', fontSize: 9 }}>KG</div>
           <div className="t-eyebrow" style={{ textAlign: 'center', fontSize: 9 }}>REPS</div>
+          <div className="t-eyebrow" style={{ textAlign: 'center', fontSize: 9 }}>RPE</div>
           <div className="t-eyebrow" style={{ textAlign: 'center', fontSize: 9 }}>✓</div>
         </div>
 
@@ -243,6 +244,27 @@ export function LoggerPage() {
                   placeholder={prev ? String(prev.r) : '0'}
                   onChange={e => updateSet(i, { r: Number(e.target.value) || 0 })}
                   onFocus={e => e.target.select()}
+                />
+              </div>
+              <div>
+                {prev && (
+                  <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted-2)', textAlign: 'center', marginBottom: 2 }}>
+                    {prev.rpe != null ? `@${prev.rpe}` : ' '}
+                  </div>
+                )}
+                {/* targetRpe is only a placeholder, never a value: prefilling it
+                    would fabricate a "felt" RPE the lifter never reported. */}
+                <input
+                  className="input-num input-rpe tnum"
+                  type="number" inputMode="decimal" step="0.5" min={6} max={10}
+                  value={s.rpe ?? ''}
+                  placeholder={cur.targetRpe != null ? String(cur.targetRpe) : '—'}
+                  onChange={e => {
+                    const raw = e.target.value
+                    updateSet(i, { rpe: raw === '' ? undefined : Number(raw) })
+                  }}
+                  onFocus={e => e.target.select()}
+                  style={{ fontSize: 18 }}
                 />
               </div>
               <div>
