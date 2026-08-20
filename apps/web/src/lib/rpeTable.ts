@@ -17,7 +17,8 @@ const RPE_TABLE: number[][] = [
   [38.4, 44.2, 51.2, 56.0, 60.5, 69.4, 71.4, 72.3, 85.0],  // 10 reps
 ]
 
-function getRpePct(reps: number, rpe: number): number {
+// Exported so e1RM can invert it (weight → 1RM) without duplicating the table.
+export function getRpePct(reps: number, rpe: number): number {
   const repsIdx = Math.min(Math.max(reps, 1), 10) - 1
   const rpeIdx = RPE_COLS.findIndex(r => Math.abs(r - rpe) < 0.01)
   if (rpeIdx === -1) {

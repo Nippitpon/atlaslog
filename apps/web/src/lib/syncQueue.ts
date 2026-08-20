@@ -1,4 +1,4 @@
-import type { Session, StructuredProgram, ProgramStateSnapshot, BodyMetricEntry, RunEntry, Exercise } from '@atlaslog/shared'
+import type { Session, StructuredProgram, ProgramStateSnapshot, BodyMetricEntry, RunEntry, Exercise, OneRMEntry } from '@atlaslog/shared'
 import { supabase } from './supabase.js'
 import type { User } from '@supabase/supabase-js'
 
@@ -13,6 +13,8 @@ type SyncOp =
   | { kind: 'body-metric-delete'; payload: { id: string } }
   | { kind: 'run-upsert'; payload: RunEntry }
   | { kind: 'run-delete'; payload: { id: string } }
+  | { kind: 'one-rm-upsert'; payload: OneRMEntry }
+  | { kind: 'one-rm-delete'; payload: { id: string } }
   | { kind: 'exercise-upsert'; payload: Exercise }
   | { kind: 'exercise-delete'; payload: { id: string } }
 
@@ -119,6 +121,20 @@ async function runOp(op: SyncOp, userId: string): Promise<void> {
   } else if (op.kind === 'run-delete') {
     const { error } = await supabase.from('runs').delete().eq('id', op.payload.id)
     if (error) throw error
+  } else if (op.kind === 'one-rm-upsert') {
+    const { error } = await supabase.from('one_rm_records').upsert({
+      id: op.payload.id,
+      user_id: userId,
+      date: op.payload.date,
+      lift: op.payload.lift,
+      weight_kg: op.payload.weightKg,
+      source: op.payload.source ?? 'manual',
+      note: op.payload.note ?? null,
+    })
+    if (error) throw error
+  } else if (op.kind === 'one-rm-delete') {
+    const { error } = await supabase.from('one_rm_records').delete().eq('id', op.payload.id)
+    if (error) throw error
   } else if (op.kind === 'exercise-upsert') {
     const { error } = await supabase.from('custom_exercises').upsert({
       id: op.payload.id,
@@ -191,6 +207,18 @@ export async function syncRunDelete(id: string) {
   const { data } = await supabase.auth.getUser()
   if (!data.user) return enqueue({ kind: 'run-delete', payload: { id } }, null)
   await attempt({ kind: 'run-delete', payload: { id } }, data.user.id)
+}
+
+export async function syncOneRM(entry: OneRMEntry) {
+  const { data } = await supabase.auth.getUser()
+  if (!data.user) return enqueue({ kind: 'one-rm-upsert', payload: entry }, null)
+  await attempt({ kind: 'one-rm-upsert', payload: entry }, data.user.id)
+}
+
+export async function syncOneRMDelete(id: string) {
+  const { data } = await supabase.auth.getUser()
+  if (!data.user) return enqueue({ kind: 'one-rm-delete', payload: { id } }, null)
+  await attempt({ kind: 'one-rm-delete', payload: { id } }, data.user.id)
 }
 
 export async function syncExercise(ex: Exercise) {

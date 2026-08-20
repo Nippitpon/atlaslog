@@ -50,6 +50,10 @@ export interface WorkoutSet {
   w: number
   r: number
   done: boolean
+  // RPE the lifter actually reported for this set (0.5 steps, 6–10). Distinct from
+  // WorkoutExercise.targetRpe, which is the prescription and is never updated.
+  // Optional forever — every set logged before this field existed has none.
+  rpe?: number
 }
 
 export interface WorkoutExercise {
@@ -92,6 +96,22 @@ export interface BodyMetricEntry {
   weightKg: number
   skeletalMuscleKg?: number
   bodyFatPct?: number
+}
+
+// Dated 1RM log — append-only history, one row per lift per test. Mirrors
+// BodyMetricEntry so both get the same store/sync/chart treatment.
+// Estimated 1RMs are derived from Session[] on the fly and are never stored
+// here — that's why 'estimated' is absent from OneRMSource.
+export type OneRMLift = keyof ProgramOneRMs      // 'squat' | 'bench' | 'deadlift'
+export type OneRMSource = 'manual' | 'test'
+
+export interface OneRMEntry {
+  id: string
+  date: string             // ISO timestamp
+  lift: OneRMLift
+  weightKg: number
+  source?: OneRMSource     // default 'manual'
+  note?: string
 }
 
 // User bio for BMR/TDEE. Weight/bodyFat come from latest BodyMetricEntry —

@@ -45,6 +45,21 @@ export function exerciseGifUrl(gifPath?: string): string | null {
   return MEDIA_HOST && gifPath ? `${MEDIA_HOST}/${gifPath}.gif` : null
 }
 
+// Today as 'YYYY-MM-DD' in the LOCAL calendar, for <input type="date"> defaults.
+// Not toISOString().split('T')[0] — that is UTC, so in UTC+7 it returns yesterday
+// until 07:00 local.
+export function todayYMD(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// 'YYYY-MM-DD' from a date picker → ISO timestamp anchored at LOCAL noon, so the
+// stored timestamptz renders as the same calendar day in any timezone.
+export function isoFromYMD(ymd: string): string {
+  const [y, m, d] = ymd.split('-').map(Number)
+  return new Date(y, m - 1, d, 12, 0, 0).toISOString()
+}
+
 // Absolute calendar date as DD/MM/YYYY — app-wide format. Year is C.E. (ค.ศ.).
 export function formatDMY(input: string | Date) {
   const d = input instanceof Date ? input : new Date(input)

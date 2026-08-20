@@ -10,6 +10,7 @@ import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { formatDate } from '../../lib/utils.js'
 import { calcEnergy, ACTIVITY } from '../../lib/energy.js'
 import { IconChevronLeft, IconPlus, IconCheck, IconX } from '../../components/icons/index.js'
+import { MiniBars } from '../../components/charts/MiniBars.js'
 
 // Volume per calendar week (Sun-start) for the last `weeks` weeks, oldest→newest.
 function weeklyBuckets(sessions: Session[], weeks = 6) {
@@ -102,7 +103,6 @@ export function AthleteDetailPage() {
   const trend = useMemo(() => sortedMetrics.slice(0, 10).reverse(), [sortedMetrics])
   const trendMin = trend.length ? Math.min(...trend.map(e => e.weightKg)) : 0
   const trendMax = trend.length ? Math.max(...trend.map(e => e.weightKg)) : 0
-  const trendRange = Math.max(1, trendMax - trendMin)
 
   if (!roleLoaded) return null
   if (!canCoach) return <Navigate to="/" replace />
@@ -221,16 +221,7 @@ export function AthleteDetailPage() {
                       <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 6 }}>
                         WEIGHT TREND · {trendMin}–{trendMax} kg
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 48 }}>
-                        {trend.map(e => {
-                          const h = 20 + ((e.weightKg - trendMin) / trendRange) * 80
-                          return (
-                            <div key={e.id} style={{ flex: 1, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', height: '100%' }}>
-                              <div style={{ width: '100%', maxWidth: 18, height: `${h}%`, background: 'var(--accent)', borderRadius: 3, opacity: 0.85 }} />
-                            </div>
-                          )
-                        })}
-                      </div>
+                      <MiniBars values={trend.map(e => e.weightKg)} height={48} />
                     </div>
                   )}
                 </>

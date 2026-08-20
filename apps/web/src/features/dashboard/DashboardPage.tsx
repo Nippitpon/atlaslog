@@ -12,7 +12,9 @@ import { weeklyVolume, getDayOfWeek, runTarget } from '../../lib/utils.js'
 import { latestWeightKg, weeklyCalories } from '../../lib/calories.js'
 import { CalorieRing } from './CalorieRing.js'
 import { pickCurrentProgramId } from '../../lib/programStatus.js'
-import { IconDumbbell, IconSearch, IconCheck, IconBell, IconRun, IconUsers, IconX, IconPlay } from '../../components/icons/index.js'
+import { IconDumbbell, IconSearch, IconCheck, IconBell, IconRun, IconUsers, IconX, IconPlay, IconTrendingUp } from '../../components/icons/index.js'
+import { OneRMSparkline } from '../../components/charts/OneRMSparkline.js'
+import { buildLiftSeries } from '../../lib/oneRM.js'
 
 const DAY_SHORT = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 
@@ -54,7 +56,7 @@ const PHASE_COLOR: Record<string, string> = {
 
 export function DashboardPage() {
   const navigate = useNavigate()
-  const { history, personalOneRMs, bodyMetrics, runs, workout, startWorkout } = useAppStore()
+  const { history, personalOneRMs, bodyMetrics, runs, workout, startWorkout, oneRMHistory } = useAppStore()
   const { configs, getDayStatus, getDayLayout, customPrograms, progress, programMeta, setProgramPaused } = useProgramStore()
   const { notifications, refreshNotifications } = useAuthStore()
 
@@ -113,6 +115,11 @@ export function DashboardPage() {
 
     return { bestSquat, bestBench, bestDeadlift, total: bestSquat + bestBench + bestDeadlift }
   }, [history])
+
+  const liftSeries = useMemo(() => buildLiftSeries(history, oneRMHistory), [history, oneRMHistory])
+  // A line needs 2+ points on the SAME lift — counting across lifts would show an
+  // empty card for someone who logged one squat and one bench on the same day.
+  const hasOneRMTrend = liftSeries.some(s => s.manual.length >= 2)
 
   // The program the user is currently on: most recently set up / resumed, and
   // NOT skipped when paused — pausing must never silently promote another
@@ -424,6 +431,31 @@ export function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* 1RM progression — all-time, sits with the retrospective stats card above.
+          Renders nothing until there are 2+ logged tests. */}
+      {hasOneRMTrend && (
+        <div style={{ padding: '0 20px', marginBottom: 16 }}>
+          <button
+            onClick={() => navigate('/one-rm')}
+            style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box' }}
+          >
+            <div className="card card-tight" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                background: 'var(--surface-2)', border: '1px solid var(--border)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--accent)',
+              }}><IconTrendingUp size={16} /></div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>1RM PROGRESSION</div>
+                <OneRMSparkline series={liftSeries} />
+              </div>
+              <span className="t-mono" style={{ fontSize: 11, color: 'var(--accent)', flexShrink: 0 }}>VIEW →</span>
+            </div>
+          </button>
+        </div>
+      )}
 
       {/* Paused program — deliberately does NOT fall through to another program */}
       {currentProgram?.paused && (

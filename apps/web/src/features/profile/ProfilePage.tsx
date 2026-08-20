@@ -6,21 +6,16 @@ import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { calcEnergy, ACTIVITY, ACTIVITY_ORDER, suggestActivityFromDays } from '../../lib/energy.js'
-import { IconBolt, IconUsers, IconScale, IconX, IconBell } from '../../components/icons/index.js'
+import { IconBolt, IconUsers, IconScale, IconX, IconBell, IconTrendingUp } from '../../components/icons/index.js'
 import { DateField } from '../../components/DateField.js'
+import { MiniBars } from '../../components/charts/MiniBars.js'
 import { isPushSupported, isIosNeedsInstall, getPermission, isSubscribed, subscribeToPush, unsubscribeFromPush } from '../../lib/pushApi.js'
 
 const todayISO = new Date().toISOString().split('T')[0]
 
-const LIFTS: { key: 'squat' | 'bench' | 'deadlift'; label: string; short: string }[] = [
-  { key: 'squat',    label: 'Squat',    short: 'S' },
-  { key: 'bench',    label: 'Bench',    short: 'B' },
-  { key: 'deadlift', label: 'Deadlift', short: 'D' },
-]
-
 export function ProfilePage() {
   const navigate = useNavigate()
-  const { history, theme, setTheme, personalOneRMs, setPersonalOneRMs, clearHistory, bodyMetrics, addBodyMetric, clearMetrics, bio, setBio } = useAppStore()
+  const { history, theme, setTheme, personalOneRMs, clearHistory, bodyMetrics, addBodyMetric, clearMetrics, bio, setBio, oneRMHistory } = useAppStore()
   const { clearCustomPrograms, setProgramState, configs, customPrograms } = useProgramStore()
   const { user, isAdmin, isCoach, signOut } = useAuthStore()
 
@@ -61,21 +56,10 @@ export function ProfilePage() {
     setPushBusy(false)
   }
 
-  const [draft, setDraft] = useState(personalOneRMs)
-  const [saved, setSaved] = useState(false)
-  const [show1RM, setShow1RM] = useState(false)
   const [showVer, setShowVer] = useState(false)
 
-  const handleSave = () => {
-    setPersonalOneRMs(draft)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 1500)
-  }
-
-  const hasChanges =
-    draft.squat !== personalOneRMs.squat ||
-    draft.bench !== personalOneRMs.bench ||
-    draft.deadlift !== personalOneRMs.deadlift
+  const sbdTotal = personalOneRMs.squat + personalOneRMs.bench + personalOneRMs.deadlift
+  const hasAnyOneRM = oneRMHistory.length > 0 || sbdTotal > 0
 
   // Body composition
   const sortedMetrics = useMemo(
@@ -106,7 +90,6 @@ export function ProfilePage() {
   const trend = useMemo(() => sortedMetrics.slice(0, 10).reverse(), [sortedMetrics])
   const trendMin = Math.min(...trend.map(e => e.weightKg))
   const trendMax = Math.max(...trend.map(e => e.weightKg))
-  const trendRange = Math.max(1, trendMax - trendMin)
 
   // Bio & Energy (BMR / TDEE)
   const energy = useMemo(() => calcEnergy(bio, latestBody), [bio, latestBody])
@@ -225,6 +208,36 @@ export function ProfilePage() {
         </div>
       </div>
 
+      {/* 1RM — menu button → dedicated page (chart + history live there, not here) */}
+      <div style={{ padding: '0 20px 20px' }}>
+        <button
+          className="card card-tight"
+          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}
+          onClick={() => navigate('/one-rm')}
+        >
+          <div style={{
+            width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+            background: 'var(--surface-2)', border: '1px solid var(--border)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--accent)',
+          }}><IconTrendingUp size={16} /></div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 15 }}>
+              Personal 1RM
+            </div>
+            {hasAnyOneRM && (
+              <div className="t-mono tnum" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                {personalOneRMs.squat}/{personalOneRMs.bench}/{personalOneRMs.deadlift} kg
+                {sbdTotal > 0 && <span style={{ marginLeft: 6 }}>· TOTAL {sbdTotal}</span>}
+              </div>
+            )}
+          </div>
+          <span className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>
+            {hasAnyOneRM ? 'PROGRESSION →' : 'Set →'}
+          </span>
+        </button>
+      </div>
+
       {/* Body composition */}
       <div style={{ padding: '0 20px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
@@ -260,16 +273,7 @@ export function ProfilePage() {
               <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 6 }}>
                 WEIGHT TREND · {trendMin}–{trendMax} kg
               </div>
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 56 }}>
-                {trend.map(e => {
-                  const h = 20 + ((e.weightKg - trendMin) / trendRange) * 80
-                  return (
-                    <div key={e.id} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
-                      <div style={{ width: '100%', maxWidth: 18, height: `${h}%`, background: 'var(--accent)', borderRadius: 3, opacity: 0.85 }} />
-                    </div>
-                  )
-                })}
-              </div>
+              <MiniBars values={trend.map(e => e.weightKg)} />
             </div>
           )}
 
@@ -354,30 +358,6 @@ export function ProfilePage() {
             {hasBio ? 'Edit bio' : 'Set up bio'}
           </button>
         </div>
-      </div>
-
-      {/* Personal 1RM — menu button → popup */}
-      <div style={{ padding: '0 20px 20px' }}>
-        <button
-          className="card card-tight"
-          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}
-          onClick={() => { setDraft(personalOneRMs); setShow1RM(true) }}
-        >
-          <div style={{
-            width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-            background: 'var(--surface-2)', border: '1px solid var(--border)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 11, color: 'var(--accent)',
-          }}>1RM</div>
-          <div style={{ flex: 1, fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 15 }}>
-            Personal 1RM
-          </div>
-          <span className="t-mono tnum" style={{ fontSize: 11, color: 'var(--muted)' }}>
-            {personalOneRMs.squat || personalOneRMs.bench || personalOneRMs.deadlift
-              ? `${personalOneRMs.squat}/${personalOneRMs.bench}/${personalOneRMs.deadlift} →`
-              : 'Set →'}
-          </span>
-        </button>
       </div>
 
       {/* Theme */}
@@ -470,52 +450,6 @@ export function ProfilePage() {
         )}
       </div>
 
-      {/* Personal 1RM popup */}
-      {show1RM && (
-        <div className="sheet-backdrop" onClick={() => setShow1RM(false)} style={{ zIndex: 100 }}>
-          <div className="sheet" onClick={e => e.stopPropagation()}>
-            <div className="sheet-handle" />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <h3 className="t-display" style={{ margin: 0, fontSize: 20 }}>Personal 1RM</h3>
-              <button className="btn-icon" onClick={() => setShow1RM(false)}><IconX size={18} /></button>
-            </div>
-            <p className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 16 }}>
-              ใช้คำนวณน้ำหนักในโปรแกรม Powerlifting อัตโนมัติ
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {LIFTS.map(({ key, label, short }) => (
-                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{
-                    width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-                    background: 'var(--surface-2)', border: '1px solid var(--border)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 11, color: 'var(--accent)',
-                  }}>{short}</div>
-                  <div style={{ flex: 1, fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 15 }}>{label}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <input className="input-num tnum" type="number" inputMode="decimal" min={0} max={1000}
-                      value={draft[key] || ''} placeholder="0"
-                      onChange={e => setDraft(d => ({ ...d, [key]: Math.max(0, Number(e.target.value) || 0) }))}
-                      onFocus={e => e.target.select()}
-                      style={{ width: 116, textAlign: 'right', paddingRight: 12 }} />
-                    <span className="t-mono" style={{ fontSize: 11, color: 'var(--muted)' }}>kg</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button
-              className="btn btn-primary"
-              style={{ width: '100%', marginTop: 18, height: 44, fontSize: 13,
-                opacity: !hasChanges && !saved ? 0.4 : 1,
-                background: saved ? '#4ade80' : undefined, color: saved ? '#000' : undefined }}
-              disabled={!hasChanges && !saved}
-              onClick={handleSave}
-            >
-              {saved ? 'Saved!' : 'Save 1RM'}
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Bio & Energy popup */}
       {showBio && (

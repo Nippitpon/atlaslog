@@ -4,6 +4,7 @@ import type { AppNotification } from '@atlaslog/shared'
 import { supabase } from '../lib/supabase.js'
 import { flushQueue } from '../lib/syncQueue.js'
 import { fetchNotifications } from '../lib/notificationsApi.js'
+import { latestOneRMs } from '../lib/oneRM.js'
 import { useAppStore } from './useAppStore.js'
 import { useProgramStore } from './useProgramStore.js'
 
@@ -58,12 +59,13 @@ async function fetchAllExercises() {
 }
 
 async function loadUserData(userId: string) {
-  const [sessionsRes, programsRes, stateRes, bodyRes, runsRes, exRes, dbExRes] = await Promise.all([
+  const [sessionsRes, programsRes, stateRes, bodyRes, runsRes, oneRmRes, exRes, dbExRes] = await Promise.all([
     supabase.from('sessions').select('*').eq('user_id', userId).order('date', { ascending: false }),
     supabase.from('custom_programs').select('*').eq('user_id', userId).order('id', { ascending: true }),
     supabase.from('program_state').select('*').eq('user_id', userId).maybeSingle(),
     supabase.from('body_metrics').select('*').eq('user_id', userId).order('date', { ascending: false }),
     supabase.from('runs').select('*').eq('user_id', userId).order('date', { ascending: false }),
+    supabase.from('one_rm_records').select('*').eq('user_id', userId).order('date', { ascending: false }),
     supabase.from('custom_exercises').select('*').order('created_at', { ascending: true }),
     // Library dataset (Phase 6): paginated (PostgREST caps at 1000 rows/request).
     fetchAllExercises(),
@@ -124,6 +126,27 @@ async function loadUserData(userId: string) {
         note: r.note ?? undefined,
       }))
     )
+  }
+  if (oneRmRes.data) {
+    useAppStore.getState().setOneRMHistory(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (oneRmRes.data as any[]).map(r => ({
+        id: r.id,
+        date: r.date,
+        lift: r.lift,
+        weightKg: r.weight_kg,
+        source: r.source ?? undefined,
+        note: r.note ?? undefined,
+      }))
+    )
+    // The dated log outranks the undated program_state blob. setState (not the
+    // action) so this can't bounce back out through syncSettings().
+    const hist = useAppStore.getState().oneRMHistory
+    if (hist.length) {
+      useAppStore.setState({
+        personalOneRMs: latestOneRMs(hist, useAppStore.getState().personalOneRMs),
+      })
+    }
   }
   if (exRes.data) {
     useAppStore.getState().setCustomExercises(

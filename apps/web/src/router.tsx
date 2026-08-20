@@ -10,6 +10,7 @@ import { HistoryPage } from './features/history/HistoryPage.js'
 import { LibraryPage } from './features/library/LibraryPage.js'
 import { ExerciseDetailPage } from './features/library/ExerciseDetailPage.js'
 import { ProfilePage } from './features/profile/ProfilePage.js'
+import { OneRMPage } from './features/profile/OneRMPage.js'
 import { RunsPage } from './features/runs/RunsPage.js'
 import { AdminPage } from './features/admin/AdminPage.js'
 import { CoachPage } from './features/coach/CoachPage.js'
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([
       { path: 'library',                                     element: <LibraryPage /> },
       { path: 'library/:exerciseId',                         element: <ExerciseDetailPage /> },
       { path: 'profile',                                     element: <ProfilePage /> },
+      { path: 'one-rm',                                      element: <OneRMPage /> },
       { path: 'admin',                                       element: <AdminPage /> },
       { path: 'coach',                                       element: <CoachPage /> },
       { path: 'coach/:athleteId',                            element: <AthleteDetailPage /> },
