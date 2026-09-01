@@ -11,7 +11,7 @@ import { resolveDayExercises } from '../../lib/dayLayout.js'
 import { weeklyVolume, getDayOfWeek, runTarget } from '../../lib/utils.js'
 import { latestWeightKg, weeklyCalories } from '../../lib/calories.js'
 import { CalorieRing } from './CalorieRing.js'
-import { pickCurrentProgramId } from '../../lib/programStatus.js'
+import { pickCurrentProgramId, pickActiveWeek } from '../../lib/programStatus.js'
 import { IconDumbbell, IconSearch, IconCheck, IconBell, IconRun, IconUsers, IconX, IconPlay, IconTrendingUp } from '../../components/icons/index.js'
 import { OneRMSparkline } from '../../components/charts/OneRMSparkline.js'
 import { buildLiftSeries } from '../../lib/oneRM.js'
@@ -133,49 +133,18 @@ export function DashboardPage() {
     return { program, paused: !!programMeta[id]?.paused }
   }, [configs, customPrograms, programMeta, progress, history])
 
-  // Current week of the current program (null while it's paused).
-  // Driven by what's actually FINISHED, not the calendar: this used to start at
-  // the calendar week and only ever scan forward, so a program set up 5 weeks ago
-  // but never trained jumped straight to week 6 and skipped its accumulation
-  // block. The calendar now only says whether you're behind schedule.
+  // The week Home shows (null while paused): the calendar week, clamped so it can
+  // never run past a week the user has actually reached — a program set up 5 weeks
+  // ago and never trained still shows W1 (log.md round 38) — and never back to a
+  // week already finished. Weeks left unfinished behind it come back as leftovers.
   const activeProgramInfo = useMemo(() => {
-    const { getWeekStatus } = useProgramStore.getState()
     if (!currentProgram || currentProgram.paused) return null
-
     const program = currentProgram.program
-    const programId = program.id
-    const config = configs[programId]
+    const config = configs[program.id]
     if (!config) return null
-
-    const doneWeeks = program.weeks.filter(w =>
-      getWeekStatus(programId, w.id, w.days.length) === 'done'
-    ).length
-
-    // First week that isn't finished — never points at a week you already did.
-    let displayWeekNum = program.totalWeeks
-    for (let w = 1; w <= program.totalWeeks; w++) {
-      const wk = program.weeks[w - 1]
-      if (!wk) break
-      if (getWeekStatus(programId, wk.id, wk.days.length) !== 'done') {
-        displayWeekNum = w
-        break
-      }
-    }
-
-    const currentWeek = program.weeks[displayWeekNum - 1]
-    if (!currentWeek) return null
-
-    // Where the plan says you should be by now, purely informational.
-    const today = new Date()
-    const start = new Date(config.startDate)
-    const diffDays = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-    const scheduledWeekNum = Math.min(Math.max(Math.floor(diffDays / 7) + 1, 1), program.totalWeeks)
-    const weeksBehind = scheduledWeekNum - displayWeekNum
-
-    const weekStatus = getWeekStatus(programId, currentWeek.id, currentWeek.days.length)
-    return { program, config, currentWeek, currentWeekNum: displayWeekNum, doneWeeks, weekStatus, weeksBehind }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- progress triggers recompute; getWeekStatus reads it internally via store.get()
-  }, [currentProgram, configs, progress])
+    const active = pickActiveWeek(program, progress, config, history)
+    return active && { program, config, ...active }
+  }, [currentProgram, configs, progress, history])
 
   // Today's scheduled training day (pure client, no push) — reminder banner.
   // `exercises` is the user's resolved list (saved order + edits), the same one
@@ -184,7 +153,7 @@ export function DashboardPage() {
     if (!activeProgramInfo) return null
     const todayShort = DAY_SHORT[new Date().getDay()]
     if (!todayShort) return null
-    const { program, currentWeek } = activeProgramInfo
+    const { program, week: currentWeek } = activeProgramInfo
     const day = currentWeek.days.find(d => d.dayOfWeek === todayShort)
     if (!day) return null
     if (getDayStatus(program.id, currentWeek.id, day.id) === 'done') return null
@@ -507,16 +476,17 @@ export function DashboardPage() {
 
       {/* Active program current-week card */}
       {activeProgramInfo && (() => {
-        const { program, currentWeek, currentWeekNum, doneWeeks, weeksBehind } = activeProgramInfo
+        const { program, week: currentWeek, weekNum: currentWeekNum, doneWeeks, weeksBehind, leftovers } = activeProgramInfo
         const phaseColor = PHASE_COLOR[currentWeek.phase] ?? 'var(--accent)'
         const pct = Math.round((doneWeeks / program.totalWeeks) * 100)
+        const oldest = leftovers[0]
         return (
           <div style={{ padding: '0 20px', marginBottom: 16 }}>
-            <button
-              style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box' }}
-              onClick={() => navigate(`/programs/${program.id}/week/${currentWeek.id}`)}
-            >
-              <div className="card card-tight" style={{ borderLeft: `3px solid ${phaseColor}`, paddingLeft: 14 }}>
+            <div className="card card-tight" style={{ borderLeft: `3px solid ${phaseColor}`, paddingLeft: 14 }}>
+              <button
+                style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box' }}
+                onClick={() => navigate(`/programs/${program.id}/week/${currentWeek.id}`)}
+              >
                 {/* Program header */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
                   <div>
@@ -600,8 +570,30 @@ export function DashboardPage() {
                 <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase' }}>
                   {doneWeeks}/{program.totalWeeks} weeks · {pct}%
                 </div>
-              </div>
-            </button>
+              </button>
+
+              {/* Unfinished days left behind — the card moved on, these didn't */}
+              {oldest && (
+                <button
+                  onClick={() => navigate(`/programs/${program.id}/week/${oldest.week.id}`)}
+                  style={{
+                    all: 'unset', cursor: 'pointer', boxSizing: 'border-box', width: '100%',
+                    display: 'flex', alignItems: 'center', gap: 6, minHeight: 28,
+                    marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)',
+                  }}
+                >
+                  <span className="t-mono" style={{ fontSize: 10, color: '#f59e0b' }}>
+                    ↩ W{oldest.weekNum} ยังค้าง {oldest.remaining} วัน
+                  </span>
+                  {leftovers.length > 1 && (
+                    <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
+                      · อีก {leftovers.length - 1} สัปดาห์
+                    </span>
+                  )}
+                  <span className="t-mono" style={{ fontSize: 10, color: 'var(--accent)', marginLeft: 'auto' }}>→</span>
+                </button>
+              )}
+            </div>
           </div>
         )
       })()}

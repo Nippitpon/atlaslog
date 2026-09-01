@@ -53,6 +53,13 @@ export function todayYMD(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+// 'YYYY-MM-DD' → LOCAL midnight. new Date('2026-08-18') is UTC midnight, which is
+// 07:00 in Bangkok, so week maths against a local `new Date()` rolls over at 07:00.
+export function dateFromYMD(ymd: string): Date {
+  const [y, m, d] = ymd.split('-').map(Number)
+  return new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1)
+}
+
 // 'YYYY-MM-DD' from a date picker → ISO timestamp anchored at LOCAL noon, so the
 // stored timestamptz renders as the same calendar day in any timezone.
 export function isoFromYMD(ymd: string): string {

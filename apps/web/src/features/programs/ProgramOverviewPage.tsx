@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import type { DayStatus } from '@atlaslog/shared'
+import type { DayStatus, StructuredProgram } from '@atlaslog/shared'
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
 import { IconChevronLeft, IconChevronRight, IconCheck, IconSettings, IconEdit, IconStar, IconPause, IconPlay } from '../../components/icons/index.js'
-import { getProgramStatus, PROGRAM_STATUS_STYLE } from '../../lib/programStatus.js'
+import { getProgramStatus, weekStatus, countDoneWeeks, PROGRAM_STATUS_STYLE } from '../../lib/programStatus.js'
 import { ProgramSetupSheet } from './ProgramSetupSheet.js'
 import { WeekDays } from './WeekDays.js'
-import { formatDMY } from '../../lib/utils.js'
+import { formatDMY, dateFromYMD } from '../../lib/utils.js'
 
 const STATUS_CONFIG: Record<DayStatus, { label: string; bg: string; border: string; color: string }> = {
   not_started: { label: 'Not started', bg: 'var(--surface-2)', border: 'var(--border)', color: 'var(--muted)' },
@@ -43,7 +43,7 @@ function StatusBadge({ status }: { status: DayStatus }) {
 export function ProgramOverviewPage() {
   const { programId } = useParams<{ programId: string }>()
   const navigate = useNavigate()
-  const { getWeekStatus, getConfig, customPrograms, progress, programMeta, toggleFavorite, setProgramPaused } = useProgramStore()
+  const { getConfig, customPrograms, progress, programMeta, toggleFavorite, setProgramPaused } = useProgramStore()
   const { isCoach, isAdmin } = useAuthStore()
   const [showSetup, setShowSetup] = useState(false)
 
@@ -206,20 +206,20 @@ export function ProgramOverviewPage() {
       )}
 
       {/* Progress summary bar */}
-      <ProgressSummary programId={program.id} totalWeeks={program.totalWeeks} />
+      <ProgressSummary program={program} />
 
       {/* Weeks list */}
       <div style={{ padding: '0 20px 24px' }}>
         <div className="t-eyebrow" style={{ marginBottom: 12 }}>WEEKS</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {program.weeks.map(week => {
-            const status = getWeekStatus(program.id, week.id, week.days.length)
+            const status = weekStatus(program.id, week, progress)
             const phaseColor = PHASE_COLOR[week.phase] ?? 'var(--muted)'
 
             // Compute date range if config set
             let weekDates: string | null = null
             if (config) {
-              const start = new Date(config.startDate)
+              const start = dateFromYMD(config.startDate)
               start.setDate(start.getDate() + (week.weekNumber - 1) * 7)
               const end = new Date(start)
               end.setDate(end.getDate() + 6)
@@ -286,13 +286,10 @@ export function ProgramOverviewPage() {
   )
 }
 
-function ProgressSummary({ programId, totalWeeks }: { programId: string; totalWeeks: number }) {
+function ProgressSummary({ program }: { program: StructuredProgram }) {
   const { progress } = useProgramStore()
-  const programProgress = progress[programId] ?? {}
-  const doneWeeks = Object.values(programProgress).filter(week =>
-    Object.values(week).length > 0 && Object.values(week).every(s => s === 'done')
-  ).length
-
+  const totalWeeks = program.totalWeeks
+  const doneWeeks = countDoneWeeks(program, progress)
   const pct = Math.round((doneWeeks / totalWeeks) * 100)
 
   return (

@@ -2,7 +2,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import type { DayStatus } from '@atlaslog/shared'
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
-import { formatDM } from '../../lib/utils.js'
+import { formatDM, dateFromYMD } from '../../lib/utils.js'
+import { weekStatus } from '../../lib/programStatus.js'
 import { IconChevronLeft, IconCheck, IconChevronRight } from '../../components/icons/index.js'
 import { WeekDays } from './WeekDays.js'
 
@@ -38,7 +39,7 @@ function StatusBadge({ status }: { status: DayStatus }) {
 export function WeekDetailPage() {
   const { programId, weekId } = useParams<{ programId: string; weekId: string }>()
   const navigate = useNavigate()
-  const { getWeekStatus, getConfig, customPrograms } = useProgramStore()
+  const { getConfig, customPrograms, progress } = useProgramStore()
 
   const program = [...STRUCTURED_PROGRAMS, ...customPrograms].find(p => p.id === programId)
   const week = program?.weeks.find(w => w.id === weekId)
@@ -49,7 +50,7 @@ export function WeekDetailPage() {
   }
 
   const config = getConfig(program.id)
-  const weekStatus = getWeekStatus(program.id, week.id, week.days.length)
+  const status = weekStatus(program.id, week, progress)
   const phaseColor = PHASE_COLOR[week.phase] ?? 'var(--muted)'
 
   return (
@@ -75,12 +76,12 @@ export function WeekDetailPage() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <StatusBadge status={weekStatus} />
+          <StatusBadge status={status} />
           <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
             {week.days.length} training days
           </span>
           {config && (() => {
-            const start = new Date(config.startDate)
+            const start = dateFromYMD(config.startDate)
             start.setDate(start.getDate() + (week.weekNumber - 1) * 7)
             const end = new Date(start)
             end.setDate(end.getDate() + 6)

@@ -1,19 +1,50 @@
 import type {
-  ProgramMeta, ProgramMetaState, ProgramProgressState, ProgramConfig,
-  Session, StructuredProgram,
+  DayStatus, ProgramMeta, ProgramMetaState, ProgramProgressState, ProgramConfig,
+  Session, StructuredProgram, StructuredWeek,
 } from '@atlaslog/shared'
+import { dateFromYMD } from './utils.js'
 
 export type ProgramStatus = 'not_setup' | 'active' | 'paused' | 'completed'
 
 // A week counts as done only when EVERY day in it is done. The Programs page
 // used to derive this from the recorded keys alone (`every(s => s === 'done')`),
 // which marks a 4-day week done once its first logged day is done.
+export function isWeekDone(
+  programId: string,
+  week: StructuredWeek,
+  progress: ProgramProgressState,
+): boolean {
+  const days = progress[programId]?.[week.id] ?? {}
+  return week.days.length > 0 && week.days.every(d => days[d.id] === 'done')
+}
+
+// Id-aware replacement for the store's old getWeekStatus, which compared a count
+// of recorded keys against week.days.length: progress can hold day ids from an
+// older shape of the program (edited, re-imported, or an old cloud snapshot), so
+// counting keys reports both false 'done' and permanently-stuck weeks.
+export function weekStatus(
+  programId: string,
+  week: StructuredWeek,
+  progress: ProgramProgressState,
+): DayStatus {
+  if (isWeekDone(programId, week, progress)) return 'done'
+  const days = progress[programId]?.[week.id] ?? {}
+  return week.days.some(d => days[d.id] === 'done' || days[d.id] === 'in_progress')
+    ? 'in_progress'
+    : 'not_started'
+}
+
+export function remainingDays(
+  programId: string,
+  week: StructuredWeek,
+  progress: ProgramProgressState,
+): number {
+  const days = progress[programId]?.[week.id] ?? {}
+  return week.days.filter(d => days[d.id] !== 'done').length
+}
+
 export function countDoneWeeks(program: StructuredProgram, progress: ProgramProgressState): number {
-  const byWeek = progress[program.id] ?? {}
-  return program.weeks.filter(w => {
-    const days = byWeek[w.id] ?? {}
-    return w.days.length > 0 && w.days.every(d => days[d.id] === 'done')
-  }).length
+  return program.weeks.filter(w => isWeekDone(program.id, w, progress)).length
 }
 
 export function hasStarted(program: StructuredProgram, progress: ProgramProgressState): boolean {
@@ -115,6 +146,109 @@ export function pickCurrentProgramId(
     if (found) return found.id
   }
   return candidates[0]!.id
+}
+
+// Where the plan's dates say you should be. Local midnight on both sides —
+// new Date('2026-08-18') is UTC, so comparing it to a local now shifts the
+// rollover to 07:00 in Bangkok (see utils.dateFromYMD).
+export function scheduledWeekNum(startDate: string, totalWeeks: number, now: Date): number {
+  const start = dateFromYMD(startDate)
+  if (Number.isNaN(start.getTime())) return 1
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const days = Math.round((today.getTime() - start.getTime()) / 86400000)
+  return Math.min(Math.max(Math.floor(days / 7) + 1, 1), Math.max(totalWeeks, 1))
+}
+
+// Training weeks run Mon–Sat (StructuredDay.dayOfWeek has no 'Sun'), so Sunday
+// belongs to the week that just ended — otherwise the card jumps on Sunday morning.
+function startOfTrainingWeek(now: Date): Date {
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  return d
+}
+
+// Highest week POSITION actually trained since `sinceMs`. Same composite-id parse
+// as lastPlayedAt. Every 'done' day has a session (useAppStore writes both on
+// finish), so this is the only signal that says which week you're really on.
+export function trainedWeekNumSince(
+  program: StructuredProgram,
+  history: Session[],
+  sinceMs: number,
+): number {
+  const posByWeekId = new Map(program.weeks.map((w, i) => [w.id, i + 1]))
+  let best = 0
+  for (const s of history) {
+    const [pid, weekId] = s.programId.split('/')
+    if (pid !== program.id || !weekId) continue
+    const t = Date.parse(s.date)
+    if (Number.isNaN(t) || t < sinceMs) continue
+    best = Math.max(best, posByWeekId.get(weekId) ?? 0)
+  }
+  return best
+}
+
+export interface ActiveWeek {
+  week: StructuredWeek
+  weekNum: number
+  scheduledWeekNum: number
+  weeksBehind: number
+  doneWeeks: number
+  leftovers: { week: StructuredWeek; weekNum: number; remaining: number }[]
+}
+
+// The week Home shows. Calendar-driven, but never past a week the user has
+// actually reached — a program set up 5 weeks ago and never trained still shows
+// W1 rather than jumping into its peaking block (log.md round 38). Weeks left
+// unfinished behind it come back as `leftovers` instead of pinning the card.
+export function pickActiveWeek(
+  program: StructuredProgram,
+  progress: ProgramProgressState,
+  config: ProgramConfig,
+  history: Session[],
+  now: Date = new Date(),
+): ActiveWeek | null {
+  const total = program.weeks.length
+  if (!total) return null
+
+  let firstUnfinished = total
+  for (let i = 0; i < total; i++) {
+    const w = program.weeks[i]!
+    // An empty week can never be done, so it must not pin the card forever.
+    if (w.days.length > 0 && !isWeekDone(program.id, w, progress)) {
+      firstUnfinished = i + 1
+      break
+    }
+  }
+
+  let lastTouched = 0
+  for (let i = 0; i < total; i++) {
+    if (weekStatus(program.id, program.weeks[i]!, progress) !== 'not_started') lastTouched = i + 1
+  }
+
+  // Trained this calendar week → that's the week you're on, and you only move up
+  // once it's finished. Otherwise the ceiling is one past whatever you've touched.
+  const trained = trainedWeekNumSince(program, history, startOfTrainingWeek(now).getTime())
+  const ceiling = trained > 0
+    ? trained + (isWeekDone(program.id, program.weeks[trained - 1]!, progress) ? 1 : 0)
+    : lastTouched + 1
+
+  const scheduled = scheduledWeekNum(config.startDate, total, now)
+  const weekNum = Math.min(Math.max(firstUnfinished, Math.min(scheduled, ceiling)), total)
+  const week = program.weeks[weekNum - 1]
+  if (!week) return null
+
+  const leftovers = program.weeks.slice(0, weekNum - 1)
+    .map((w, i) => ({ week: w, weekNum: i + 1, remaining: remainingDays(program.id, w, progress) }))
+    .filter(x => x.remaining > 0)
+
+  return {
+    week,
+    weekNum,
+    scheduledWeekNum: scheduled,
+    weeksBehind: scheduled - weekNum,
+    doneWeeks: countDoneWeeks(program, progress),
+    leftovers,
+  }
 }
 
 export const PROGRAM_STATUS_STYLE: Record<

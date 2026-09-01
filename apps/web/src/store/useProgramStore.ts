@@ -24,7 +24,6 @@ interface ProgramStore {
   programMeta: ProgramMetaState
 
   getDayStatus: (programId: string, weekId: string, dayId: string) => DayStatus
-  getWeekStatus: (programId: string, weekId: string, dayCount: number) => DayStatus
   setDayStatus: (programId: string, weekId: string, dayId: string, status: DayStatus) => void
   resetProgram: (programId: string) => void
 
@@ -73,16 +72,6 @@ export const useProgramStore = create<ProgramStore>()(
 
       getDayStatus: (programId, weekId, dayId) => {
         return get().progress[programId]?.[weekId]?.[dayId] ?? 'not_started'
-      },
-
-      getWeekStatus: (programId, weekId, dayCount) => {
-        const weekProgress = get().progress[programId]?.[weekId] ?? {}
-        const statuses = Object.values(weekProgress)
-        const doneCount = statuses.filter(s => s === 'done').length
-        const inProgressCount = statuses.filter(s => s === 'in_progress').length
-        if (doneCount === dayCount) return 'done'
-        if (doneCount > 0 || inProgressCount > 0) return 'in_progress'
-        return 'not_started'
       },
 
       setDayStatus: (programId, weekId, dayId, status) => {
