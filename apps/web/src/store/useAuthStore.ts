@@ -124,6 +124,7 @@ async function loadUserData(userId: string) {
         distanceKm: r.distance_km,
         durationMin: r.duration_min,
         note: r.note ?? undefined,
+        dayRef: r.day_ref ?? undefined,
       }))
     )
   }

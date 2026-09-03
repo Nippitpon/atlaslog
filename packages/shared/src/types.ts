@@ -141,6 +141,10 @@ export interface RunEntry {
   distanceKm: number
   durationMin: number
   note?: string
+  // Composite `programId/weekId/dayId`, same convention as Session.programId
+  // (dayToProgram). Present when the run was logged from a program day — that
+  // link, not the date, is what marks the day done.
+  dayRef?: string
 }
 
 // ─── Structured (Hierarchical) Program Types ──────────────────────────────────

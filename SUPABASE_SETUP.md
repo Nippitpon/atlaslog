@@ -147,11 +147,20 @@ create table public.runs (
   distance_km numeric not null,
   duration_min numeric not null,
   note text,
+  -- `programId/weekId/dayId` of the program day this run was logged for (null = free run)
+  day_ref text,
   created_at timestamptz default now()
 );
 alter table public.runs enable row level security;
 create policy "own runs" on public.runs for all using (auth.uid() = user_id);
 ```
+
+> **ถ้าตาราง `runs` สร้างไปแล้วก่อน 2026-09-03** ต้องเพิ่มคอลัมน์ `day_ref` ก่อน deploy
+> ไม่งั้น `run-upsert` จะ error แล้วค้างคิว `atlas:v1:sync-queue`:
+>
+> ```sql
+> alter table public.runs add column if not exists day_ref text;
+> ```
 
 ## 2e. Coach consent — pending status (2026-06-23)
 

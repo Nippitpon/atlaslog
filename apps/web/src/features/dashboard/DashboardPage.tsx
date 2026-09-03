@@ -11,7 +11,7 @@ import { resolveDayExercises } from '../../lib/dayLayout.js'
 import { weeklyVolume, getDayOfWeek, runTarget } from '../../lib/utils.js'
 import { latestWeightKg, weeklyCalories } from '../../lib/calories.js'
 import { CalorieRing } from './CalorieRing.js'
-import { pickCurrentProgramId, pickActiveWeek } from '../../lib/programStatus.js'
+import { pickCurrentProgramId, pickActiveWeek, dayRef as buildDayRef } from '../../lib/programStatus.js'
 import { IconDumbbell, IconSearch, IconCheck, IconBell, IconRun, IconUsers, IconX, IconPlay, IconTrendingUp } from '../../components/icons/index.js'
 import { OneRMSparkline } from '../../components/charts/OneRMSparkline.js'
 import { buildLiftSeries } from '../../lib/oneRM.js'
@@ -216,6 +216,8 @@ export function DashboardPage() {
         const hasLifts = exercises.length > 0
         const calcRMs = resolveCalcRMs(program, configs[program.id], personalOneRMs)
         const weekHref = `/programs/${program.id}/week/${currentWeek.id}`
+        // Carry the day into /runs so logging there closes this day out
+        const runHref = `/runs?day=${encodeURIComponent(buildDayRef(program.id, currentWeek.id, day.id))}`
 
         // Running-only day → the whole card opens the /runs logger
         if (!hasLifts && runs.length > 0) {
@@ -224,7 +226,7 @@ export function DashboardPage() {
             <div style={{ padding: '0 20px', marginBottom: 16 }}>
               <button
                 style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box' }}
-                onClick={() => navigate('/runs')}
+                onClick={() => navigate(runHref)}
               >
                 <div className="card card-tight" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ fontSize: 22 }}>🏃</div>
@@ -307,7 +309,7 @@ export function DashboardPage() {
               {/* Running on a lifting day → separate tap target to /runs */}
               {runs.length > 0 && (
                 <button
-                  onClick={() => navigate('/runs')}
+                  onClick={() => navigate(runHref)}
                   style={{
                     all: 'unset', cursor: 'pointer', boxSizing: 'border-box', width: '100%',
                     display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, padding: '8px 10px',

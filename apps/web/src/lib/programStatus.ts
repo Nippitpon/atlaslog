@@ -1,6 +1,6 @@
 import type {
   DayStatus, ProgramMeta, ProgramMetaState, ProgramProgressState, ProgramConfig,
-  Session, StructuredProgram, StructuredWeek,
+  Session, StructuredDay, StructuredProgram, StructuredWeek,
 } from '@atlaslog/shared'
 import { dateFromYMD } from './utils.js'
 
@@ -250,6 +250,42 @@ export function pickActiveWeek(
     leftovers,
   }
 }
+
+export interface DayRefTarget {
+  program: StructuredProgram
+  week: StructuredWeek
+  weekNum: number
+  day: StructuredDay
+}
+
+// `programId/weekId/dayId` — the same composite dayToProgram() stamps onto a
+// Workout/Session, reused so a logged run can point back at the day it was
+// prescribed for. Ids are opaque, so callers going into a URL must encode it.
+export function dayRef(programId: string, weekId: string, dayId: string): string {
+  return `${programId}/${weekId}/${dayId}`
+}
+
+// Resolve a dayRef against the programs the user actually has. Returns null for
+// a malformed ref and for one whose ids no longer exist — a program can be
+// deleted, re-imported, or edited (updateCustomProgram prunes day ids), and a
+// run stored before that must not resurrect a day that is gone.
+export function resolveDayRef(
+  ref: string | undefined | null,
+  programs: StructuredProgram[],
+): DayRefTarget | null {
+  const parts = (ref ?? '').split('/')
+  if (parts.length !== 3) return null
+  const [programId, weekId, dayId] = parts
+  const program = programs.find(p => p.id === programId)
+  if (!program) return null
+  const weekIdx = program.weeks.findIndex(w => w.id === weekId)
+  if (weekIdx < 0) return null
+  const week = program.weeks[weekIdx]!
+  const day = week.days.find(d => d.id === dayId)
+  if (!day) return null
+  return { program, week, weekNum: weekIdx + 1, day }
+}
+
 
 export const PROGRAM_STATUS_STYLE: Record<
   Exclude<ProgramStatus, 'not_setup'>,

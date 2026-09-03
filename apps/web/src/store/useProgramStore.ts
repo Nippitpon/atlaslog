@@ -2,6 +2,9 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { DayStatus, ProgramProgressState, ProgramConfig, ProgramMeta, ProgramMetaState, StructuredExercise, StructuredProgram, ProgramStateSnapshot } from '@atlaslog/shared'
 import { syncProgramUpsert, syncProgramDelete, syncProgramState } from '../lib/syncQueue.js'
+import { resolveDayRef } from '../lib/programStatus.js'
+import { resolveDayExercises } from '../lib/dayLayout.js'
+import { STRUCTURED_PROGRAMS } from '../lib/twelveWeekProgram.js'
 import { useAppStore } from './useAppStore.js'
 
 // Per-user override of a program day's exercise list. Historically accessories
@@ -25,6 +28,7 @@ interface ProgramStore {
 
   getDayStatus: (programId: string, weekId: string, dayId: string) => DayStatus
   setDayStatus: (programId: string, weekId: string, dayId: string, status: DayStatus) => void
+  setRunDayStatus: (dayRef: string, logged: boolean) => void
   resetProgram: (programId: string) => void
 
   setConfig: (programId: string, config: ProgramConfig) => void
@@ -88,6 +92,29 @@ export const useProgramStore = create<ProgramStore>()(
           },
         }))
         queueStateSync(get)
+      },
+
+      // A run logged against a program day. Running rows never reach the set
+      // logger, so finishWorkout's setDayStatus(...'done') can't fire for them —
+      // this is the equivalent write, and it lives here so week/program
+      // aggregation keeps reading one source of truth (progress).
+      setRunDayStatus: (dayRef, logged) => {
+        const target = resolveDayRef(dayRef, [...STRUCTURED_PROGRAMS, ...get().customPrograms])
+        if (!target) return
+        const { program, week, day } = target
+        const { getDayStatus, setDayStatus, getDayLayout } = get()
+        // Same lift list DayCard shows, so an accessory added to a run day via
+        // Edit hands 'done' back to the logger instead of the run.
+        const lifts = resolveDayExercises(day, getDayLayout(program.id, week.id, day.id))
+        if (lifts.length === 0 && day.exercises.some(e => e.type === 'running')) {
+          setDayStatus(program.id, week.id, day.id, logged ? 'done' : 'not_started')
+          return
+        }
+        // Mixed day: the lifts own 'done'. A run only nudges an untouched day
+        // off not_started, and un-logging it never rewinds the lifts.
+        if (logged && getDayStatus(program.id, week.id, day.id) === 'not_started') {
+          setDayStatus(program.id, week.id, day.id, 'in_progress')
+        }
       },
 
       resetProgram: (programId) => {

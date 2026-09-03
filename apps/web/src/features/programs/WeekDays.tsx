@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { DayStatus, StructuredDay, StructuredExercise, StructuredProgram, StructuredWeek } from '@atlaslog/shared'
+import type { DayStatus, RunEntry, StructuredDay, StructuredExercise, StructuredProgram, StructuredWeek } from '@atlaslog/shared'
 import { buildDayProgram } from '../../lib/twelveWeekProgram.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAppStore } from '../../store/useAppStore.js'
 import { structuredWeight, resolveCalcRMs } from '../../lib/rpeTable.js'
 import { resolveDayExercises } from '../../lib/dayLayout.js'
+import { dayRef as buildDayRef } from '../../lib/programStatus.js'
 import { runTarget } from '../../lib/utils.js'
 import { IconCheck, IconPlay, IconChevronRight, IconEdit, IconRun } from '../../components/icons/index.js'
 import { DayEditSheet } from './DayEditSheet.js'
@@ -38,16 +39,19 @@ function StatusBadge({ status }: { status: DayStatus }) {
 }
 
 function DayCard({
-  day, status, exercises, oneRMs, onStart, onEditDay, onOpenRun,
+  day, status, exercises, oneRMs, loggedRun, onStart, onEditDay, onOpenRun, onToggleDone,
 }: {
   day: StructuredDay
   status: DayStatus
   // Full ordered lift list for the day (main + accessory, user order applied).
   exercises: StructuredExercise[]
   oneRMs: { squat: number; bench: number; deadlift: number } | null
+  // Newest run logged against this day, if any — what made a run day 'done'.
+  loggedRun: RunEntry | undefined
   onStart: () => void
   onEditDay: () => void
   onOpenRun: () => void
+  onToggleDone: () => void
 }) {
   const PREVIEW = 5
   const preview = exercises.slice(0, PREVIEW)
@@ -162,6 +166,12 @@ function DayCard({
                 </button>
               )
             })}
+            {loggedRun && (
+              <div className="t-mono" style={{ fontSize: 10, color: '#4ade80', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <IconCheck size={10} stroke={3} />
+                LOGGED {loggedRun.distanceKm} km · {Math.round(loggedRun.durationMin)} min
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -184,6 +194,24 @@ function DayCard({
           >
             <IconEdit size={11} /> Edit
           </button>
+          {/* A run-only day has no workout to finish, so 'done' has to be
+              reachable by hand too — covers running outside the app, or a run
+              logged before this day was linked. */}
+          {!hasLifts && runs.length > 0 && (
+            <button
+              onClick={e => { e.stopPropagation(); onToggleDone() }}
+              style={{
+                background: 'transparent',
+                border: `1px solid ${isDone ? 'var(--border)' : 'rgba(74,222,128,0.4)'}`,
+                borderRadius: 6, padding: '2px 8px', cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                color: isDone ? 'var(--text-2)' : '#4ade80',
+                fontFamily: 'var(--font-mono)', fontSize: 10,
+              }}
+            >
+              {isDone ? 'Undo' : <><IconCheck size={11} stroke={3} /> Mark done</>}
+            </button>
+          )}
         </div>
         {hasLifts ? (
           <button
@@ -224,8 +252,8 @@ function DayCard({
 // profile's Personal 1RM (no setup needed); general programs show no weights.
 export function WeekDays({ program, week }: { program: StructuredProgram; week: StructuredWeek }) {
   const navigate = useNavigate()
-  const { getDayStatus, getConfig, getDayLayout, setDayLayout } = useProgramStore()
-  const { startWorkout, personalOneRMs } = useAppStore()
+  const { getDayStatus, setDayStatus, getConfig, getDayLayout, setDayLayout } = useProgramStore()
+  const { startWorkout, personalOneRMs, runs } = useAppStore()
   const [editingDayId, setEditingDayId] = useState<string | null>(null)
 
   const calcRMs = resolveCalcRMs(program, getConfig(program.id), personalOneRMs)
@@ -242,16 +270,22 @@ export function WeekDays({ program, week }: { program: StructuredProgram; week: 
       <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         {week.days.map(day => {
           const exercises = resolveDayExercises(day, getDayLayout(program.id, week.id, day.id))
+          const ref = buildDayRef(program.id, week.id, day.id)
+          const status = getDayStatus(program.id, week.id, day.id)
           return (
             <DayCard
               key={day.id}
               day={day}
-              status={getDayStatus(program.id, week.id, day.id)}
+              status={status}
               exercises={exercises}
               oneRMs={calcRMs}
+              // runs is newest-first, so find() gives the latest for this day
+              loggedRun={runs.find(r => r.dayRef === ref)}
               onStart={() => handleStart(day, exercises)}
               onEditDay={() => setEditingDayId(day.id)}
-              onOpenRun={() => navigate('/runs')}
+              // Carry the day into /runs so logging there can close it out
+              onOpenRun={() => navigate(`/runs?day=${encodeURIComponent(ref)}`)}
+              onToggleDone={() => setDayStatus(program.id, week.id, day.id, status === 'done' ? 'not_started' : 'done')}
             />
           )
         })}

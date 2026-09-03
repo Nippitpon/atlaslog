@@ -1,18 +1,33 @@
 import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore.js'
-import { formatDate, formatPace } from '../../lib/utils.js'
+import { useProgramStore } from '../../store/useProgramStore.js'
+import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
+import { resolveDayRef } from '../../lib/programStatus.js'
+import { formatDate, formatPace, runTarget } from '../../lib/utils.js'
 import { DateField } from '../../components/DateField.js'
-import { IconChevronLeft, IconRun, IconTrash } from '../../components/icons/index.js'
+import { IconChevronLeft, IconRun, IconTrash, IconX } from '../../components/icons/index.js'
 import type { RunEntry } from '@atlaslog/shared'
 
 export function RunsPage() {
   const navigate = useNavigate()
   const { runs, addRun, removeRun } = useAppStore()
 
+  // Arriving from a program day (`?day=programId/weekId/dayId`) links the run to
+  // that day, which is what flips the day to done — see useProgramStore.setRunDayStatus.
+  const [params, setParams] = useSearchParams()
+  const dayRef = params.get('day') ?? undefined
+  const customPrograms = useProgramStore(s => s.customPrograms)
+  const target = useMemo(
+    () => resolveDayRef(dayRef, [...STRUCTURED_PROGRAMS, ...customPrograms]),
+    [dayRef, customPrograms],
+  )
+  const runRow = target?.day.exercises.find(e => e.type === 'running')
+
   const todayStr = new Date().toISOString().slice(0, 10)
-  const [dist, setDist] = useState('')
-  const [dur, setDur] = useState('')
+  // Prescribed distance/time seed the form once on mount; the user types over them.
+  const [dist, setDist] = useState(runRow?.distanceKm != null ? String(runRow.distanceKm) : '')
+  const [dur, setDur] = useState(runRow?.durationMin != null ? String(runRow.durationMin) : '')
   const [note, setNote] = useState('')
   const [date, setDate] = useState(todayStr)
 
@@ -40,8 +55,12 @@ export function RunsPage() {
       distanceKm: Number(dist),
       durationMin: Number(dur),
       note: note.trim() || undefined,
+      // Only when the ref still resolves — a stale one would never mark a day
+      dayRef: target ? dayRef : undefined,
     })
     setDist(''); setDur(''); setNote(''); setDate(todayStr)
+    // Logged for a program day → back to the day, now green
+    if (target) navigate(-1)
   }
 
   const handleDelete = (r: RunEntry) => {
@@ -83,6 +102,32 @@ export function RunsPage() {
 
       {/* Add run */}
       <div style={{ padding: '0 20px 20px' }}>
+        {target && (
+          <div className="card card-tight" style={{
+            display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12,
+            borderLeft: '3px solid var(--accent)', paddingLeft: 13,
+          }}>
+            <IconRun size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>LOGGING FOR</div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>
+                W{target.weekNum} · {target.day.dayOfWeek} — {target.day.focus}
+              </div>
+              {runRow && runTarget(runRow) && (
+                <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                  TARGET {runTarget(runRow)}
+                </div>
+              )}
+            </div>
+            <button
+              className="btn-icon" aria-label="Log as a free run instead"
+              onClick={() => setParams({}, { replace: true })}
+              style={{ flexShrink: 0, color: 'var(--muted)' }}
+            >
+              <IconX size={16} />
+            </button>
+          </div>
+        )}
         <div className="t-eyebrow" style={{ marginBottom: 10 }}>LOG A RUN</div>
         <div className="card">
           <div style={{ marginBottom: 8 }}>

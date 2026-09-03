@@ -194,10 +194,18 @@ export const useAppStore = create<AppStore>()(
       addRun: (entry) => {
         set(state => ({ runs: [entry, ...state.runs.filter(e => e.id !== entry.id)] }))
         void syncRun(entry)
+        // Logged from a program day → that day counts as trained. Mirrors the
+        // setDayStatus write finishWorkout does for a lifting day.
+        if (entry.dayRef) useProgramStore.getState().setRunDayStatus(entry.dayRef, true)
       },
       removeRun: (id) => {
+        const ref = get().runs.find(e => e.id === id)?.dayRef
         set(state => ({ runs: state.runs.filter(e => e.id !== id) }))
         void syncRunDelete(id)
+        // Only the last run for that day rewinds it — two runs on one day is valid.
+        if (ref && !get().runs.some(e => e.dayRef === ref)) {
+          useProgramStore.getState().setRunDayStatus(ref, false)
+        }
       },
       setRuns: (runs) => set({ runs }),
 

@@ -116,6 +116,7 @@ async function runOp(op: SyncOp, userId: string): Promise<void> {
       distance_km: op.payload.distanceKm,
       duration_min: op.payload.durationMin,
       note: op.payload.note ?? null,
+      day_ref: op.payload.dayRef ?? null,
     })
     if (error) throw error
   } else if (op.kind === 'run-delete') {
