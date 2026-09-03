@@ -1,8 +1,75 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-09-01 (รอบ 40 — ✅ SHIPPED: Home ยึดสัปดาห์ปฏิทิน + บรรทัดวันค้าง + รวมสูตรสัปดาห์จบ)
+> อัปเดตล่าสุด: 2026-09-03 (รอบ 41 — ✅ SHIPPED: วันวิ่งในโปรแกรมขึ้น DONE ได้แล้ว)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-09-03 — รอบ 41 (✅ SHIPPED, deploy main): วันวิ่งในโปรแกรมขึ้น DONE ได้แล้ว (ผูก run → program day)
+
+commit `9c879bb` (feat) · **Supabase: รัน `alter table public.runs add column if not exists day_ref text;`
+ไปแล้ว 2026-09-03** (ยืนยัน `day_ref | text | YES` ใน information_schema) — ถ้าตั้ง project ใหม่ DDL ใน
+`SUPABASE_SETUP.md` มีคอลัมน์นี้อยู่แล้ว
+
+ผู้ใช้ทักว่า *"วิ่งเสร็จแล้วบันทึกค่าลงในแอพ แต่ในโปรแกรมยังไม่ขึ้น done"* — เป็นช่องว่างที่**รอบ 23 จดค้างไว้เองใน
+"ไม่ทำรอบนี้"** (`running-only day ไม่ได้ track "done" status ผ่าน Logger`) ไม่ใช่ bug ที่เพิ่งเกิด
+
+### ทำไมมันไม่เคยขึ้น done (root cause 4 ชั้น)
+- `'done'` ถูกเขียนจากที่เดียวในทั้งแอป — `finishWorkout()` (`useAppStore.ts`) อ่าน `workout.programId`
+  รูป `programId/weekId/dayId` แล้ว `setDayStatus(..., 'done')`
+- แถว `type: 'running'` ถูกกรองออก**ก่อน**ถึง Logger ทุกทาง (`dayToProgram` + `resolveDayExercises`)
+  → วันวิ่งล้วนไม่มี workout ให้เริ่ม → `finishWorkout` ไม่เคยทำงาน → ค้าง `not_started` ตลอดกาล
+- `/runs` เป็น log แยกที่ไม่รู้จักโปรแกรม — ปุ่ม "Go Run"/"LOG →" ยิง `navigate('/runs')` เปล่า ๆ ไม่ส่ง context
+- `RunEntry` ไม่มี field ผูก program/week/day และ `addRun` ไม่แตะ `useProgramStore` เลย
+
+**ผลข้างเคียงที่หนักกว่าอาการที่เห็น (แก้ไปด้วยในรอบนี้):** `isWeekDone` ต้องการทุกวัน `done`
+→ สัปดาห์ที่มีวันวิ่ง **done ไม่ได้ตลอดกาล** → `pickActiveWeek` ตรึงการ์ดไว้สัปดาห์นั้น (ต่อจากรอบ 40 ตรง ๆ),
+`remainingDays` ค้าง ≥1, โปรแกรมไม่มีวันขึ้น `COMPLETED`
+
+### ทำอะไร
+- **`types.ts`** — `RunEntry.dayRef?: string` = composite `programId/weekId/dayId` (convention เดียวกับ
+  `Session.programId` ที่ `dayToProgram` ปั๊ม) · optional → backward compatible กับ run เก่าทั้งหมด
+- **`programStatus.ts`** — `dayRef(programId, weekId, dayId)` สร้าง composite + `resolveDayRef(ref, programs)`
+  คืน `{program, week, weekNum, day}` หรือ `null` ถ้า malformed/id หายไปแล้ว (กัน dayRef ค้างหลัง
+  `resetProgram`/`updateCustomProgram` prune ids) — pure, รับ programs เป็น argument ตามแบบไฟล์นี้
+- **`useProgramStore`** — action ใหม่ `setRunDayStatus(dayRef, logged)` เก็บ invariant ไว้ใน store ที่เดียว:
+  วันวิ่งล้วน → `'done'` / `'not_started'` · mixed day → ยกจาก `not_started` เป็น `in_progress` เท่านั้น
+  ห้ามทับ `'done'` ของเวท · เช็ค "วิ่งล้วน" ด้วย `resolveDayExercises` (ไม่ใช่ `day.exercises` ดิบ) →
+  ถ้าผู้ใช้ Edit เพิ่ม accessory เข้าวันวิ่ง สิทธิ์ `'done'` กลับไปเป็นของ Logger อัตโนมัติ
+- **`useAppStore`** — `addRun` → ถ้ามี `dayRef` เรียก `setRunDayStatus(ref, true)` · `removeRun` → อ่าน dayRef
+  ก่อนลบ แล้วถอยสถานะ**เฉพาะเมื่อไม่มี run อื่นของวันนั้นเหลือ** (วิ่ง 2 รอบในวันเดียวเป็นเรื่องปกติ)
+- **`WeekDays`** — `onOpenRun` ส่ง `/runs?day=<encoded ref>` · แถว RUNNING โชว์ `✓ LOGGED 5.2 km · 28 min`
+  เมื่อมี run ผูกอยู่ (ทำให้เห็นว่าทำไมวันนั้นเขียว) · footer วันวิ่งล้วนเพิ่มปุ่ม ghost `✓ Mark done`/`Undo`
+- **`DashboardPage`** — `runHref` ตัวเดียวใช้ทั้งการ์ดวันวิ่งล้วนและแถววิ่งบนวันเวท (ปุ่ม Running บนแถบ
+  shortcut **ไม่**ส่ง dayRef — เป็นการวิ่งอิสระ)
+- **`RunsPage`** — `useSearchParams` อ่าน `?day=` → แถบ `LOGGING FOR W3 · Wed — <focus>` + `TARGET 5 km · 30 min`
+  + ปุ่ม ✕ ยกเลิกการผูก (บันทึกเป็น free run) · prefill ระยะ/เวลาจากที่โปรแกรมสั่ง (ปิดช่องว่างอีกข้อของรอบ 23)
+  · บันทึกแล้ว `navigate(-1)` กลับไปเห็นการ์ดวันเขียวทันที
+- **sync** — `syncQueue` run-upsert เพิ่ม `day_ref` · `useAuthStore` map `day_ref → dayRef` ·
+  `SUPABASE_SETUP.md` เพิ่ม `day_ref text` ใน DDL + snippet `alter table` สำหรับ project ที่สร้างตารางไปแล้ว
+
+### ผลกระทบ (จัดการแล้ว)
+สถานะยังอยู่ใน `progress` blob ที่เดียว → `isWeekDone`/`weekStatus`/`remainingDays`/`pickActiveWeek`/
+`countDoneWeeks` ได้ของฟรีทั้งหมด ไม่ต้องแก้ (นี่คือเหตุผลที่ **ไม่**เลือกทาง "derive จากวันที่ปฏิทิน"
+ซึ่งจะต้องยัด `runs` เข้าไปในทุกฟังก์ชันของ `programStatus.ts`) · ไม่มี import cycle ใหม่
+(`useProgramStore` → `programStatus`/`dayLayout`/`twelveWeekProgram` ล้วน pure ไม่ย้อนกลับมาที่ store) ·
+วันที่ในฟอร์ม `/runs` ไม่มีผลกับ done — `dayRef` เป็นตัวตัดสิน สอดคล้องกับ `progress` ทั้งระบบที่ไม่เคยผูกวันที่ ·
+run ที่ ref หายแล้ว → `resolveDayRef` คืน null → บันทึกเป็น free run เงียบ ๆ ไม่ crash
+
+### verify
+`tsc -b` + ESLint + `vite build` ผ่าน (125 modules) · **ยังไม่ได้ click-through e2e** (แอป gate ด้วย Supabase auth)
+แต่รอบนี้เทสตรรกะจริงด้วย harness ชั่วคราว (`vite build --ssr` + stub localStorage → รัน store จริงใน node),
+ผ่าน 12/12: run→done · ลบ run รองยัง done · ลบตัวสุดท้าย→not_started · mixed day→in_progress ·
+mixed day done แล้ว run ไม่ทับ/ไม่ถอย · stale dayRef ไม่ crash · free run ไม่แตะวัน ·
+วันวิ่งที่ Edit เพิ่ม accessory→in_progress ไม่ใช่ done · `isWeekDone` true + `remainingDays` 0 (คือบั๊กพ่วง)
+→ ควร click-through: กด Go Run จากการ์ดวัน → เห็นแถบ LOGGING FOR + prefill → Add Run → เด้งกลับ เห็นการ์ดเขียว ·
+`/runs` ที่เข้าตรง ๆ (ไม่มี `?day=`) ต้องเหมือนเดิมทุกอย่าง
+
+### ไม่ทำรอบนี้
+ไม่ derive done จากวันที่ปฏิทิน (run ที่บันทึกก่อนรอบนี้จึงไม่ขึ้น done เอง — ใช้ปุ่ม `✓ Mark done` แตะย้อนหลัง) ·
+mixed day ยังนับ done จากเวทเสร็จอย่างเดียว ไม่บังคับให้ต้องบันทึกวิ่ง (ผู้ใช้เลือกเอง) ·
+`HistoryPage` RunCard ยังไม่บอกว่า run นั้นผูกกับวันไหนของโปรแกรม · ไม่มี unit test ถาวร (harness ลบทิ้งแล้ว)
 
 ---
 
