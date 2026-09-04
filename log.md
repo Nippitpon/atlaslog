@@ -1,8 +1,56 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-09-04 (รอบ 43 — ✅ SHIPPED: เวิร์กเอาต์ค้าง resume ได้ ไม่ถูกทับเงียบ ๆ + แถบ resume ทุกหน้า)
+> อัปเดตล่าสุด: 2026-09-04 (รอบ 44 — ✅ SHIPPED: Progress ของโปรแกรมนับเป็นวันที่เล่นจริง ไม่ใช่สัปดาห์ที่จบครบ)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-09-04 — รอบ 44 (✅ SHIPPED, deploy main): Progress ของโปรแกรมนับเป็น "วันที่เล่นจริง" ไม่ใช่ "สัปดาห์ที่จบครบ"
+
+ผู้ใช้ทักว่า *"เข้าโปรแกรมใน MY PROGRAM แล้ว Progress ไม่ขึ้นเลย ทั้งที่เล่นไปถึง week 3 —
+ทุก week ขึ้น In Progress เพราะมี 1 วันของทุกสัปดาห์ที่ไม่ได้เล่น"* · ไม่แตะ Supabase schema
+
+**สาเหตุ:** ตัวเลข progress ทุกจุดคิดจาก **สัปดาห์ที่จบครบทุกวัน** — `isWeekDone` ต้องการ
+`week.days.every(=== 'done')` ขาดวันเดียวก็ไม่นับ → `countDoneWeeks` เป็น **0 ตลอดกาล** สำหรับคนที่
+ข้ามสัปดาห์ละวัน (ซึ่งคือคนส่วนใหญ่) → แถบค้าง 0% ทั้งที่เทรนไปแล้ว ~9 วัน
+สูตร `doneWeeks / totalWeeks` ถูกก๊อปไว้ 3 ที่ (Overview + การ์ด STRUCTURED + การ์ด MY PROGRAMS)
+และลากของอื่นเพี้ยนตามไปด้วย: ป้าย `Week ${doneWeeks + 1}` **ค้างที่ Week 1** ทั้งที่อยู่ week 3 ·
+phase chip หยิบจาก `sp.weeks[doneWeeks]` เลยค้างที่ Accumulation
+
+### ทำอะไร
+- **`programStatus.ts`** — สูตรกลางชุดใหม่:
+  `doneDaysInWeek()` (นับจาก `week.days` ไม่ใช่จาก key ที่บันทึกไว้ → day id ของโปรแกรมรูปเก่าที่ค้างอยู่
+  ไม่ทำให้ตัวเลขเกินจริง) · `programProgress()` คืน `{doneDays,totalDays,doneWeeks,totalWeeks,pct}`
+  (`pct` กันหาร 0) · `reachedWeekNum()` = สัปดาห์สูงสุดที่แตะแล้ว (0 = ยังไม่เริ่ม)
+- **ยุบของซ้ำ** — `remainingDays` เขียนใหม่เป็น `days.length - doneDaysInWeek()` ·
+  ตัวแปร `lastTouched` ที่ฝังอยู่ใน `pickActiveWeek` ยกออกมาเป็น `reachedWeekNum` แล้วเรียกใช้ร่วม
+  (พฤติกรรม Home เท่าเดิมเป๊ะ — ทั้งคู่เริ่มนับที่ 0)
+- **`ProgramOverviewPage`** — แถบ Progress เปลี่ยนหัวเป็น `{doneDays}/{totalDays} days` + `pct` จากวัน,
+  บรรทัดล่างเป็น `{pct}% complete · {doneWeeks}/{totalWeeks} weeks done` (ได้ทั้งความละเอียดและภาพรวม) ·
+  แถวสัปดาห์เปลี่ยน `{days.length} DAYS` → **`{done}/{total} DAYS`** เห็นทันทีว่าสัปดาห์ไหนเหลือกี่วัน
+- **`ProgramsPage`** ทั้งการ์ด STRUCTURED และ MY PROGRAMS — `pct` จากวัน · ป้ายเป็น `Week {reachedWeekNum}`
+  (เลิกใช้ `doneWeeks + 1`) · phase chip หยิบสัปดาห์ที่ถึงจริง
+
+### ผลกระทบ (จัดการแล้ว)
+`isWeekDone`/`countDoneWeeks`/`getProgramStatus` ไม่ถูกแตะ → เกณฑ์ `COMPLETED` และ badge ของสัปดาห์
+ยังเหมือนเดิมทุกประการ, เปลี่ยนแค่ "ตัวเลขที่แสดง" · `remainingDays` คืนค่าเท่าเดิม (มีเทสกันไว้) →
+บรรทัดวันค้างบน Home และ `pickActiveWeek` ไม่ขยับ · `ProgressSummary` เปลี่ยนมาใช้ `program.weeks.length`
+แทน `program.totalWeeks` (ตรงกับของจริงกว่าเมื่อ metadata ของโปรแกรม import ไม่ตรงกับจำนวนสัปดาห์จริง)
+
+### verify
+`pnpm test` **34 เทส ผ่านหมด** (เพิ่ม 11 เคส: `doneDaysInWeek` รวมเคส day id ค้างจากโปรแกรมรูปเก่า ·
+`programProgress` รวม**เคสของผู้ใช้เป๊ะ ๆ** คือข้ามสัปดาห์ละวัน → `doneWeeks === 0` แต่ `pct === 50` ·
+เคสโปรแกรมว่างไม่ NaN · `reachedWeekNum` 3 เคส · กัน regression `remainingDays`) ·
+`pnpm build` (128 modules) + ESLint ผ่าน
+
+**ยังไม่ได้ click-through e2e** → ควรเช็คกับข้อมูลจริง: โปรแกรมที่เล่นถึง week 3 ขาดสัปดาห์ละวัน
+ต้องเห็นแถบขยับ (เดิม 0%), แถวสัปดาห์ขึ้น `3/4 DAYS`, การ์ดหน้า Programs ขึ้น `Week 3/12`
+
+### ไม่ทำรอบนี้
+**ไม่เพิ่มสถานะ `skipped`** (ผู้ใช้เลือกเอาแค่ progress เป็นวันก่อน) → สัปดาห์ที่เหลือวันที่ไม่ได้เล่น
+**ยังขึ้น `IN PROGRESS`** และโปรแกรมยังไม่มีวันขึ้น `COMPLETED` — เป็นข้อเดียวกับที่รอบ 40 จดค้างไว้
+ถ้าจะเอาจริงต้องแก้ `DayStatus` ใน shared + ทุกสูตรที่รวมสถานะ + UI ปุ่ม "ข้ามวันนี้"
 
 ---
 
