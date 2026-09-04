@@ -161,6 +161,16 @@ export function DashboardPage() {
     return { day, exercises, program, currentWeek }
   }, [activeProgramInfo, getDayStatus, getDayLayout])
 
+  // Where every "go for a run" tap on Home leads. When today's program day
+  // prescribes a run, the link carries that day so logging closes it out
+  // (useProgramStore.setRunDayStatus); otherwise it's a plain free run. Once the
+  // day is done todayReminder is null, so the link relaxes back on its own.
+  const todayRunHref = useMemo(() => {
+    if (!todayReminder?.day.exercises.some(e => e.type === 'running')) return '/runs'
+    const { program, currentWeek, day } = todayReminder
+    return `/runs?day=${encodeURIComponent(buildDayRef(program.id, currentWeek.id, day.id))}`
+  }, [todayReminder])
+
   // Start today's session straight from Home. startWorkout always replaces the
   // active workout, so an unfinished one is either resumed or confirmed away.
   const handleStartToday = () => {
@@ -216,8 +226,6 @@ export function DashboardPage() {
         const hasLifts = exercises.length > 0
         const calcRMs = resolveCalcRMs(program, configs[program.id], personalOneRMs)
         const weekHref = `/programs/${program.id}/week/${currentWeek.id}`
-        // Carry the day into /runs so logging there closes this day out
-        const runHref = `/runs?day=${encodeURIComponent(buildDayRef(program.id, currentWeek.id, day.id))}`
 
         // Running-only day → the whole card opens the /runs logger
         if (!hasLifts && runs.length > 0) {
@@ -226,7 +234,7 @@ export function DashboardPage() {
             <div style={{ padding: '0 20px', marginBottom: 16 }}>
               <button
                 style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box' }}
-                onClick={() => navigate(runHref)}
+                onClick={() => navigate(todayRunHref)}
               >
                 <div className="card card-tight" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ fontSize: 22 }}>🏃</div>
@@ -309,7 +317,7 @@ export function DashboardPage() {
               {/* Running on a lifting day → separate tap target to /runs */}
               {runs.length > 0 && (
                 <button
-                  onClick={() => navigate(runHref)}
+                  onClick={() => navigate(todayRunHref)}
                   style={{
                     all: 'unset', cursor: 'pointer', boxSizing: 'border-box', width: '100%',
                     display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, padding: '8px 10px',
@@ -605,10 +613,11 @@ export function DashboardPage() {
         {[
           { label: 'Programs', Ic: IconDumbbell, to: '/programs' },
           { label: 'Exercises', Ic: IconSearch, to: '/library' },
-          { label: 'Running', Ic: IconRun, to: '/runs' },
+          { label: 'Running', Ic: IconRun, to: todayRunHref },
+          // key is the label, not `to` — the Running href changes with the day
         ].map(({ label, Ic, to }) => (
           <button
-            key={to}
+            key={label}
             className="btn btn-secondary"
             style={{ minWidth: 0, padding: '0 6px', gap: 6, fontSize: 13 }}
             onClick={() => navigate(to)}

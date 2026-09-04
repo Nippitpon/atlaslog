@@ -1,4 +1,5 @@
-import { defineConfig } from 'vite'
+// vitest/config re-exports Vite's defineConfig and adds typing for `test`
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -22,5 +23,10 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkg.version),
     __APP_COMMIT__: JSON.stringify(gitShortHash()),
     __APP_BUILD_DATE__: JSON.stringify(new Date().toISOString().split('T')[0]),
+  },
+  test: {
+    // No DOM in these suites — the stores and lib helpers are plain modules.
+    environment: 'node',
+    setupFiles: ['src/test/setup.ts'],
   },
 })

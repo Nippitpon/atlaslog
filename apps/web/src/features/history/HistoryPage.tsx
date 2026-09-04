@@ -1,6 +1,9 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore.js'
+import { useProgramStore } from '../../store/useProgramStore.js'
+import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
+import { resolveDayRef, type DayRefTarget } from '../../lib/programStatus.js'
 import { getExercise, formatPace } from '../../lib/utils.js'
 import { IconRun } from '../../components/icons/index.js'
 import type { Session, RunEntry } from '@atlaslog/shared'
@@ -9,8 +12,12 @@ type TimelineItem =
   | { kind: 'session'; date: string; data: Session }
   | { kind: 'run'; date: string; data: RunEntry }
 
-function RunCard({ r }: { r: RunEntry }) {
-  return (
+// `target` is the program day this run closed out (null for a free run, and for
+// a dayRef whose program/day no longer exists). With one, the card names the day
+// and taps through to its week — a run is otherwise the only timeline entry that
+// can't say what it belonged to, since SessionCard has the day in its name.
+function RunCard({ r, target, onOpen }: { r: RunEntry; target: DayRefTarget | null; onOpen?: () => void }) {
+  const card = (
     <div className="card card-tight" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
       <div style={{
         width: 48, flexShrink: 0,
@@ -32,6 +39,11 @@ function RunCard({ r }: { r: RunEntry }) {
             Run{r.note ? ` · ${r.note}` : ''}
           </div>
         </div>
+        {target && (
+          <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4 }}>
+            W{target.weekNum} · {target.day.dayOfWeek.toUpperCase()} — {target.day.focus}
+          </div>
+        )}
         <div className="t-mono tnum" style={{ fontSize: 11, color: 'var(--muted)', display: 'flex', gap: 10 }}>
           <span><span style={{ color: 'var(--text)', fontWeight: 600 }}>{r.distanceKm}</span>km</span>
           <span>·</span>
@@ -41,6 +53,14 @@ function RunCard({ r }: { r: RunEntry }) {
         </div>
       </div>
     </div>
+  )
+
+  // Safe to wrap the whole card: it holds no buttons of its own.
+  if (!onOpen) return card
+  return (
+    <button onClick={onOpen} style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', display: 'block', width: '100%' }}>
+      {card}
+    </button>
   )
 }
 
@@ -139,6 +159,8 @@ function SessionCard({ h }: { h: Session }) {
 export function HistoryPage() {
   const navigate = useNavigate()
   const { history, runs } = useAppStore()
+  const customPrograms = useProgramStore(s => s.customPrograms)
+  const programs = useMemo(() => [...STRUCTURED_PROGRAMS, ...customPrograms], [customPrograms])
 
   const groups = useMemo(() => {
     const items: TimelineItem[] = [
@@ -185,10 +207,18 @@ export function HistoryPage() {
             <div className="t-eyebrow">{month}</div>
           </div>
           <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {items.map(it => it.kind === 'session'
-              ? <SessionCard key={it.data.id} h={it.data} />
-              : <RunCard key={it.data.id} r={it.data} />
-            )}
+            {items.map(it => {
+              if (it.kind === 'session') return <SessionCard key={it.data.id} h={it.data} />
+              const target = resolveDayRef(it.data.dayRef, programs)
+              return (
+                <RunCard
+                  key={it.data.id}
+                  r={it.data}
+                  target={target}
+                  onOpen={target ? () => navigate(`/programs/${target.program.id}/week/${target.week.id}`) : undefined}
+                />
+              )
+            })}
           </div>
         </div>
       ))}
