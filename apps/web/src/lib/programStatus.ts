@@ -34,17 +34,69 @@ export function weekStatus(
     : 'not_started'
 }
 
-export function remainingDays(
+// Counted off the program's own day list, never off the recorded keys: progress
+// can still hold day ids from an older shape of the program (edited, re-imported,
+// or an old cloud snapshot), and those would inflate the total.
+export function doneDaysInWeek(
   programId: string,
   week: StructuredWeek,
   progress: ProgramProgressState,
 ): number {
   const days = progress[programId]?.[week.id] ?? {}
-  return week.days.filter(d => days[d.id] !== 'done').length
+  return week.days.filter(d => days[d.id] === 'done').length
+}
+
+export function remainingDays(
+  programId: string,
+  week: StructuredWeek,
+  progress: ProgramProgressState,
+): number {
+  return week.days.length - doneDaysInWeek(programId, week, progress)
 }
 
 export function countDoneWeeks(program: StructuredProgram, progress: ProgramProgressState): number {
   return program.weeks.filter(w => isWeekDone(program.id, w, progress)).length
+}
+
+export interface ProgramProgress {
+  doneDays: number
+  totalDays: number
+  doneWeeks: number
+  totalWeeks: number
+  pct: number
+}
+
+// How far through a program the user actually is. Measured in DAYS: counting
+// finished weeks reports 0% forever for anyone who skips one day a week, which
+// is most people — the work was done, the number just never moved.
+export function programProgress(
+  program: StructuredProgram,
+  progress: ProgramProgressState,
+): ProgramProgress {
+  let doneDays = 0
+  let totalDays = 0
+  for (const week of program.weeks) {
+    doneDays += doneDaysInWeek(program.id, week, progress)
+    totalDays += week.days.length
+  }
+  return {
+    doneDays,
+    totalDays,
+    doneWeeks: countDoneWeeks(program, progress),
+    totalWeeks: program.weeks.length,
+    pct: totalDays ? Math.round((doneDays / totalDays) * 100) : 0,
+  }
+}
+
+// Highest week POSITION the user has touched at all (any day off not_started);
+// 0 when the program has never been started. This is "which week am I on" for
+// display — unlike doneWeeks + 1, one unfinished day doesn't freeze it at week 1.
+export function reachedWeekNum(program: StructuredProgram, progress: ProgramProgressState): number {
+  let reached = 0
+  program.weeks.forEach((w, i) => {
+    if (weekStatus(program.id, w, progress) !== 'not_started') reached = i + 1
+  })
+  return reached
 }
 
 export function hasStarted(program: StructuredProgram, progress: ProgramProgressState): boolean {
@@ -220,13 +272,9 @@ export function pickActiveWeek(
     }
   }
 
-  let lastTouched = 0
-  for (let i = 0; i < total; i++) {
-    if (weekStatus(program.id, program.weeks[i]!, progress) !== 'not_started') lastTouched = i + 1
-  }
-
   // Trained this calendar week → that's the week you're on, and you only move up
   // once it's finished. Otherwise the ceiling is one past whatever you've touched.
+  const lastTouched = reachedWeekNum(program, progress)
   const trained = trainedWeekNumSince(program, history, startOfTrainingWeek(now).getTime())
   const ceiling = trained > 0
     ? trained + (isWeekDone(program.id, program.weeks[trained - 1]!, progress) ? 1 : 0)

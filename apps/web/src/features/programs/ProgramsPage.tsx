@@ -11,7 +11,7 @@ import { ImportProgramSheet } from './ImportProgramSheet.js'
 import { useStartWorkout } from '../../hooks/useStartWorkout.js'
 import { createShare, importShare, listPublicPrograms, type PublicProgram } from '../../lib/shareApi.js'
 import {
-  countDoneWeeks, hasStarted as programHasStarted, getProgramStatus, sortPrograms,
+  programProgress, reachedWeekNum, hasStarted as programHasStarted, getProgramStatus, sortPrograms,
   PROGRAM_STATUS_STYLE, type ProgramStatus,
 } from '../../lib/programStatus.js'
 import {
@@ -189,13 +189,13 @@ export function ProgramsPage() {
         <div className="t-eyebrow" style={{ marginBottom: 12 }}>STRUCTURED PROGRAMS</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {sortPrograms(STRUCTURED_PROGRAMS, programMeta, history).map(sp => {
-            const doneWeeks = countDoneWeeks(sp, progress)
+            const { pct } = programProgress(sp, progress)
             const started = programHasStarted(sp, progress)
-            const pct = Math.round((doneWeeks / sp.totalWeeks) * 100)
+            const weekNum = Math.max(reachedWeekNum(sp, progress), 1)
             const status = getProgramStatus(sp, configs[sp.id], programMeta[sp.id], progress)
 
-            // Find current phase
-            const currentWeek = sp.weeks[doneWeeks] ?? sp.weeks[sp.totalWeeks - 1]
+            // Phase of the week actually reached, not of the last one finished
+            const currentWeek = sp.weeks[weekNum - 1] ?? sp.weeks[sp.totalWeeks - 1]
             const phaseColor = PHASE_COLOR[currentWeek.phase]
 
             return (
@@ -249,7 +249,7 @@ export function ProgramsPage() {
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
                         <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
-                          {started ? `Week ${doneWeeks + 1}/${sp.totalWeeks}` : 'Not started'}
+                          {started ? `Week ${weekNum}/${sp.totalWeeks}` : 'Not started'}
                         </span>
                         {started && (
                           <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
@@ -276,9 +276,9 @@ export function ProgramsPage() {
           <div className="t-eyebrow" style={{ marginBottom: 12 }}>MY PROGRAMS</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {myPrograms.map(sp => {
-              const doneWeeks = countDoneWeeks(sp, progress)
+              const { pct } = programProgress(sp, progress)
               const started = programHasStarted(sp, progress)
-              const pct = Math.round((doneWeeks / sp.totalWeeks) * 100)
+              const weekNum = Math.max(reachedWeekNum(sp, progress), 1)
               const status = getProgramStatus(sp, configs[sp.id], programMeta[sp.id], progress)
 
               return (
@@ -357,7 +357,7 @@ export function ProgramsPage() {
                         <div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
                             <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
-                              {started ? `Week ${doneWeeks + 1}/${sp.totalWeeks}` : 'Not started'}
+                              {started ? `Week ${weekNum}/${sp.totalWeeks}` : 'Not started'}
                             </span>
                             {started && (
                               <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>

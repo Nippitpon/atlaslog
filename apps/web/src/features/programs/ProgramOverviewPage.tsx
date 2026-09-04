@@ -5,7 +5,7 @@ import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
 import { IconChevronLeft, IconChevronRight, IconCheck, IconSettings, IconEdit, IconStar, IconPause, IconPlay } from '../../components/icons/index.js'
-import { getProgramStatus, weekStatus, countDoneWeeks, PROGRAM_STATUS_STYLE } from '../../lib/programStatus.js'
+import { getProgramStatus, weekStatus, doneDaysInWeek, programProgress, PROGRAM_STATUS_STYLE } from '../../lib/programStatus.js'
 import { ProgramSetupSheet } from './ProgramSetupSheet.js'
 import { WeekDays } from './WeekDays.js'
 import { formatDMY, dateFromYMD } from '../../lib/utils.js'
@@ -246,7 +246,7 @@ export function ProgramOverviewPage() {
                       Week {week.weekNumber}
                     </div>
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', marginTop: 1 }}>
-                      {week.days.length} DAYS
+                      {doneDaysInWeek(program.id, week, progress)}/{week.days.length} DAYS
                     </div>
                   </div>
 
@@ -288,9 +288,8 @@ export function ProgramOverviewPage() {
 
 function ProgressSummary({ program }: { program: StructuredProgram }) {
   const { progress } = useProgramStore()
-  const totalWeeks = program.totalWeeks
-  const doneWeeks = countDoneWeeks(program, progress)
-  const pct = Math.round((doneWeeks / totalWeeks) * 100)
+  // Days, not finished weeks: skipping one day a week used to hold this at 0%
+  const { doneDays, totalDays, doneWeeks, totalWeeks, pct } = programProgress(program, progress)
 
   return (
     <div style={{ padding: '0 20px', marginBottom: 20 }}>
@@ -299,9 +298,9 @@ function ProgressSummary({ program }: { program: StructuredProgram }) {
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)',
             textTransform: 'uppercase', letterSpacing: '0.08em' }}>Progress</span>
           <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16 }}>
-            {doneWeeks}/{totalWeeks}
+            {doneDays}/{totalDays}
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)',
-              marginLeft: 4, fontWeight: 400 }}>weeks</span>
+              marginLeft: 4, fontWeight: 400 }}>days</span>
           </span>
         </div>
         <div style={{ height: 6, background: 'var(--surface-2)', borderRadius: 3, overflow: 'hidden' }}>
@@ -309,7 +308,9 @@ function ProgressSummary({ program }: { program: StructuredProgram }) {
             borderRadius: 3, transition: 'width .4s ease' }} />
         </div>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)',
-          marginTop: 6, textTransform: 'uppercase' }}>{pct}% complete</div>
+          marginTop: 6, textTransform: 'uppercase' }}>
+          {pct}% complete · {doneWeeks}/{totalWeeks} weeks done
+        </div>
       </div>
     </div>
   )
