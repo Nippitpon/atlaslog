@@ -6,41 +6,20 @@ import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAppStore } from '../../store/useAppStore.js'
 import { structuredWeight, resolveCalcRMs } from '../../lib/rpeTable.js'
 import { resolveDayExercises } from '../../lib/dayLayout.js'
-import { dayRef as buildDayRef } from '../../lib/programStatus.js'
+import { dayRef as buildDayRef, isDayPast, DAY_STATUS_EDGE } from '../../lib/programStatus.js'
+import { DayStatusBadge } from '../../components/DayStatusBadge.js'
 import { useStartWorkout } from '../../hooks/useStartWorkout.js'
 import { runTarget } from '../../lib/utils.js'
 import { IconCheck, IconPlay, IconChevronRight, IconEdit, IconRun } from '../../components/icons/index.js'
 import { DayEditSheet } from './DayEditSheet.js'
-
-const STATUS_CONFIG: Record<DayStatus, { label: string; bg: string; border: string; color: string }> = {
-  not_started: { label: 'Not started', bg: 'var(--surface-2)', border: 'var(--border)',            color: 'var(--muted)' },
-  in_progress: { label: 'In progress', bg: 'rgba(212,255,58,0.12)', border: 'rgba(212,255,58,0.35)', color: 'var(--accent)' },
-  done:        { label: 'Done',        bg: 'rgba(74,222,128,0.1)',  border: 'rgba(74,222,128,0.3)',  color: '#4ade80' },
-}
 
 const DAY_FULL: Record<string, string> = {
   Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday',
   Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday',
 }
 
-function StatusBadge({ status }: { status: DayStatus }) {
-  const cfg = STATUS_CONFIG[status]
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 5,
-      padding: '3px 9px', borderRadius: 999,
-      background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color,
-      fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600,
-      textTransform: 'uppercase', letterSpacing: '0.07em', flexShrink: 0,
-    }}>
-      {status === 'done' && <IconCheck size={10} stroke={3} />}
-      {cfg.label}
-    </span>
-  )
-}
-
 function DayCard({
-  day, status, exercises, oneRMs, loggedRun, onStart, onEditDay, onOpenRun, onToggleDone,
+  day, status, exercises, oneRMs, loggedRun, canSkip, onStart, onEditDay, onOpenRun, onToggleDone, onToggleSkip,
 }: {
   day: StructuredDay
   status: DayStatus
@@ -49,10 +28,13 @@ function DayCard({
   oneRMs: { squat: number; bench: number; deadlift: number } | null
   // Newest run logged against this day, if any — what made a run day 'done'.
   loggedRun: RunEntry | undefined
+  // Only a day that has already gone by can be skipped
+  canSkip: boolean
   onStart: () => void
   onEditDay: () => void
   onOpenRun: () => void
   onToggleDone: () => void
+  onToggleSkip: () => void
 }) {
   const PREVIEW = 5
   const preview = exercises.slice(0, PREVIEW)
@@ -60,9 +42,10 @@ function DayCard({
   const hasLifts = exercises.length > 0
   const isDone = status === 'done'
   const isInProgress = status === 'in_progress'
+  const isSkipped = status === 'skipped'
 
   const btnLabel = isDone ? 'Redo' : isInProgress ? 'Continue' : 'Start'
-  const btnStyle: React.CSSProperties = isDone
+  const btnStyle: React.CSSProperties = isDone || isSkipped
     ? { background: 'var(--surface-2)', color: 'var(--text-2)', border: '1px solid var(--border)' }
     : { background: 'var(--accent)', color: 'var(--accent-ink)', border: 'none' }
 
@@ -70,11 +53,9 @@ function DayCard({
 
   return (
     <div className="card" style={{
-      borderLeft: isInProgress
-        ? '3px solid var(--accent)'
-        : isDone ? '3px solid #4ade80' : '3px solid var(--surface-3)',
+      borderLeft: `3px solid ${DAY_STATUS_EDGE[status]}`,
       paddingLeft: 18,
-      opacity: isDone ? 0.7 : 1,
+      opacity: isDone || isSkipped ? 0.7 : 1,
     }}>
       {/* Day header row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -92,7 +73,7 @@ function DayCard({
             {day.focus}
           </div>
         </div>
-        <StatusBadge status={status} />
+        <DayStatusBadge status={status} />
       </div>
 
       {/* Lifts — one list in the order they'll be trained (main + accessory) */}
@@ -178,8 +159,9 @@ function DayCard({
       )}
 
       {/* Footer: count + edit + start */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      {/* Wraps: a past run-only day carries Edit + Skip + Mark done at 390px */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', rowGap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', rowGap: 6 }}>
           <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
             {exercises.length} exercises
             {runs.length > 0 && ` · ${runs.length} run`}
@@ -195,6 +177,23 @@ function DayCard({
           >
             <IconEdit size={11} /> Edit
           </button>
+          {/* A day that has gone by unlogged keeps its week — and the whole
+              program — unfinished. Skip says "this one didn't happen" so the
+              plan can close, without inflating what was trained. */}
+          {canSkip && !isDone && (
+            <button
+              onClick={e => { e.stopPropagation(); onToggleSkip() }}
+              style={{
+                background: 'transparent',
+                border: `1px solid ${isSkipped ? 'var(--border-strong)' : 'var(--border)'}`,
+                borderRadius: 6, padding: '2px 8px', cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                color: 'var(--text-2)', fontFamily: 'var(--font-mono)', fontSize: 10,
+              }}
+            >
+              {isSkipped ? 'Un-skip' : 'Skip'}
+            </button>
+          )}
           {/* A run-only day has no workout to finish, so 'done' has to be
               reachable by hand too — covers running outside the app, or a run
               logged before this day was linked. */}
@@ -258,7 +257,8 @@ export function WeekDays({ program, week }: { program: StructuredProgram; week: 
   const startWorkout = useStartWorkout()
   const [editingDayId, setEditingDayId] = useState<string | null>(null)
 
-  const calcRMs = resolveCalcRMs(program, getConfig(program.id), personalOneRMs)
+  const config = getConfig(program.id)
+  const calcRMs = resolveCalcRMs(program, config, personalOneRMs)
 
   const handleStart = (day: StructuredDay, exercises: StructuredExercise[]) => {
     startWorkout(buildDayProgram(program.id, week.id, day, exercises, calcRMs))
@@ -273,6 +273,11 @@ export function WeekDays({ program, week }: { program: StructuredProgram; week: 
           const exercises = resolveDayExercises(day, getDayLayout(program.id, week.id, day.id))
           const ref = buildDayRef(program.id, week.id, day.id)
           const status = getDayStatus(program.id, week.id, day.id)
+          // No start date (weekly routines) → no calendar to judge by, so leave
+          // the call to the user on any day.
+          const canSkip = config
+            ? isDayPast(config.startDate, week.weekNumber, day.dayOfWeek)
+            : true
           return (
             <DayCard
               key={day.id}
@@ -287,6 +292,8 @@ export function WeekDays({ program, week }: { program: StructuredProgram; week: 
               // Carry the day into /runs so logging there can close it out
               onOpenRun={() => navigate(`/runs?day=${encodeURIComponent(ref)}`)}
               onToggleDone={() => setDayStatus(program.id, week.id, day.id, status === 'done' ? 'not_started' : 'done')}
+              onToggleSkip={() => setDayStatus(program.id, week.id, day.id, status === 'skipped' ? 'not_started' : 'skipped')}
+              canSkip={canSkip}
             />
           )
         })}

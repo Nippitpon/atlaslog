@@ -6,17 +6,21 @@ import { dateFromYMD } from './utils.js'
 
 export type ProgramStatus = 'not_setup' | 'active' | 'paused' | 'completed'
 
-// A week counts as done only when EVERY day in it is done. The Programs page
-// used to derive this from the recorded keys alone (`every(s => s === 'done')`),
-// which marks a 4-day week done once its first logged day is done.
+// Every day accounted for — trained, or explicitly skipped by the user. Derived
+// from the program's own day list, not the recorded keys (`every(s => s ===
+// 'done')` over those marks a 4-day week done once its first logged day is).
 export function isWeekDone(
   programId: string,
   week: StructuredWeek,
   progress: ProgramProgressState,
 ): boolean {
   const days = progress[programId]?.[week.id] ?? {}
-  return week.days.length > 0 && week.days.every(d => days[d.id] === 'done')
+  return week.days.length > 0 && week.days.every(d => isSettled(days[d.id]))
 }
+
+// A day nobody has to come back to. Skipping is the only way to settle a day
+// without training it, and it has to be deliberate.
+const isSettled = (s: DayStatus | undefined): boolean => s === 'done' || s === 'skipped'
 
 // Id-aware replacement for the store's old getWeekStatus, which compared a count
 // of recorded keys against week.days.length: progress can hold day ids from an
@@ -29,7 +33,7 @@ export function weekStatus(
 ): DayStatus {
   if (isWeekDone(programId, week, progress)) return 'done'
   const days = progress[programId]?.[week.id] ?? {}
-  return week.days.some(d => days[d.id] === 'done' || days[d.id] === 'in_progress')
+  return week.days.some(d => days[d.id] && days[d.id] !== 'not_started')
     ? 'in_progress'
     : 'not_started'
 }
@@ -46,12 +50,25 @@ export function doneDaysInWeek(
   return week.days.filter(d => days[d.id] === 'done').length
 }
 
+// Days the user skipped on purpose. Kept apart from doneDays everywhere: they
+// close out a week without pretending the training happened.
+export function skippedDaysInWeek(
+  programId: string,
+  week: StructuredWeek,
+  progress: ProgramProgressState,
+): number {
+  const days = progress[programId]?.[week.id] ?? {}
+  return week.days.filter(d => days[d.id] === 'skipped').length
+}
+
+// Days still waiting on the user — what Home's "days left behind" line counts.
 export function remainingDays(
   programId: string,
   week: StructuredWeek,
   progress: ProgramProgressState,
 ): number {
-  return week.days.length - doneDaysInWeek(programId, week, progress)
+  const days = progress[programId]?.[week.id] ?? {}
+  return week.days.filter(d => !isSettled(days[d.id])).length
 }
 
 export function countDoneWeeks(program: StructuredProgram, progress: ProgramProgressState): number {
@@ -60,6 +77,7 @@ export function countDoneWeeks(program: StructuredProgram, progress: ProgramProg
 
 export interface ProgramProgress {
   doneDays: number
+  skippedDays: number
   totalDays: number
   doneWeeks: number
   totalWeeks: number
@@ -74,16 +92,21 @@ export function programProgress(
   progress: ProgramProgressState,
 ): ProgramProgress {
   let doneDays = 0
+  let skippedDays = 0
   let totalDays = 0
   for (const week of program.weeks) {
     doneDays += doneDaysInWeek(program.id, week, progress)
+    skippedDays += skippedDaysInWeek(program.id, week, progress)
     totalDays += week.days.length
   }
   return {
     doneDays,
+    skippedDays,
     totalDays,
     doneWeeks: countDoneWeeks(program, progress),
     totalWeeks: program.weeks.length,
+    // Skipped days never count here — the bar reports training done, not boxes
+    // ticked, so a finished program that skipped days lands under 100%.
     pct: totalDays ? Math.round((doneDays / totalDays) * 100) : 0,
   }
 }
@@ -334,6 +357,56 @@ export function resolveDayRef(
   return { program, week, weekNum: weekIdx + 1, day }
 }
 
+
+const DAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+
+// The calendar date a program day falls on. Weeks are 7-day blocks counted from
+// startDate (same arithmetic as scheduledWeekNum and the week ranges shown on the
+// overview page), and every weekday name appears exactly once inside a block —
+// so the mapping is unambiguous even when startDate isn't a Monday.
+export function dayDate(startDate: string, weekNumber: number, dayOfWeek: string): Date | null {
+  const start = dateFromYMD(startDate)
+  if (Number.isNaN(start.getTime())) return null
+  const target = DAY_INDEX[dayOfWeek]
+  if (target === undefined) return null
+  start.setDate(start.getDate() + (weekNumber - 1) * 7)
+  start.setDate(start.getDate() + ((target - start.getDay() + 7) % 7))
+  return start
+}
+
+// Has this day already gone by? Local midnight on both sides (see dateFromYMD).
+// Today is NOT past — there's still time to train it.
+export function isDayPast(
+  startDate: string,
+  weekNumber: number,
+  dayOfWeek: string,
+  now: Date = new Date(),
+): boolean {
+  const d = dayDate(startDate, weekNumber, dayOfWeek)
+  if (!d) return false
+  return d < new Date(now.getFullYear(), now.getMonth(), now.getDate())
+}
+
+// One source for the day badge, which three pages render identically (Week days,
+// week rows on the overview, the week header) — adding 'skipped' to a copy in
+// each was what surfaced the duplication.
+export const DAY_STATUS_STYLE: Record<
+  DayStatus,
+  { label: string; bg: string; border: string; color: string }
+> = {
+  not_started: { label: 'Not started', bg: 'var(--surface-2)',       border: 'var(--border)',           color: 'var(--muted)' },
+  in_progress: { label: 'In progress', bg: 'rgba(212,255,58,0.12)',  border: 'rgba(212,255,58,0.35)',   color: 'var(--accent)' },
+  done:        { label: 'Done',        bg: 'rgba(74,222,128,0.1)',   border: 'rgba(74,222,128,0.3)',    color: '#4ade80' },
+  skipped:     { label: 'Skipped',     bg: 'var(--surface-2)',       border: 'var(--border-strong)',    color: 'var(--text-2)' },
+}
+
+// Left edge of a day/week card, keyed off the same status.
+export const DAY_STATUS_EDGE: Record<DayStatus, string> = {
+  not_started: 'var(--surface-3)',
+  in_progress: 'var(--accent)',
+  done: '#4ade80',
+  skipped: 'var(--border-strong)',
+}
 
 export const PROGRAM_STATUS_STYLE: Record<
   Exclude<ProgramStatus, 'not_setup'>,

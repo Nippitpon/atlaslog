@@ -158,7 +158,9 @@ export function DashboardPage() {
     const { program, week: currentWeek } = activeProgramInfo
     const day = currentWeek.days.find(d => d.dayOfWeek === todayShort)
     if (!day) return null
-    if (getDayStatus(program.id, currentWeek.id, day.id) === 'done') return null
+    const dayStatus = getDayStatus(program.id, currentWeek.id, day.id)
+    // Trained or deliberately skipped → nothing left to prompt about today
+    if (dayStatus === 'done' || dayStatus === 'skipped') return null
     const exercises = resolveDayExercises(day, getDayLayout(program.id, currentWeek.id, day.id))
     return { day, exercises, program, currentWeek }
   }, [activeProgramInfo, getDayStatus, getDayLayout])
@@ -553,6 +555,9 @@ export function DashboardPage() {
                             ? <IconCheck size={11} stroke={3} style={{ color: '#4ade80' }} />
                             : isActive
                             ? <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)' }} />
+                            : status === 'skipped'
+                            // A dash, not a dot: settled, but nothing was trained
+                            ? <div style={{ width: 8, height: 2, borderRadius: 1, background: 'var(--text-2)' }} />
                             : <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--border-strong)' }} />
                           }
                         </div>

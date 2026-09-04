@@ -149,7 +149,11 @@ export interface RunEntry {
 
 // ─── Structured (Hierarchical) Program Types ──────────────────────────────────
 
-export type DayStatus = 'not_started' | 'in_progress' | 'done'
+// 'skipped' is only ever set by the user tapping Skip on a day that has gone by.
+// Nothing infers it: a day left alone stays 'not_started' and keeps its week (and
+// the whole program) unfinished, which is the point — the plan isn't closed until
+// the athlete says what happened to that day.
+export type DayStatus = 'not_started' | 'in_progress' | 'done' | 'skipped'
 export type ProgramPhase = 'Accumulation' | 'Intensification' | 'Peaking' | 'Taper'
 
 export interface StructuredExercise {

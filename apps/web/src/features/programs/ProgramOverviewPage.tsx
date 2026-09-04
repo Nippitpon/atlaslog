@@ -1,43 +1,24 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import type { DayStatus, StructuredProgram } from '@atlaslog/shared'
+import type { StructuredProgram } from '@atlaslog/shared'
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
-import { IconChevronLeft, IconChevronRight, IconCheck, IconSettings, IconEdit, IconStar, IconPause, IconPlay } from '../../components/icons/index.js'
-import { getProgramStatus, weekStatus, doneDaysInWeek, programProgress, PROGRAM_STATUS_STYLE } from '../../lib/programStatus.js'
+import { IconChevronLeft, IconChevronRight, IconSettings, IconEdit, IconStar, IconPause, IconPlay } from '../../components/icons/index.js'
+import {
+  getProgramStatus, weekStatus, doneDaysInWeek, programProgress,
+  PROGRAM_STATUS_STYLE, DAY_STATUS_EDGE,
+} from '../../lib/programStatus.js'
+import { DayStatusBadge } from '../../components/DayStatusBadge.js'
 import { ProgramSetupSheet } from './ProgramSetupSheet.js'
 import { WeekDays } from './WeekDays.js'
 import { formatDMY, dateFromYMD } from '../../lib/utils.js'
-
-const STATUS_CONFIG: Record<DayStatus, { label: string; bg: string; border: string; color: string }> = {
-  not_started: { label: 'Not started', bg: 'var(--surface-2)', border: 'var(--border)', color: 'var(--muted)' },
-  in_progress: { label: 'In progress', bg: 'rgba(212,255,58,0.12)', border: 'rgba(212,255,58,0.35)', color: 'var(--accent)' },
-  done:        { label: 'Done',        bg: 'rgba(74,222,128,0.1)',  border: 'rgba(74,222,128,0.3)',  color: '#4ade80' },
-}
 
 const PHASE_COLOR: Record<string, string> = {
   Accumulation:    '#60a5fa',
   Intensification: '#f97316',
   Peaking:         '#a78bfa',
   Taper:           '#4ade80',
-}
-
-function StatusBadge({ status }: { status: DayStatus }) {
-  const cfg = STATUS_CONFIG[status]
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 5,
-      padding: '3px 9px', borderRadius: 999,
-      background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color,
-      fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600,
-      textTransform: 'uppercase', letterSpacing: '0.07em',
-      flexShrink: 0,
-    }}>
-      {status === 'done' && <IconCheck size={10} stroke={3} />}
-      {cfg.label}
-    </span>
-  )
 }
 
 export function ProgramOverviewPage() {
@@ -235,9 +216,7 @@ export function ProgramOverviewPage() {
               >
                 <div className="card card-tight" style={{
                   display: 'flex', alignItems: 'center', gap: 12,
-                  borderLeft: status === 'in_progress'
-                    ? '3px solid var(--accent)'
-                    : status === 'done' ? '3px solid #4ade80' : '3px solid var(--surface-3)',
+                  borderLeft: `3px solid ${DAY_STATUS_EDGE[status]}`,
                   paddingLeft: 14,
                 }}>
                   {/* Week number */}
@@ -267,7 +246,7 @@ export function ProgramOverviewPage() {
 
                   {/* Status + chevron */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                    <StatusBadge status={status} />
+                    <DayStatusBadge status={status} />
                     <IconChevronRight size={16} style={{ color: 'var(--muted)' }} />
                   </div>
                 </div>
@@ -289,7 +268,7 @@ export function ProgramOverviewPage() {
 function ProgressSummary({ program }: { program: StructuredProgram }) {
   const { progress } = useProgramStore()
   // Days, not finished weeks: skipping one day a week used to hold this at 0%
-  const { doneDays, totalDays, doneWeeks, totalWeeks, pct } = programProgress(program, progress)
+  const { doneDays, skippedDays, totalDays, doneWeeks, totalWeeks, pct } = programProgress(program, progress)
 
   return (
     <div style={{ padding: '0 20px', marginBottom: 20 }}>
@@ -310,6 +289,7 @@ function ProgressSummary({ program }: { program: StructuredProgram }) {
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)',
           marginTop: 6, textTransform: 'uppercase' }}>
           {pct}% complete · {doneWeeks}/{totalWeeks} weeks done
+          {skippedDays > 0 && ` · ${skippedDays} skipped`}
         </div>
       </div>
     </div>

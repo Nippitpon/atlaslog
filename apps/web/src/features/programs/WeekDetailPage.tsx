@@ -1,39 +1,18 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import type { DayStatus } from '@atlaslog/shared'
+
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { formatDM, dateFromYMD } from '../../lib/utils.js'
 import { weekStatus } from '../../lib/programStatus.js'
-import { IconChevronLeft, IconCheck, IconChevronRight } from '../../components/icons/index.js'
+import { DayStatusBadge } from '../../components/DayStatusBadge.js'
+import { IconChevronLeft, IconChevronRight } from '../../components/icons/index.js'
 import { WeekDays } from './WeekDays.js'
-
-const STATUS_CONFIG: Record<DayStatus, { label: string; bg: string; border: string; color: string }> = {
-  not_started: { label: 'Not started', bg: 'var(--surface-2)', border: 'var(--border)',            color: 'var(--muted)' },
-  in_progress: { label: 'In progress', bg: 'rgba(212,255,58,0.12)', border: 'rgba(212,255,58,0.35)', color: 'var(--accent)' },
-  done:        { label: 'Done',        bg: 'rgba(74,222,128,0.1)',  border: 'rgba(74,222,128,0.3)',  color: '#4ade80' },
-}
 
 const PHASE_COLOR: Record<string, string> = {
   Accumulation:    '#60a5fa',
   Intensification: '#f97316',
   Peaking:         '#a78bfa',
   Taper:           '#4ade80',
-}
-
-function StatusBadge({ status }: { status: DayStatus }) {
-  const cfg = STATUS_CONFIG[status]
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 5,
-      padding: '3px 9px', borderRadius: 999,
-      background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color,
-      fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600,
-      textTransform: 'uppercase', letterSpacing: '0.07em', flexShrink: 0,
-    }}>
-      {status === 'done' && <IconCheck size={10} stroke={3} />}
-      {cfg.label}
-    </span>
-  )
 }
 
 export function WeekDetailPage() {
@@ -76,7 +55,7 @@ export function WeekDetailPage() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <StatusBadge status={status} />
+          <DayStatusBadge status={status} />
           <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
             {week.days.length} training days
           </span>
