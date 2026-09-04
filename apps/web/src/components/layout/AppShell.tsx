@@ -3,6 +3,8 @@ import { useLocation, Outlet, useNavigate, Navigate } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
 import { BottomNav } from './BottomNav.js'
+import { ResumeBar } from './ResumeBar.js'
+import { useStartWorkout } from '../../hooks/useStartWorkout.js'
 import { PROGRAMS } from '../../lib/data.js'
 import { IconX, IconChevronRight } from '../icons/index.js'
 import { isSupabaseConfigured } from '../../lib/supabase.js'
@@ -10,12 +12,15 @@ import { isSupabaseConfigured } from '../../lib/supabase.js'
 export function AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { theme, showPicker, setShowPicker, startWorkout } = useAppStore()
+  const { theme, showPicker, setShowPicker, workout } = useAppStore()
   const { user, initialized, init } = useAuthStore()
+  const startWorkout = useStartWorkout()
 
   useEffect(() => { if (isSupabaseConfigured) init() }, [init])
   const isDark = theme === 'dark'
   const isLogger = location.pathname === '/workout'
+  // The bar sits above the nav, so screens need extra bottom padding while it shows
+  const showResumeBar = !!workout && !isLogger
 
   if (!isSupabaseConfigured) {
     return (
@@ -50,16 +55,17 @@ export function AppShell() {
   if (!user) return <Navigate to="/login" replace />
 
   const handlePickProgram = (p: typeof PROGRAMS[number]) => {
-    startWorkout(p)
-    navigate('/workout')
+    // Backing out of the "you have a workout running" confirm keeps the sheet up
+    if (startWorkout(p) !== 'cancelled') setShowPicker(false)
   }
 
   return (
-    <div className={`atlas-app theme-${theme}`}>
+    <div className={`atlas-app theme-${theme}${showResumeBar ? ' has-resume-bar' : ''}`}>
       <div className="dynamic-island" />
 
       <Outlet />
 
+      {showResumeBar && <ResumeBar workout={workout} onOpen={() => navigate('/workout')} />}
       {!isLogger && <BottomNav />}
 
       {showPicker && (

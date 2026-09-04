@@ -44,15 +44,10 @@ export function LoggerPage() {
     s + e.sets.filter(x => x.done).reduce((ss, st) => ss + (st.w * st.r), 0), 0)
 
   const updateSet = (setIdx: number, patch: Partial<Pick<WorkoutSet, 'w' | 'r' | 'rpe' | 'done'>>) => {
-    // Set day to in_progress on first checked set
+    // First checked set of the whole workout marks its program day as started
     if (patch.done === true) {
       const noSetsDoneYet = workout.exercises.every(e => e.sets.every(s => !s.done))
-      if (noSetsDoneYet) {
-        const parts = workout.programId.split('/')
-        if (parts.length === 3) {
-          useProgramStore.getState().setDayStatus(parts[0], parts[1], parts[2], 'in_progress')
-        }
-      }
+      if (noSetsDoneYet) useProgramStore.getState().markDayStarted(workout.programId)
     }
     const next: Workout = { ...workout }
     next.exercises = next.exercises.map((e, i) => i !== workout.currentIdx ? e : {

@@ -96,6 +96,31 @@ describe('runs that point at nothing', () => {
   })
 })
 
+describe('markDayStarted', () => {
+  it('lifts an untouched day to in_progress', () => {
+    ps().markDayStarted(mixedRef)
+    expect(statusOf(mixedRef)).toBe('in_progress')
+  })
+
+  // Redo: abandoning a re-run of a finished day must not demote it
+  it('leaves a finished day alone', () => {
+    ps().setDayStatus(RUN_PROGRAM_ID, RUN_WEEK_ID, MIXED_DAY_ID, 'done')
+    ps().markDayStarted(mixedRef)
+    expect(statusOf(mixedRef)).toBe('done')
+  })
+
+  it('is a no-op for a day already in progress', () => {
+    ps().setDayStatus(RUN_PROGRAM_ID, RUN_WEEK_ID, MIXED_DAY_ID, 'in_progress')
+    ps().markDayStarted(mixedRef)
+    expect(statusOf(mixedRef)).toBe('in_progress')
+  })
+
+  it('ignores a quick session, which belongs to no program day', () => {
+    ps().markDayStarted('quick')
+    expect(ps().progress).toEqual({})
+  })
+})
+
 // The knock-on bug behind round 41: isWeekDone needs every day, so a week
 // holding a run day could never finish, pinning Home and blocking COMPLETED.
 describe('week completion', () => {

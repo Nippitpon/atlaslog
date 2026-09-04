@@ -11,6 +11,7 @@ import { resolveDayExercises } from '../../lib/dayLayout.js'
 import { weeklyVolume, getDayOfWeek, runTarget } from '../../lib/utils.js'
 import { latestWeightKg, weeklyCalories } from '../../lib/calories.js'
 import { CalorieRing } from './CalorieRing.js'
+import { useStartWorkout } from '../../hooks/useStartWorkout.js'
 import { pickCurrentProgramId, pickActiveWeek, dayRef as buildDayRef } from '../../lib/programStatus.js'
 import { IconDumbbell, IconSearch, IconCheck, IconBell, IconRun, IconUsers, IconX, IconPlay, IconTrendingUp } from '../../components/icons/index.js'
 import { OneRMSparkline } from '../../components/charts/OneRMSparkline.js'
@@ -56,7 +57,8 @@ const PHASE_COLOR: Record<string, string> = {
 
 export function DashboardPage() {
   const navigate = useNavigate()
-  const { history, personalOneRMs, bodyMetrics, runs, workout, startWorkout, oneRMHistory } = useAppStore()
+  const { history, personalOneRMs, bodyMetrics, runs, oneRMHistory } = useAppStore()
+  const startWorkout = useStartWorkout()
   const { configs, getDayStatus, getDayLayout, customPrograms, progress, programMeta, setProgramPaused } = useProgramStore()
   const { notifications, refreshNotifications } = useAuthStore()
 
@@ -171,21 +173,14 @@ export function DashboardPage() {
     return `/runs?day=${encodeURIComponent(buildDayRef(program.id, currentWeek.id, day.id))}`
   }, [todayReminder])
 
-  // Start today's session straight from Home. startWorkout always replaces the
-  // active workout, so an unfinished one is either resumed or confirmed away.
+  // Start today's session straight from Home.
   const handleStartToday = () => {
     if (!todayReminder) return
     const { day, exercises, program, currentWeek } = todayReminder
-    const p = buildDayProgram(
+    startWorkout(buildDayProgram(
       program.id, currentWeek.id, day, exercises,
       resolveCalcRMs(program, configs[program.id], personalOneRMs),
-    )
-    if (workout) {
-      if (workout.programId === p.id) return navigate('/workout')
-      if (!confirm(`"${workout.name}" ยังเทรนค้างอยู่ — เริ่มวันนี้ใหม่จะทิ้งเซ็ตที่บันทึกไว้`)) return
-    }
-    startWorkout(p)
-    navigate('/workout')
+    ))
   }
 
 

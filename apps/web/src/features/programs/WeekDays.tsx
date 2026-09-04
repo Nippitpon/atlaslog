@@ -7,6 +7,7 @@ import { useAppStore } from '../../store/useAppStore.js'
 import { structuredWeight, resolveCalcRMs } from '../../lib/rpeTable.js'
 import { resolveDayExercises } from '../../lib/dayLayout.js'
 import { dayRef as buildDayRef } from '../../lib/programStatus.js'
+import { useStartWorkout } from '../../hooks/useStartWorkout.js'
 import { runTarget } from '../../lib/utils.js'
 import { IconCheck, IconPlay, IconChevronRight, IconEdit, IconRun } from '../../components/icons/index.js'
 import { DayEditSheet } from './DayEditSheet.js'
@@ -253,14 +254,14 @@ function DayCard({
 export function WeekDays({ program, week }: { program: StructuredProgram; week: StructuredWeek }) {
   const navigate = useNavigate()
   const { getDayStatus, setDayStatus, getConfig, getDayLayout, setDayLayout } = useProgramStore()
-  const { startWorkout, personalOneRMs, runs } = useAppStore()
+  const { personalOneRMs, runs } = useAppStore()
+  const startWorkout = useStartWorkout()
   const [editingDayId, setEditingDayId] = useState<string | null>(null)
 
   const calcRMs = resolveCalcRMs(program, getConfig(program.id), personalOneRMs)
 
   const handleStart = (day: StructuredDay, exercises: StructuredExercise[]) => {
     startWorkout(buildDayProgram(program.id, week.id, day, exercises, calcRMs))
-    navigate('/workout')
   }
 
   const editingDay = editingDayId ? week.days.find(d => d.id === editingDayId) : null

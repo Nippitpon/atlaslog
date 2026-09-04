@@ -5,6 +5,7 @@ import { EXERCISES, MUSCLE_GROUPS, EXERCISE_GROUPS, EQUIPMENT_OPTIONS, makeExerc
 import { muscleColor, exerciseGifUrl } from '../../lib/utils.js'
 import { useAppStore } from '../../store/useAppStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
+import { useStartWorkout } from '../../hooks/useStartWorkout.js'
 import { IconSearch, IconX, IconDumbbell, IconChevronRight, IconPlus, IconTrash, IconCheck, IconBolt } from '../../components/icons/index.js'
 
 const PAGE = 50
@@ -30,7 +31,8 @@ function ExThumb({ ex, size }: { ex: Exercise; size: number }) {
 
 export function LibraryPage() {
   const navigate = useNavigate()
-  const { customExercises, dbExercises, addCustomExercise, removeCustomExercise, workout, startWorkout } = useAppStore()
+  const { customExercises, dbExercises, addCustomExercise, removeCustomExercise, workout } = useAppStore()
+  const startWorkout = useStartWorkout()
   const quickRunning = workout?.programId === QUICK_PROGRAM.id
   const { isCoach, isAdmin } = useAuthStore()
   const canManage = isCoach || isAdmin
@@ -74,17 +76,7 @@ export function LibraryPage() {
     if (window.confirm(`Delete "${ex.name}" from the library?`)) removeCustomExercise(ex.id)
   }
 
-  // startWorkout always replaces the active workout, so an unfinished one is either
-  // resumed (when it's already a Quick Session) or confirmed away first.
-  const handleQuick = () => {
-    if (workout) {
-      if (workout.programId !== QUICK_PROGRAM.id
-        && !window.confirm(`"${workout.name}" ยังเทรนค้างอยู่ — เริ่ม Quick Session ใหม่จะทิ้งเซ็ตที่บันทึกไว้`)) return
-      if (workout.programId === QUICK_PROGRAM.id) return navigate('/workout')
-    }
-    startWorkout(QUICK_PROGRAM)
-    navigate('/workout')
-  }
+  const handleQuick = () => startWorkout(QUICK_PROGRAM)
 
   return (
     <div className="atlas-screen screen-enter">

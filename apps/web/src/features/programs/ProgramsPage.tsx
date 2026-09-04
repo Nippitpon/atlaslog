@@ -8,6 +8,7 @@ import { programVolume } from '../../lib/utils.js'
 import { PROGRAMS } from '../../lib/data.js'
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { ImportProgramSheet } from './ImportProgramSheet.js'
+import { useStartWorkout } from '../../hooks/useStartWorkout.js'
 import { createShare, importShare, listPublicPrograms, type PublicProgram } from '../../lib/shareApi.js'
 import {
   countDoneWeeks, hasStarted as programHasStarted, getProgramStatus, sortPrograms,
@@ -73,7 +74,8 @@ function PauseButton({ programId, status, onSetPaused }: {
 
 export function ProgramsPage() {
   const navigate = useNavigate()
-  const { startWorkout, history } = useAppStore()
+  const { history } = useAppStore()
+  const startWorkout = useStartWorkout()
   const {
     progress, configs, customPrograms, programMeta,
     removeCustomProgram, addCustomProgram, toggleFavorite, setProgramPaused,
@@ -121,10 +123,7 @@ export function ProgramsPage() {
   const [importBusy, setImportBusy] = useState(false)
   const [importErr, setImportErr] = useState<string | null>(null)
 
-  const handleQuickPick = (p: Program) => {
-    startWorkout(p)
-    navigate('/workout')
-  }
+  const handleQuickPick = (p: Program) => startWorkout(p)
 
   const handleShare = async (sp: typeof customPrograms[number]) => {
     setSharing(true)

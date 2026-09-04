@@ -29,6 +29,7 @@ interface ProgramStore {
   getDayStatus: (programId: string, weekId: string, dayId: string) => DayStatus
   setDayStatus: (programId: string, weekId: string, dayId: string, status: DayStatus) => void
   setRunDayStatus: (dayRef: string, logged: boolean) => void
+  markDayStarted: (dayRef: string) => void
   resetProgram: (programId: string) => void
 
   setConfig: (programId: string, config: ProgramConfig) => void
@@ -92,6 +93,20 @@ export const useProgramStore = create<ProgramStore>()(
           },
         }))
         queueStateSync(get)
+      },
+
+      // First set ticked in the logger. Only lifts a day that hasn't been trained
+      // yet: redoing a day that is already 'done' must keep saying done until the
+      // redo is actually finished, or abandoning it halfway demotes the day (and
+      // with it a week that had been complete).
+      markDayStarted: (dayRef) => {
+        const [programId, weekId, dayId] = dayRef.split('/')
+        // Quick sessions carry a single-segment id and belong to no program day
+        if (!programId || !weekId || !dayId) return
+        const { getDayStatus, setDayStatus } = get()
+        if (getDayStatus(programId, weekId, dayId) === 'not_started') {
+          setDayStatus(programId, weekId, dayId, 'in_progress')
+        }
       },
 
       // A run logged against a program day. Running rows never reach the set
