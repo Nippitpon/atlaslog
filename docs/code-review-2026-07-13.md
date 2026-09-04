@@ -3,6 +3,9 @@
 > Senior review แบบเต็ม ครอบ 4 ด้าน: state/sync, domain logic + Excel import, security/privacy, UI workout flows
 > ทุกข้อ verify กับโค้ดจริงแล้ว (อ้าง `file:line`). ยังไม่มี unit test / E2E เลยสักไฟล์ — เป็นความเสี่ยงหลัก
 > ใช้ไฟล์นี้เป็น backlog: ติ๊ก `[x]` เมื่อแก้เสร็จ แล้วอ้าง commit
+>
+> **ตรวจซ้ำกับโค้ดจริง 2026-09-04 (รอบ 43):** ติ๊กย้อนหลังให้ข้อที่รอบ 31–42 แก้ไปแล้วแต่ยังค้าง `[ ]` อยู่
+> — ที่เหลือ `[ ]` คือยังไม่ได้แก้จริง ลุยต่อได้เลย
 
 ## สรุปภาพรวม
 
@@ -22,7 +25,7 @@
   ถ้า user log เวิร์กเอาต์ระหว่าง flush รอ network อยู่ op นั้นถูกลบทิ้งเงียบ ๆ ไม่เคย sync
   **แก้:** re-read คิวตอนเขียนกลับแล้ว merge ส่วนที่เพิ่มใหม่; ให้ entry มี id เพื่อ diff แม่นยำ
 
-- [ ] **Op ที่ต่อคิวตอน sign-out ถูก sync เข้าบัญชีคนถัดไป** — `apps/web/src/lib/syncQueue.ts:149,225`
+- [x] **Op ที่ต่อคิวตอน sign-out ถูก sync เข้าบัญชีคนถัดไป** ✅ (`syncQueue.ts:254` ข้าม entry ที่ `userId` ไม่ตรง user ปัจจุบัน) — `apps/web/src/lib/syncQueue.ts:149,225`
   op ตอนไม่ล็อกอิน enqueue เป็น `userId:null`, flush ถือว่า null = user ปัจจุบัน →
   เครื่องแชร์: A ล็อกเอาต์แล้ว log, B ล็อกอิน → เวิร์กเอาต์ A ไปโผล่ใน cloud ของ B
   **แก้:** stamp entry ด้วย last-known user id แทน null; null สงวนไว้เฉพาะ migration entry เก่า
@@ -41,12 +44,15 @@
   importer รับ `reps=2.5` (`Number()||1` ไม่กรอง) → `getRpePct` ทำ `RPE_TABLE[1.5]`=undefined →
   TypeError บน **render path** ของหน้า week + dashboard → จอขาวตราบที่ยังตั้งโปรแกรมนี้
   **แก้:** `Math.round(reps)` ใน `getRpePct` + validate reps เป็นจำนวนเต็มบวก/AMRAP ฝั่ง import
+  ⚠️ **แก้ครึ่งเดียว (2026-09-04):** ฝั่ง import ปิดแล้ว (`excelImport.ts:239` บังคับจำนวนเต็ม) แต่
+  `getRpePct` (`rpeTable.ts:22`) ยัง clamp โดยไม่ปัดเศษ → `RPE_TABLE[1.5]` ยัง undefined ได้
+  ถ้ามี reps ทศนิยมมาจากทางอื่น (เช่นช่อง number ใน CreateProgramPage) — **ยังไม่ติ๊ก**
 
-- [ ] **pct ไม่ตรวจช่วง** — `apps/web/src/lib/excelImport.ts:114`
+- [x] **pct ไม่ตรวจช่วง** ✅ รอบ 31 `7536231` (`excelImport.ts:251` reject นอกช่วง 0–1.1 พร้อมเลข row) — `apps/web/src/lib/excelImport.ts:114`
   กรอก `75` แทน `0.75` ได้ → 180×75 = **13,500 kg** prefill เข้า logger; pct ติดลบก็ผ่าน
   **แก้:** reject ถ้า `pct<=0 || pct>1.05` พร้อมเลข row (หรือ auto-หาร 100 ถ้าอยู่ 1–100 แล้วเตือน)
 
-- [ ] **คีย์ override ชนกัน → เซ็ต back-off prefill น้ำหนักเท่า top set** — `apps/web/src/features/programs/WeekDays.tsx:250` + importer/CreateProgram ไม่ใส่ `id`
+- [x] **คีย์ override ชนกัน → เซ็ต back-off prefill น้ำหนักเท่า top set** ✅ รอบ 31 `7536231` (import มี `id` ต่อ row `w{n}-{day}-e{i}`; CreateProgramPage มินต์ id เองที่ `:149-151`) — `apps/web/src/features/programs/WeekDays.tsx:250` + importer/CreateProgram ไม่ใส่ `id`
   Excel import (`excelImport.ts:139`) และ CreateProgramPage (`ExerciseDraft`) ไม่เคยใส่ `id` →
   2 row ลิฟต์เดียวกัน rpe เท่ากัน / pct-only (rpe=undefined) → key ชนกัน →
   เช่น "Squat 5×5@75%" + "3×3@85%" prefill 85% ทั้งคู่ = เทรนหนักเกิน 10%
@@ -57,12 +63,15 @@
   (accessory ไต่ pct, วัน/ท่าเฉพาะสัปดาห์หลัง) หายหมดแค่กด "Save"
   **แก้:** reconstruct จากทุกสัปดาห์ key ด้วย exercise id; หรือบล็อกการแก้เมื่อสัปดาห์ไม่ uniform
 
-- [ ] **ปุ่ม "Continue"/START ทับ workout ที่ค้าง ไม่มีทาง resume** — `apps/web/src/features/programs/WeekDays.tsx:243`, `apps/web/src/store/useAppStore.ts:77`
+- [x] **ปุ่ม "Continue"/START ทับ workout ที่ค้าง ไม่มีทาง resume** ✅ รอบ 43 — `apps/web/src/features/programs/WeekDays.tsx:243`, `apps/web/src/store/useAppStore.ts:77`
   `startWorkout` แทนที่ workout เสมอ, ไม่มี UI กลับไปเวิร์กเอาต์ค้าง →
   log 15 เซ็ตแล้วกด back, กลับมากด Continue = เซ็ตหายหมด ไม่มี confirm
   **แก้:** ถ้า programId ตรงกับ workout ค้าง → navigate เฉย ๆ; ถ้าต่าง → confirm; เพิ่ม banner "มีเวิร์กเอาต์ค้าง"
+  **แก้แล้ว (รอบ 43):** `lib/workoutFlow.resolveStartAction()` + `hooks/useStartWorkout()` ใช้ร่วมทั้ง 5 จุด
+  (เดิม guard มีแค่ที่ Dashboard/Library อีก 3 จุดทับทันที) · `components/layout/ResumeBar.tsx` เป็นแถบ
+  "ยังเทรนค้างอยู่" เหนือ BottomNav เห็นทุกหน้า · เทส `lib/workoutFlow.test.ts`
 
-- [ ] **ลบ custom program แตะเดียว ไม่ confirm ลบทั้ง cloud** — `apps/web/src/features/programs/ProgramsPage.tsx:274`
+- [x] **ลบ custom program แตะเดียว ไม่ confirm ลบทั้ง cloud** ✅ (`ProgramsPage.tsx:92` มี confirm แล้ว) — `apps/web/src/features/programs/ProgramsPage.tsx:274`
   ไอคอนถังขยะเรียก `removeCustomProgram` ทันที ลบ progress+config+cloud (LibraryPage มี `confirm` แต่หน้านี้ไม่มี)
   **แก้:** ครอบด้วย confirm dialog ให้เหมือน `LibraryPage.handleDelete`
 
@@ -92,14 +101,14 @@
 - [ ] **persist ไม่มี `version`/`migrate` (ทั้ง 2 store)** — `useAppStore.ts:196`, `useProgramStore.ts:228`
   เปลี่ยน shape ครั้งหน้า → user เดิม rehydrate ของเก่าทับ = error/field หาย; key `atlas:v1` เก่ายังค้าง
   **แก้:** เพิ่ม `version:1`+`migrate` เดี๋ยวนี้ + ลบ key `atlas:v1`
-- [ ] **sets ไม่จำกัดเพดาน + ไม่เช็คจำนวนเต็ม** — `excelImport.ts:103`
+- [x] **sets ไม่จำกัดเพดาน + ไม่เช็คจำนวนเต็ม** ✅ รอบ 31 `7536231` (`excelImport.ts:227` บังคับจำนวนเต็ม 1–50) — `excelImport.ts:103`
   `sets=1000000` ผ่าน → `Array.from({length})` สร้าง state ล้าน element → tab ค้าง/quota แตก
   **แก้:** บังคับจำนวนเต็ม 1–50 พร้อมเลข row
 - [ ] **วันที่คำนวณแบบ UTC ทั้งแอป** — `DashboardPage.tsx:129`, `ProgramSetupSheet.tsx:54`, `RunsPage.tsx:13`, `ProgramOverviewPage.tsx:193`
   `new Date('YYYY-MM-DD')`=UTC midnight → ไทย (UTC+7) ช่วง 00:00–07:00 "วันนี้"=เมื่อวาน:
   default start date เพี้ยน, สัปดาห์ปัจจุบันเลื่อน, RunsPage `max` บล็อกวันนี้
   **แก้:** helper parse เป็น local date จุดเดียว (แบบ `useProgramStore.ts:178`)
-- [ ] **week นับ "done" หลังทำวันแรกวันเดียว** — `ProgramsPage.tsx:130`, `ProgramOverviewPage.tsx:263`
+- [x] **week นับ "done" หลังทำวันแรกวันเดียว** ✅ รอบ 40 `3399a0c` (`programStatus.isWeekDone` เทียบ `week.days` ครบทุกวัน ใช้ร่วมทุกหน้า) — `ProgramsPage.tsx:130`, `ProgramOverviewPage.tsx:263`
   นับด้วย `every(s==='done')` บน key เฉพาะวันที่แตะ → ทำ 1/4 วัน = สัปดาห์นับ done → ขัดกับ dashboard
   **แก้:** ใช้ `getWeekStatus(...)` เทียบ `week.days.length` ทั้ง 3 จุด
 - [ ] **🔒 coach function ไม่เช็ค role + resolve-link auto-active** — `coach/index.ts:38,62`
@@ -117,8 +126,9 @@
 - [ ] **week ไม่ต่อเนื่อง (1,2,4) เพี้ยน + rpe ไม่เช็คช่วง** — `excelImport.ts:161` — validate week ต่อเนื่องจาก 1; validate rpe∈[6,10]
 - [ ] **swap ท่าไม่เปลี่ยนชื่อ/RPE เป้า** — `LoggerPage.tsx:274` — ตอนเลือกให้เซ็ต `name` ใหม่ + เคลียร์ `targetRpe`
 - [ ] **ไม่มี route 404 / errorElement** — `router.tsx:19` — เพิ่ม catch-all `path:'*'` + `errorElement` บน shell
-- [ ] **`/workout` เมื่อไม่มี workout = จอว่างตัน** — `LoggerPage.tsx:31` — `return <Navigate to="/" replace/>` แทน `null`
-- [ ] **Redo วัน done แล้ว cancel → ตกเป็น in_progress ถาวร** — `LoggerPage.tsx:42` — set `in_progress` เฉพาะตอนสถานะเดิม `not_started`
+- [x] **`/workout` เมื่อไม่มี workout = จอว่างตัน** — `LoggerPage.tsx:31` — `return <Navigate to="/" replace/>` แทน `null` ✅ (`LoggerPage.tsx:35`)
+- [x] **Redo วัน done แล้ว cancel → ตกเป็น in_progress ถาวร** — `LoggerPage.tsx:42` — set `in_progress` เฉพาะตอนสถานะเดิม `not_started`
+  ✅ **รอบ 43** — ย้ายกฎเข้า `useProgramStore.markDayStarted()` (ยกเฉพาะจาก `not_started`) + เทสใน `store/runDayStatus.test.ts`
 - [ ] **Finish 0 เซ็ต → mark done + session ว่างลบไม่ได้** — `useAppStore.ts:106` — disable Confirm เมื่อ `setCount===0`; เพิ่มลบ session ใน History
 - [ ] **drag ไม่จับ `pointercancel`** — `CreateProgramPage.tsx:124` — ฟัง `pointercancel` handler เดียวกัน หรือ `setPointerCapture`
 

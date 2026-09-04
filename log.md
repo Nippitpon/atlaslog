@@ -1,8 +1,75 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-09-04 (รอบ 42 — ✅ SHIPPED: ปิดของค้าง 3 ข้อของรอบ 41 + โปรเจกต์มี Vitest แล้ว 13 เทส)
+> อัปเดตล่าสุด: 2026-09-04 (รอบ 43 — ✅ SHIPPED: เวิร์กเอาต์ค้าง resume ได้ ไม่ถูกทับเงียบ ๆ + แถบ resume ทุกหน้า)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-09-04 — รอบ 43 (✅ SHIPPED, deploy main): เวิร์กเอาต์ค้างต้อง resume ได้ ไม่ใช่ถูกทับเงียบ ๆ
+
+เก็บข้อ 🔴 #9 ของ `docs/code-review-2026-07-13.md` ("ปุ่ม Continue/START ทับ workout ที่ค้าง ไม่มีทาง resume")
+พร้อมบั๊กพี่น้อง 🟡 "Redo วัน done แล้ว cancel → ตกเป็น in_progress ถาวร" · ไม่แตะ Supabase schema
+
+**ที่รีวิวเขียนไว้ตกยุคไปครึ่งหนึ่ง** — ตรวจแล้วพบว่ากฎ resume/confirm **มีอยู่แล้วและถูกต้อง** แต่ถูกก๊อปวาง
+ไว้แค่ 2 ใน 5 จุดที่เรียก `startWorkout`:
+
+| จุดที่เรียก | ก่อนรอบนี้ |
+|---|---|
+| `DashboardPage.handleStartToday` | ✅ resume/confirm (รอบ 38) |
+| `LibraryPage.handleQuick` | ✅ resume/confirm (รอบ 35) |
+| `WeekDays.handleStart` | ❌ ทับทันที ← ที่รีวิวชี้ |
+| `ProgramsPage.handleQuickPick` | ❌ ทับทันที |
+| `AppShell.handlePickProgram` | ❌ ทับทันที |
+
+ส่วน "`/workout` จอว่างตัน" ที่รีวิวจดคู่กันไว้ แก้ไปแล้วก่อนหน้านี้ (`<Navigate to="/" replace />`)
+แต่ **ครึ่งหลังของข้อนี้ยังไม่มีใครทำเลย: ไม่มี UI กลับไปเวิร์กเอาต์ค้าง** — กด back ออกมาแล้วเซ็ตไม่หาย
+(อยู่ใน persist) แต่ไม่มีร่องรอยบนจอเลยว่ายังเทรนค้าง ต้องเดาเองว่าต้องกด Start วันไหนถึงจะกลับเข้าไป
+
+### ทำอะไร
+- **`lib/workoutFlow.ts`** *(ใหม่)* — `resolveStartAction(current, nextProgramId)` → `start`/`resume`/`confirm`
+  ล้วน ๆ ไม่แตะ DOM (เทียบ composite `programId/weekId/dayId` กับ id เดี่ยวของ Quick Session ได้ด้วยกฎเดียว)
+  + `workoutSetProgress()` นับเซ็ตที่ทำ/ทั้งหมด
+- **`hooks/useStartWorkout.ts`** *(ใหม่ — ไดเรกทอรีใหม่)* — ทางเข้า Logger ทางเดียวของทั้งแอป:
+  `resume` → `navigate('/workout')` **ไม่แตะ state** · `confirm` → `window.confirm` บอกชื่อทั้งตัวที่ค้างและตัวใหม่ ·
+  คืนค่าที่ทำจริง (`'cancelled'` ถ้าผู้ใช้ถอย) เพื่อให้ sheet เลือกโปรแกรมใน AppShell ไม่ปิดตัวเองตอนกดยกเลิก
+- **แก้ 5 จุดให้เรียก hook** — `WeekDays` · `ProgramsPage` · `AppShell` ได้ guard ใหม่;
+  `DashboardPage` · `LibraryPage` ลบโค้ดซ้ำทิ้ง
+- **`components/layout/ResumeBar.tsx`** *(ใหม่)* — แถบ "ยังเทรนค้างอยู่" เหนือ `BottomNav` เห็นทุกหน้า
+  (จุด accent เต้น · ชื่อเวิร์กเอาต์ · `8/20 เซ็ต` · chevron) กดกลับเข้า Logger · **ไม่มีปุ่มทิ้งงานบนแถบ**
+  โดยตั้งใจ (กดพลาดแล้วข้อมูลหาย — การทิ้งงานอยู่ใน Logger อยู่แล้ว)
+- **`index.css`** — `.resume-bar` (`absolute; bottom: 88px` = สูงของ nav) + `.atlas-app.has-resume-bar
+  .atlas-screen { padding-bottom: 148px }` เพราะ `.atlas-screen` เผื่อไว้ 100px แค่พอดี nav
+- **`useProgramStore.markDayStarted(dayRef)`** *(ใหม่)* — ยกเป็น `in_progress` **เฉพาะเมื่อสถานะเดิมเป็น
+  `not_started`** → Redo วันที่ `done` แล้วเลิกกลางคัน วันนั้นยัง `done` (เดิม `LoggerPage` เรียก
+  `setDayStatus(...,'in_progress')` ทับทิ้งโดยไม่ดูของเดิม) · `LoggerPage` เรียก action นี้แทน logic inline
+
+### ผลกระทบ (จัดการแล้ว)
+`AppShell` เดิมพึ่ง `startWorkout` ใน store ที่ `set({ showPicker: false })` ให้ → ตอนนี้ปิด sheet เองตาม
+ค่าที่ hook คืน (กด Cancel = sheet ยังอยู่) · `LibraryPage.quickRunning` ที่ใช้เปลี่ยน label ปุ่มยังคงเดิม
+ไม่เกี่ยวกับ guard · แถบ resume ซ่อนเองในหน้า `/workout` และหายทันทีที่ Finish/Cancel เพราะผูกกับ
+`workout` ใน store ตรง ๆ
+
+### verify
+`pnpm test` **23 เทส / 3 ไฟล์ ผ่านหมด** (เพิ่ม `lib/workoutFlow.test.ts` 6 เคส + `markDayStarted` 4 เคส) ·
+`pnpm build` (128 modules) + ESLint ผ่าน — และนี่เป็นรอบแรกที่ `pnpm` เรียกตรง ๆ ได้ หลังผู้ใช้รัน
+`corepack enable` เมื่อ 2026-09-04
+
+**ยังไม่ได้ click-through e2e** → ควรทดสอบมือ: เริ่มวัน A ติ๊กหลายเซ็ต → back → กด Start วัน A ซ้ำ
+ต้องกลับเข้าไปเจอเซ็ตเดิมครบไม่มี confirm · กด Start วัน B ต้องขึ้น confirm, กด Cancel แล้ว A ต้องไม่หาย ·
+เดินดูทุกหน้าต้องเห็นแถบ resume และเนื้อหาท้ายหน้าไม่ถูกบัง · Redo วัน done → ติ๊ก 1 เซ็ต → Cancel → ยัง done
+
+### ไม่ทำรอบนี้
+- **`getRpePct` ยังไม่ปัดเศษ reps** — ข้อ 🔴 "reps ทศนิยม → crash จอขาว" **แก้ครึ่งเดียว**: ฝั่ง Excel import
+  ปิดแล้ว (รอบ 31) แต่ `rpeTable.ts:22` ยัง `Math.min(Math.max(reps,1),10)` ไม่ `Math.round` →
+  `RPE_TABLE[1.5]` ยัง undefined ได้ถ้า reps ทศนิยมมาจากทางอื่น (ช่อง number ใน CreateProgramPage)
+  → จดไว้ในไฟล์รีวิวว่า**ยังไม่ติ๊ก** เก็บรอบหน้า (แก้จริงแค่บรรทัดเดียว + เทส)
+- ไม่เพิ่มสถานะ `skipped`, ไม่แตะกลุ่ม sync data-loss 4 ตัว, ไม่แตะ coach edge function (ยังเป็นข้อ 🔴 ที่เหลือ)
+
+### ติ๊ก backlog ย้อนหลัง
+ตรวจ `docs/code-review-2026-07-13.md` กับโค้ดจริงทั้งไฟล์ → ติ๊ก `[x]` ให้ข้อที่รอบ 31–42 แก้ไปแล้วแต่ยังค้าง
+(pct/sets validation, override key ชน, confirm ลบโปรแกรม, op ข้ามบัญชี, week นับ done, `/workout` จอว่าง)
+เหลือ **34 ข้อที่ยังไม่ได้แก้จริง** จาก 43 — session หน้าอ่านแล้วเชื่อได้เลยว่าอันไหนค้างจริง
 
 ---
 
