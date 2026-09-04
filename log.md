@@ -1,8 +1,105 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-09-03 (รอบ 41 — ✅ SHIPPED: วันวิ่งในโปรแกรมขึ้น DONE ได้แล้ว)
+> อัปเดตล่าสุด: 2026-09-04 (รอบ 42 — ✅ SHIPPED: ปิดของค้าง 3 ข้อของรอบ 41 + โปรเจกต์มี Vitest แล้ว 13 เทส)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-09-04 — รอบ 42 (✅ SHIPPED, deploy main): ปิดของค้าง 3 ข้อของรอบ 41 + **โปรเจกต์มี test runner แล้ว**
+
+ทั้ง 3 ข้อคือ "ไม่ทำรอบนี้" ของรอบ 41 ยกมาทำให้จบ (วางแผนไว้ 2026-09-03 ลงมือ 2026-09-04) ·
+รอบนี้**ไม่**แตะ Supabase schema
+
+**ผู้ใช้ตัดสินใจแล้ว:** test runner = **Vitest** · ขอบเขตเทส = **แค่ run→day status ของรอบ 41**
+ไม่ลามไป pure libs อื่น · การ์ด Run ใน History = ป้ายเดียว **+ กดไปหน้าสัปดาห์นั้นได้**
+
+### 🔑 pnpm เรียกผ่าน corepack (จดไว้กันเสียเวลาซ้ำ)
+`pnpm` ไม่อยู่ใน PATH ทั้ง Bash และ PowerShell ของเครื่องนี้ (ผู้ใช้รันเองก็เจอ `command not found`)
+แต่ **`corepack pnpm` ใช้ได้** (v11.25.0) → `corepack pnpm --filter web add -D vitest` ผ่านฉลุย
+⚠️ **`corepack pnpm test` ที่ root พัง** เพราะ script root เป็น `pnpm --filter web test` ซึ่ง shell out
+ไปหา `pnpm` เปล่า ๆ (`dev`/`build`/`preview` ก็พังด้วยเหตุผลเดียวกัน — คงไว้ตาม convention เดิมเพราะ
+Vercel/เครื่องที่มี pnpm ใน PATH ใช้ได้) → ใช้ `corepack pnpm --filter web test` แทน
+
+### A. ทางลัด Running บน Home ผูกวันให้ (`DashboardPage.tsx`)
+ตอนนี้ปุ่ม Running บนแถบทางลัด (`:606`) ยิง `/runs` เปล่า → ถ้าวันนี้โปรแกรมสั่งวิ่งอยู่ คนที่กดทางนี้
+(ใกล้นิ้วกว่าการ์ด Today) จะบันทึกเป็นวิ่งอิสระ วันนั้นไม่ขึ้น DONE ต้องไปแตะ Mark done เอง
+- `runHref` ที่รอบ 41 เพิ่มไว้อยู่**ข้างใน** IIFE ของการ์ด Today ใช้ได้แค่ 2 จุด →
+  **ยกออกมาเป็น `todayRunHref` memo ระดับ component ตัวเดียว** ใช้ทั้ง 3 จุด (ลดของซ้ำไปด้วย):
+  ถ้า `todayReminder.day.exercises` มีแถว `type === 'running'` → `/runs?day=<encoded dayRef>` ไม่งั้น `/runs`
+- ผูกทั้งวันวิ่งล้วนและ mixed day (mixed day ขึ้นแค่ `in_progress` ตามกฎเดิมใน `setRunDayStatus`)
+- `todayReminder` เป็น `null` อยู่แล้วเมื่อวันนั้น done (`:159`) → ทางลัดกลับเป็น `/runs` เปล่าเอง ไม่ต้องเขียนเงื่อนไขเพิ่ม
+- ⚠️ `key` ของ `.map` แถบ Shortcuts ใช้ `to` อยู่ → เปลี่ยนเป็น `key={label}` เพราะ `to` ไม่คงที่แล้ว
+
+### B. การ์ด Run ใน History บอกวัน + กดไปสัปดาห์นั้น (`HistoryPage.tsx`)
+`RunCard` (`:12`) โชว์แค่ `Run` + note ขณะที่ `SessionCard` โชว์ `h.name` = `"Wed — Easy Run"` อยู่แล้ว
+→ timeline อ่านไม่สมมาตร และ `dayRef` ที่รอบ 41 เพิ่มมาไม่โผล่ใน UI เลย
+- ให้**หน้า** resolve แล้วส่งลงมาเป็น prop (คงความเป็น presentational เหมือน `SessionCard`):
+  `programs = useMemo(() => [...STRUCTURED_PROGRAMS, ...customPrograms])` → `resolveDayRef(it.data.dayRef, programs)`
+- `RunCard` รับ `target: DayRefTarget | null` + `onOpen?: () => void` →
+  เติมบรรทัด `t-mono` 10px `W{weekNum} · {dayOfWeek} — {focus}` ใต้หัวข้อ + ครอบการ์ดด้วยปุ่ม
+  `all: 'unset'` (แพตเทิร์นเดิม `WeekDays.tsx:147` / `DashboardPage.tsx:226`; การ์ดนี้ไม่มีปุ่มข้างใน → ไม่เกิด nested button)
+- ไม่มี `dayRef` (วิ่งอิสระ/run เก่าก่อนรอบ 41) หรือ `resolveDayRef` คืน `null` (ลบโปรแกรมไปแล้ว)
+  → หน้าตาเดิมทุกอย่าง กดไม่ได้
+
+### C. ตั้ง Vitest + เก็บเทสรอบ 41 ให้ถาวร
+ก่อนรอบนี้ **repo ไม่มี test runner เลยสักตัว** (ไม่มี `*.test.*` สักไฟล์, ไม่มี vitest/jest/playwright
+ใน `node_modules`, ไม่มี `.github/workflows`) — ตรงกับที่ `docs/code-review-2026-07-13.md` ชี้ว่าเป็น
+**ความเสี่ยงหลัก** · ตรรกะรอบ 41 เทสด้วย harness ชั่วคราว (`vite build --ssr` + node) ผ่าน 12/12 **แล้วลบทิ้ง**
+- ลง `vitest ^4.1.11` (รองรับ Vite 8) เป็น devDep ของ `apps/web` ด้วย `corepack pnpm --filter web add -D vitest`
+- `apps/web/vite.config.ts` — เปลี่ยน `defineConfig` มาจาก `'vitest/config'` (re-export ของ Vite +
+  ได้ typing ของ `test` ไม่ต้องแตะ tsconfig) + เพิ่ม `test: { environment: 'node', setupFiles: ['src/test/setup.ts'] }`
+  (`plugins`/`define`/`gitShortHash()` เดิมคงไว้)
+- `src/test/setup.ts` *(ใหม่)* — stub `localStorage` in-memory บน `globalThis`
+  (สิ่งที่ทำให้ harness รันได้: zustand `persist` แตะ `localStorage` ตอน import store) → ไม่ต้องลง jsdom
+- `src/test/fixtures.ts` *(ใหม่)* — `makeRunProgram()`: 1 สัปดาห์ 2 วัน = `day-run` (วิ่งล้วน 5km/30min)
+  + `day-mixed` (bench + cooldown run) ใช้ร่วมทั้งสองไฟล์เทส
+- `src/lib/programStatus.test.ts` *(ใหม่)* — `dayRef()` ประกอบ composite · `resolveDayRef()` happy path
+  (`weekNum` ถูก) · คืน `null` เมื่อ segment ไม่ครบ 3 / `undefined` / program-week-day id ที่ไม่มีจริง
+- `src/store/runDayStatus.test.ts` *(ใหม่)* — ย้าย 12 เคสของ harness เข้ามา: run→done · ลบ run รองยัง done ·
+  ลบตัวสุดท้าย→not_started · mixed day→in_progress · mixed day ที่ done แล้ว run ไม่ทับ/ลบ run ไม่ถอย ·
+  stale dayRef ไม่ crash · free run ไม่แตะวัน · วันวิ่งที่ Edit เพิ่ม accessory→in_progress ไม่ใช่ done ·
+  `isWeekDone` true + `remainingDays` 0
+- import `{ describe, it, expect, beforeEach }` จาก `'vitest'` **ตรง ๆ** (ไม่เปิด `globals` → ไม่ต้องแก้
+  tsconfig และ `tsc -b` typecheck ไฟล์เทสให้ฟรี) · `beforeEach` ต้องรีเซ็ต store singleton ด้วย
+  `useProgramStore.setState({ progress:{}, customPrograms:[], customAccessories:{}, configs:{}, programMeta:{} })`
+  + `useAppStore.setState({ runs: [] })`
+- scripts: `apps/web/package.json` → `"test": "vitest run"` · root → `"test": "pnpm --filter web test"`
+  (ตามแพตเทิร์น `dev`/`build`/`preview`)
+
+> ได้ runner แล้ว **รอบถัดไป**ค่อยเก็บเป้าที่ไฟล์รีวิวชี้ไว้ (`flushQueue`, `parseExcelFile`, RPE math,
+> date helper) — ไม่อยู่ในรอบนี้
+
+### verify
+`corepack pnpm --filter web test` → **13 tests / 2 files ผ่านหมด** · `tsc -b` + ESLint + `vite build` ผ่าน
+(125 modules เท่าเดิม → ไฟล์ `*.test.ts` ไม่หลุดเข้า bundle จริง)
+
+**พิสูจน์ว่าไม่ใช่เทสหลอก** — แก้ `setRunDayStatus` ให้วันวิ่งล้วนเซ็ต `'in_progress'` แทน `'done'` ชั่วคราว
+→ แดง 3 เคสตรงจุด (`expected 'in_progress' to be 'done'` ×2 + `isWeekDone expected false to be true`)
+แล้ว `git checkout --` คืน → เขียวเหมือนเดิม
+
+**ยังไม่ได้ click-through e2e** (แอป gate ด้วย Supabase auth) → ควรทดสอบมือที่ 390px:
+วันที่โปรแกรมสั่งวิ่ง กดปุ่ม Running บนทางลัด Home ต้องเห็นแถบ `LOGGING FOR` + prefill →
+Add Run → วันขึ้น DONE · วันที่ไม่มีวิ่ง (หรือวันวิ่งที่ done แล้ว) ต้องไม่มีแถบ ·
+History: การ์ด run ที่ผูกวันโชว์ `W1 · WED — EASY RUN` กดไปหน้าสัปดาห์ได้, run อิสระกดไม่ได้
+
+### ไม่ทำรอบนี้
+เทสยังครอบแค่ run→day status + `dayRef`/`resolveDayRef` — เป้าที่ `docs/code-review-2026-07-13.md` ชี้
+(`flushQueue`, `parseExcelFile`, RPE math, date helper) ยังไม่แตะ · ไม่มี CI รันเทสอัตโนมัติ
+(`.github/workflows` ยังไม่มี) · ไม่ได้ลง jsdom → เทส component ยังทำไม่ได้ ·
+`SessionCard` ยังไม่โชว์เลขสัปดาห์แบบที่ `RunCard` โชว์แล้ว
+
+### ข้อควรระวัง
+- `to` ในแถบ Shortcuts ไม่คงที่แล้ว → `key` ต้องเปลี่ยน ไม่งั้น React remount ปุ่มทุกครั้งที่ href เปลี่ยน
+- `RunCard` ครอบด้วย `<button>` ได้เพราะไม่มีปุ่มข้างใน — ถ้ารอบหลังเพิ่มปุ่มลบใน History ต้องรื้อเป็น
+  `<div>` ครอบปุ่มพี่น้อง (เคสเดียวกับที่รอบ 23 เจอกับการ์ด Today's session)
+- `environment: 'node'` ใช้ได้เพราะเทสชุดนี้ไม่แตะ DOM — ถ้าจะเทส component ต้องลง jsdom เพิ่ม
+
+### ไฟล์
+`DashboardPage.tsx` · `HistoryPage.tsx` · `apps/web/vite.config.ts` · `apps/web/package.json` + root `package.json` ·
+*(ใหม่)* `src/test/setup.ts`, `src/test/fixtures.ts`, `src/lib/programStatus.test.ts`, `src/store/runDayStatus.test.ts`
+**reuse:** `dayRef`/`resolveDayRef`/`DayRefTarget` (`lib/programStatus.ts`) · `setRunDayStatus` (`useProgramStore`) ·
+`STRUCTURED_PROGRAMS` (`lib/twelveWeekProgram.ts`)
 
 ---
 
