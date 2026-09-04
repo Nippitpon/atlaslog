@@ -1,8 +1,58 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-09-04 (รอบ 44 — ✅ SHIPPED: Progress ของโปรแกรมนับเป็นวันที่เล่นจริง ไม่ใช่สัปดาห์ที่จบครบ)
+> อัปเดตล่าสุด: 2026-09-04 (รอบ 45 — ✅ SHIPPED: ปุ่ม Skip ปิดวันที่ข้ามมาแล้ว → สัปดาห์/โปรแกรมจบได้ ถ้าไม่กดยังไม่ปิด)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-09-04 — รอบ 45 (✅ SHIPPED, deploy main): สถานะ `skipped` — ปุ่ม Skip บนวันที่ข้ามมาแล้ว
+
+ต่อจากรอบ 44 ทันที: ผู้ใช้สั่ง *"มีปุ่ม skip ให้กดในแต่ละวันที่ข้ามมาแล้วด้วย **ถ้าไม่กดต้องยังไม่ปิดโปรแกรม**"*
+— ปิดข้อที่รอบ 40 จดค้างไว้ว่า "ไม่เพิ่มสถานะ skipped" · ไม่แตะ Supabase schema (progress เป็น JSON blob)
+
+**กฎที่ยึด:** ไม่มีการเดาให้อัตโนมัติเลย วันที่ปล่อยไว้เฉย ๆ ยังเป็น `not_started` และตรึงสัปดาห์
+(กับโปรแกรม) ไม่ให้จบ — แผนปิดได้เมื่อเจ้าตัวบอกว่าวันนั้นเกิดอะไรขึ้นเท่านั้น
+
+**ผู้ใช้เลือก:** วัน skip **ไม่นับใน %** แยกโชว์ต่างหาก → แถบสะท้อนงานที่ทำจริง ไม่หลอกตัวเอง
+(โปรแกรมที่ปิดจ๊อบด้วย skip จะขึ้น COMPLETED แต่แถบไม่ถึง 100%)
+
+### ทำอะไร
+- **`DayStatus` เพิ่ม `'skipped'`** (`packages/shared/src/types.ts`) — TS บังคับให้ทุก `Record<DayStatus,...>`
+  ต้องรับมือ ซึ่งพาไปเจอ **STATUS_CONFIG + StatusBadge ที่ก๊อปไว้ 3 ไฟล์**
+- **`programStatus.ts`** — `isSettled(s) = done | skipped` เป็นแกน: `isWeekDone` ใช้ `every(isSettled)` ·
+  `weekStatus` นับทุกสถานะที่ไม่ใช่ `not_started` ว่าเริ่มแล้ว · `remainingDays` = วันที่ยังไม่ settled
+  (บรรทัด "วันค้าง" บน Home เลยไม่ทวงวันที่ skip แล้ว) · `skippedDaysInWeek()` ใหม่ ·
+  `programProgress` เพิ่ม `skippedDays` แต่ `pct` ยังหารด้วย `doneDays` เท่านั้น
+- **`dayDate()` + `isDayPast()`** *(ใหม่)* — หาวันที่จริงของแต่ละวันในโปรแกรม: สัปดาห์เป็นบล็อก 7 วันนับจาก
+  `startDate` (เลขคณิตชุดเดียวกับ `scheduledWeekNum` และช่วงวันที่ที่หน้า Overview โชว์อยู่) และในบล็อก 7 วัน
+  ชื่อวันแต่ละชื่อโผล่ครั้งเดียวเป๊ะ → แม็ปได้ไม่กำกวมแม้ `startDate` ไม่ใช่วันจันทร์ · **วันนี้ยังไม่ถือว่าเลย**
+- **ปุ่ม Skip / Un-skip ใน `WeekDays` DayCard** — โผล่เฉพาะวันที่เลยมาแล้วและยังไม่ `done`
+  (โปรแกรมที่ไม่มี `startDate` เช่น weekly routine ไม่มีปฏิทินให้ตัดสิน → ให้ผู้ใช้กดได้ทุกวัน) ·
+  การ์ดที่ skip แล้ว จาง 0.7 + ขอบเทา + badge `SKIPPED` · footer ใส่ `flexWrap` เพราะวันวิ่งที่เลยมาแล้ว
+  มี Edit + Skip + Mark done พร้อมกันที่ 390px
+- **ยุบของซ้ำที่ TS ชี้ให้** — `DAY_STATUS_STYLE` + `DAY_STATUS_EDGE` ใน `programStatus.ts` และ
+  `components/DayStatusBadge.tsx` ตัวเดียว แทน STATUS_CONFIG/StatusBadge ที่เคยมี 3 ชุดใน
+  `WeekDays` · `ProgramOverviewPage` · `WeekDetailPage`
+- **`ProgramOverviewPage`** — บรรทัดรองต่อท้าย `· N skipped` เมื่อมี · แถวสัปดาห์ใช้ `DAY_STATUS_EDGE`
+- **`DashboardPage`** — การ์ด TODAY'S SESSION ไม่ทวงวันที่ skip แล้ว · แถบวันในสัปดาห์โชว์ **ขีด** (ไม่ใช่จุด)
+  ให้วัน skip: ปิดจ๊อบแล้ว แต่ไม่ได้เทรน
+
+### verify
+`pnpm test` **43 เทส ผ่านหมด** (+9): สัปดาห์ยังไม่จบตอนวันค้าง → **จบทันทีที่กด skip** · skip ไม่เข้า `doneDays`
+และไม่ดัน `pct` · โปรแกรมที่ปิดด้วย skip ขึ้น `completed` แต่ `pct` = 67% · สัปดาห์ที่มีแต่ skip นับว่าแตะแล้ว ·
+`dayDate` ทั้งเคส startDate วันจันทร์และกลางสัปดาห์ + คืน null เมื่ออ่านไม่ได้ · `isDayPast` วันนี้ยังไม่เลย
+`pnpm build` (129 modules) + ESLint ผ่าน
+
+> ⚠️ บทเรียน: **vitest ผ่านแต่ `tsc -b` แดง** — helper ในไฟล์เทสประกาศ type ค่าสถานะเป็น
+> `'done' | 'in_progress'` ไว้ (esbuild ของ vitest ถอด type ทิ้งเลยไม่เห็น) → รัน `pnpm build` เสมอ ไม่ใช่แค่ test
+
+**ยังไม่ได้ click-through e2e** → ควรเช็ค: วันที่เลยมาแล้วต้องมีปุ่ม Skip · วันนี้/อนาคตต้องไม่มี ·
+กด Skip → สัปดาห์ที่เหลือวันเดียวขึ้น DONE ทันที และ % ไม่ขยับ · กด Un-skip → กลับมา IN PROGRESS
+
+### ไม่ทำรอบนี้
+ไม่มี bulk "skip ทั้งสัปดาห์" (กดวันต่อวัน) · Un-skip คืนเป็น `not_started` เสมอ ถึงวันนั้นเคยเป็น
+`in_progress` มาก่อน (เคสหายาก ไม่คุ้มเก็บสถานะเดิม) · `getRpePct` ยังไม่ปัดเศษ reps (ยังค้างจากรอบ 43)
 
 ---
 
