@@ -1,8 +1,102 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-09-07 (รอบ 46 — ✅ SHIPPED: แยก SheetJS ออกจาก entry chunk — entry gzip 315.9 → 201.9 kB)
+> อัปเดตล่าสุด: 2026-09-07 (รอบ 47 — ✅ SHIPPED: excelImport มีเทสต์ 26 เคส + fixture เข้า repo)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-09-07 — รอบ 47 (✅ SHIPPED, deploy main): `excelImport` มีเทสต์แล้ว + fixture มีบ้าน
+
+ต่อจากรอบ 46 ทันที: ผมรายงานว่า `Hybrid_Powerlifting-Template.xlsx` ค้าง untracked ที่ root
+แล้วไม่รู้เจตนา — สืบแล้วมันไม่ใช่ไฟล์หลุด timestamp มันมาก่อน commit `7536231`
+(feat: Hybrid import) แค่ **50 นาที** คือเป็น input จริงที่ใช้สร้าง parser แต่ไม่เคยถูก commit
+· `log.md:895` กับ `:1112` เคยจดว่า "ไม่ commit ไฟล์นี้" ไว้ **2 รอบ** แล้วปล่อยผ่าน
+
+**ปัญหาที่ลึกกว่าไฟล์ค้าง:** `excelImport.ts` (346 บรรทัด) **ไม่มีเทสต์แม้แต่ตัวเดียว** ทั้งที่
+เปราะที่สุดในแอป (parse ไฟล์ที่ผู้ใช้ยื่นมา · alias 2 vocabulary · วันไทย/phase/type · validate
+พร้อมเลขแถว) และการ verify รอบ 46 พึ่งไฟล์ที่ **clone ใหม่แล้วไม่มี → ทำซ้ำไม่ได้**
+ไฟล์ไม่มีบ้าน + เทสต์ไม่มี fixture = ปัญหาเดียวกัน รอบนี้ชนกันให้จบทีเดียว · commit `97c785b` (test)
+
+### ทำอะไร
+
+- **`Hybrid_Powerlifting-Template.xlsx` → `apps/web/src/test/fixtures/hybrid-program.xlsx`**
+  (untracked จึงใช้ `mv` ไม่ใช่ `git mv`) · root สะอาดแล้ว
+- **`src/lib/excelImport.test.ts` (ใหม่, 286 บรรทัด / +26 เทสต์)** — กลยุทธ์ 2 ชั้น: golden path
+  ใช้ fixture จริง 1 ไฟล์ · edge case สร้าง workbook ในหน่วยความจำด้วย helper `makeXlsx()`
+  (`aoa_to_sheet` + `XLSX.write({type:'array'})` → `new File`) **ไม่ต้อง commit binary เพิ่มเลย**
+- **`.gitattributes` (ใหม่)** — `*.xlsx binary` / `*.xls binary`
+- **tsconfig 4 ไฟล์** — เพิ่ม `tsconfig.test.json`, กันเทสต์ออกจาก `tsconfig.app.json`,
+  ต่อ reference ที่ `tsconfig.json` (ดูหัวข้อถัดไป)
+
+### ผลกระทบ (จัดการแล้ว)
+
+- **⚠️ ตัวสกัดจริง: `tsconfig.app.json` ไม่ให้เทสต์แตะ Node API** — มัน `include: ["src"]`
+  (ไม่มี exclude) จึง type-check ไฟล์ `*.test.ts` ด้วย แต่ตั้ง `types: ["vite/client"]` →
+  `@types/node` ไม่ถูกโหลดแม้ติดตั้งไว้ · ยืนยันด้วยของจริง: `pnpm build` พัง
+  **`TS2591: Cannot find name 'node:fs'`** · เทสต์ 3 ตัวเดิมรอดเพราะเป็น pure logic ไม่มีตัวไหน
+  import `node:` เลย — ตัวนี้เป็นตัวแรก · **รอบ 46 ผมไม่เจอเพราะรัน `vitest run` ตรง ๆ
+  (Vitest ไม่ type-check) แล้วลบไฟล์ชั่วคราวก่อน build — บังเอิญรอด**
+- ทางที่**ไม่**เลือก: เติม `"node"` เข้า `types` ของ project แอป (โค้ดแอปจะเรียก `process`/`Buffer`
+  ได้โดย type ผ่าน แล้วระเบิดในเบราว์เซอร์) · ย้ายเทสต์ไปอยู่ `tsconfig.node.json`
+  (`lib: ["ES2023"]` ไม่มี DOM แต่ `src/test/setup.ts:8` ประกาศ `const storage: Storage`)
+  → เลือกแยก project ที่ 4: `lib: ["ES2023","DOM"]` + `types: ["node","vite/client"]`
+  ปลอดภัยเพราะ grep ยืนยันว่า `src/test/` ถูก import จากไฟล์เทสต์เท่านั้น
+- **`.gitattributes` ปิดความเสี่ยง byte-exact** — repo ไม่มีไฟล์นี้เลย, เครื่องนี้
+  `core.autocrlf=true` และ git มอง xlsx เป็น `text: unspecified` = **พึ่ง heuristic เดา**
+  ตอนนี้เทสต์พึ่งพาไฟล์ที่ต้องตรงทุกไบต์ จึงระบุให้ชัด (คุ้มกันไฟล์ xlsx ที่ tracked อยู่ก่อน
+  อีก 2 ตัวด้วย) · เช็คแล้วทั้ง 3 ไฟล์ blob size == disk size ไม่มีตัวไหนเคยเพี้ยน
+- **`program.id` เป็น `custom-${Date.now()}`** → เทสต์ห้าม assert ทั้ง object ใช้
+  `toMatch(/^custom-\d+$/)`
+- เทสต์ไม่รั่วเข้า bundle — ขนาด chunk ก่อน/หลังเท่ากันเป๊ะ (760.44 / 424.76 kB)
+
+### เทสต์ที่ครอบ
+
+- **golden path (fixture จริง)** — `errors: []` · 12 สัปดาห์ · `daysPerWeek: 4` · 99 ท่า ·
+  phase ครบ 4 · `label` = `Competition · Top set` · โน้ตไทยไม่เพี้ยน · ชื่อโปรแกรมจากชื่อไฟล์
+- **invariant ที่ CLAUDE.md ห้ามพัง** — `id` per-row `w1-Mon-e0`/`e1` ของ Top set + Back-off
+  ไม่ชนกัน + วน assert ว่า `id` ไม่ซ้ำใน **ทุกวันของทุกสัปดาห์**
+- **`Target Weight (kg)` ถูกทิ้ง** — assert ว่าไม่มี key ไหน match `/weight/i` เลย
+  (น้ำหนักต้องมาจาก 1RM ผู้ใช้เสมอ ไม่ใช่จากไฟล์โค้ช)
+- **validation พร้อมเลขแถว** — `Row 2:` (header คือแถว 1) ครอบ Week/Day/Lift/Sets/Reps/PCT ·
+  `PCT` 1.1 ผ่าน 1.11 ไม่ผ่าน (เกิน 100% ได้เพราะเป็น attempt) · ไฟล์เสีย 3 แถวต้องรายงาน **3 ข้อ**
+- **vocabulary** — `AMRAP` ไม่แคร์ตัวพิมพ์ · วันเต็ม + ไทย (`จันทร์`/`พฤหัสบดี`) · `%1RM` → `pct` ·
+  `Back Squat`/`Bench Press`/`Sumo Deadlift` → `squat`/`bench`/`deadlift` · `Taper/Test` → `Taper` ·
+  RPE `<6.0` กลืนเข้า `note` ไม่ error · แถวว่างข้ามเงียบ · legacy `Program`+`Meta`
+  (`Meta.name` ชนะชื่อไฟล์, `program_type: general`) · workbook มีทั้ง 2 sheet ต้องเลือก `Program`
+
+### 📌 บั๊กแฝงที่เจอ — บันทึกไว้ ยังไม่แก้ (รอเจ้าของตัดสิน)
+
+`excelImport.ts:288` ตั้ง `totalWeeks: sortedWeekNums.length` = **จำนวนสัปดาห์ที่มีข้อมูล
+ไม่ใช่เลขสัปดาห์สูงสุด** ไฟล์ที่เลขสัปดาห์เป็น 1, 2, 5 จะได้ `totalWeeks: 3` แต่
+`weeks.at(-1).weekNumber === 5` → ใครวน `1..totalWeeks` หรืออ่านว่า "สัปดาห์สุดท้าย" จะเพี้ยน
+และช่วงที่ขาดถูกรับเงียบ ๆ ไม่เตือนเลย
+→ มีเทสต์ `gappy week numbers` **บันทึกพฤติกรรมปัจจุบัน** พร้อมคอมเมนต์กำกับว่ายังไม่ตัดสินว่าถูก
+ถ้าจะปิดต้องเป็นรอบแยก (กระทบ consumer ของ `totalWeeks` ทั้งหมด)
+
+### verify
+
+- `pnpm build` ผ่าน (129 modules) · `pnpm test` **69/69** (เดิม 43 + ใหม่ 26) · ESLint exit 0
+- **พิสูจน์ว่าทำซ้ำได้จาก checkout เปล่า** (จุดประสงค์ทั้งรอบ) — `git write-tree` +
+  `git archive` แตกเนื้อหาที่ staged ออกมาเป็น tree สะอาด (ไม่ต้อง commit) แล้วรัน
+  `pnpm install --frozen-lockfile` → **`pnpm test` 69/69 ผ่าน** และ **`pnpm build` ผ่านจากศูนย์**
+  (สำคัญ: พิสูจน์ว่า tsconfig ถูกจริง ไม่ใช่ผ่านเพราะ `tsbuildinfo` เก่าในเครื่อง) ·
+  fixture ใน tree เป็น 18,589 ไบต์ ตรงต้นฉบับ · root ของ tree ไม่มีไฟล์เดิมค้าง
+- bundle ไม่ขยับ: 760.44 kB / gzip 201.85 เท่ารอบ 46 (ใน tree เปล่าได้ 759.40 เพราะ
+  `__APP_COMMIT__` fallback เป็น `'dev'` ตอนไม่มี `.git` — พฤติกรรมเดิมของ `vite.config.ts`)
+
+### ไม่ทำรอบนี้
+
+- **ไม่แก้ `docs/excel-import-guide.md`** — แผนเขียนไว้ว่าจะแก้ แต่อ่านบรรทัด 61 ในบริบทแล้ว
+  **มันไม่พัง**: มันเป็นตัวอย่างสอนว่า "ชื่อไฟล์ **ของผู้ใช้** จะกลายเป็นชื่อโปรแกรมอย่างไร"
+  ไม่ได้อ้างว่าไฟล์อยู่ใน repo (ลิงก์ดาวน์โหลดที่บรรทัด 9 ชี้ไป `public/...` ซึ่งถูกอยู่แล้ว) ·
+  ที่สำคัญ **แก้แล้วจะแย่ลง** เพราะ `prettifyName` ไม่ทำ title-case →
+  `hybrid-program.xlsx` ได้ `"hybrid program"` ตัวเล็ก ทำให้ตัวอย่างในเอกสารผิด
+- **ไม่แตะไฟล์ดาวน์โหลดของผู้ใช้** — `public/atlaslog-program-template.xlsx` (19 แถว) และปุ่ม
+  ดาวน์โหลดคงเดิม ผู้ใช้ไม่เห็นความเปลี่ยนแปลงอะไรเลยทั้งรอบ
+- **`powerlifting_RPE_12weeks (Template).xlsx` ปล่อยไว้ที่ root** — tracked อยู่แล้ว ย้ายได้แค่
+  ความสวย แต่ทำให้ประวัติ git ตามยาก
+- ไม่แก้บั๊ก `totalWeeks` (ดูหัวข้อข้างบน)
 
 ---
 
