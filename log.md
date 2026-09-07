@@ -67,7 +67,7 @@
 
 ### 📌 บั๊กแฝงที่เจอ — บันทึกไว้ ยังไม่แก้ (รอเจ้าของตัดสิน)
 
-`excelImport.ts:288` ตั้ง `totalWeeks: sortedWeekNums.length` = **จำนวนสัปดาห์ที่มีข้อมูล
+`excelImport.ts:324` ตั้ง `totalWeeks: sortedWeekNums.length` = **จำนวนสัปดาห์ที่มีข้อมูล
 ไม่ใช่เลขสัปดาห์สูงสุด** ไฟล์ที่เลขสัปดาห์เป็น 1, 2, 5 จะได้ `totalWeeks: 3` แต่
 `weeks.at(-1).weekNumber === 5` → ใครวน `1..totalWeeks` หรืออ่านว่า "สัปดาห์สุดท้าย" จะเพี้ยน
 และช่วงที่ขาดถูกรับเงียบ ๆ ไม่เตือนเลย
@@ -1100,19 +1100,24 @@ commit `7fcaabe` (fix)
 
 ---
 
-## 📌 งานค้าง — ตรวจกับโค้ดปัจจุบันแล้ว 2026-08-10 · อัปเดตสถานะ 2026-08-18 (รอบ 37)
+## 📌 งานค้าง — re-verify กับโค้ดทุกข้อ 2026-09-07 (รอบ 47) · ก่อนหน้า: ตรวจ 2026-08-10, สถานะ 2026-08-18 (รอบ 37)
 
 > ⚠️ `docs/code-review-2026-07-13.md` **stale** — รอบ 31 เขียน `excelImport.ts` ใหม่ ทำให้ข้อ 🔴 เรื่อง Excel
 > (sets/reps/pct/id ชนกัน) **ปิดไปแล้วทั้งหมด** แต่ไม่มีใครติ๊ก · รายการข้างล่างคือที่ verify แล้วว่ายังเปิดอยู่จริง
+>
+> 📍 **2026-09-07 (รอบ 47): ไล่เช็คทุกข้อกับโค้ดอีกครั้ง — ยังเปิดจริงทั้งหมด ไม่มีข้อไหนถูกปิดไปเงียบ ๆ**
+> แต่เลขบรรทัดเลื่อนแทบทุกข้อ (รอบ 38–47 ผ่านไป 10 รอบ) จึงอัปเดตให้ตามอ่านได้จริง —
+> **เลขบรรทัดในตารางนี้คือของ 2026-09-07** ถ้ากลับมาอ่านหลังผ่านไปหลายรอบ ให้ถือว่าอาจเลื่อนอีก
 
 | ระดับ | ข้อ | ผลกระทบถ้าไม่ทำ |
 |---|---|---|
-| 🔴 | reps ทศนิยมจาก **Create Program** → `rpeTable.ts:21` `RPE_TABLE[1.5]` = undefined | **จอขาวถาวร** บนหน้า Week + Dashboard (ทางเข้า Excel ปิดแล้ว แต่ input `type="number"` ไม่มี `step` ยังพิมพ์ `2.5` ได้ · `CreateProgramPage.tsx:579,588` `Number(reps)` ไม่กรองจำนวนเต็ม) — แก้ 2 ชั้น: `Math.round()` ใน `getRpePct` + validate ฝั่ง input |
-| 🔴 | sync data-loss 4 ตัว | (a) `syncQueue.ts:211/236` flush เขียนทับ op ที่ต่อคิวระหว่าง flush · (b) `:149/225` entry `userId: null` ยังไปโผล่บัญชีคนถัดไป · (c) `useProgramStore.ts:46` debounce timer ยิงหลัง sign-out → snapshot ว่าง (รวมกับ (b) = ทับ progress คนถัดไป) · (d) `useAuthStore.ts:166/182` `loadUserData` แข่ง `flushQueue` → `setHistory` ทับเซ็ตที่ log offline (`[]` ก็ truthy) |
-| 🟡 | แก้โปรแกรม Excel → periodization ของ **accessory** หาย | `weekly[]` เก็บรายสัปดาห์เฉพาะ `powerlifting && type === 'main'` · accessory ที่ pct ไต่รายสัปดาห์ + วัน/ท่าที่มีเฉพาะสัปดาห์หลัง + โปรแกรม `general` หายตอนกด Save |
+| 🔴 | reps ทศนิยมจาก **Create Program** → `rpeTable.ts:22` `repsIdx` = 1.5 → `RPE_TABLE[1.5]` = undefined | **จอขาวถาวร** บนหน้า Week + Dashboard · ระเบิดที่ `rpeTable.ts:28`/`:29`/`:33` (`RPE_TABLE[repsIdx][…]`) ยังไม่มี `Math.round` · ต้นทาง: `CreateProgramPage.tsx:762` input `type="number" inputMode="numeric"` **ไม่มี `step`** → พิมพ์ `2.5` ได้ แล้ว `:579` `Number(reps) \|\| 10` กับ `:588` ไม่กรองจำนวนเต็ม · **ทางเข้า Excel ปิดแล้วจริง มีเทสต์ยืนยัน** (`excelImport.test.ts` เคส reps ต้องเป็นจำนวนเต็มบวกหรือ `AMRAP`) เหลือทางเข้า Create Program ทางเดียว — แก้ 2 ชั้น: `Math.round()` ใน `getRpePct` + validate ฝั่ง input |
+| 🔴 | sync data-loss 4 ตัว | (a) `syncQueue.ts:241` `readQueue()` → `await runOp()` → `:266` `writeQueue(remaining)` ใน `finally` **ทับ op ที่ `enqueue` เข้ามาระหว่าง flush** · `flushing` guard (`:240`) กัน flush ซ้อนได้ แต่ไม่กัน enqueue → log เซ็ตระหว่าง flush = เซ็ตนั้นหลุดจากคิว · (b) 9 จุดเรียก `enqueue(op, null)` (`:167,173,179,185,191,197,203,209`) ตอนไม่มี session แล้ว `:255` ตีความ `userId === null` ว่าเป็นของ user ปัจจุบัน → ไปโผล่บัญชีคนถัดไป · (c) `useProgramStore.ts:58` `stateSyncTimer` เป็น module-level ไม่มีใคร clear ตอน sign-out → ยิงหลัง sign-out ได้ snapshot ว่าง (รวมกับ (b) = ทับ progress คนถัดไป) · (d) `useAuthStore.ts:191-192` และ `:207-208` เรียก `loadUserData(u.id)` **ไม่ await** แล้วยิง `void flushQueue()` ต่อ → แข่งกัน · `setHistory` ที่ `:74` ทับเซ็ตที่ log offline (`[]` ก็ truthy) |
+| 🟡 | แก้โปรแกรม Excel → periodization ของ **accessory** หาย | `CreateProgramPage.tsx:64` gate ไว้ว่า `programType === 'powerlifting' && weeks.length > 1 && ex.type === 'main'` เท่านั้นที่ได้ `weekly[]` · ตัวที่ไม่เข้าเงื่อนไขไปเจอ `:152` `if (!weekly) return { ...base, id }` = เขียนค่าเดียวกันทุกสัปดาห์ → accessory ที่ pct ไต่รายสัปดาห์ + โปรแกรม `general` (ทั้งโปรแกรม) แบนราบตอนกด Save · และ `:69` หยิบท่าด้วย **ตำแหน่ง** `w.days[di]?.exercises[ei]` → สัปดาห์หลังที่จำนวน/ลำดับท่าไม่เท่ากันจะได้ผิดตัวหรือ `undefined` (กลไกที่ทำให้ "วัน/ท่าที่มีเฉพาะสัปดาห์หลังหาย") |
 | ~~🟡~~ | ~~ลบ custom program ไม่ confirm~~ | ✅ **ปิดแล้วรอบ 37** — เพิ่ม `confirm()` ใน `ProgramsPage` |
-| 🟡 | persist ไม่มี `version`/`migrate` — `useAppStore.ts:198`, `useProgramStore.ts:233` | วันนี้ยังไม่พัง แต่**ใส่ทีหลังไม่ได้** (zustand ถือ state ที่ไม่มี version = version 0) |
-| ⚠️ | coach edge function เปิดให้ harvest อีเมล — `supabase/functions/coach/index.ts:47-59` | **ยืนยันว่าเปิดอยู่จริงบน prod**: `resolveUser` match ด้วย prefix ของ UUID (`startsWith`) + ทั้งไฟล์ไม่เช็ค `profiles.role` เลย + `add-athlete` คืน `athleteEmail` เสมอ → authed คนไหนก็ไล่ prefix ดึงอีเมลได้ · **ตัดสินใจแล้วว่ายังไม่แตะ** (ต้อง deploy edge function แยก) |
+| 🟡 | persist ไม่มี `version`/`migrate` — `persist(` ที่ `useAppStore.ts:56` และ `useProgramStore.ts:70` (grep `version`/`migrate` ไม่เจอในทั้งสองไฟล์) | วันนี้ยังไม่พัง แต่**ใส่ทีหลังไม่ได้** (zustand ถือ state ที่ไม่มี version = version 0) |
+| 🟡 | `totalWeeks` = **จำนวนสัปดาห์ที่มีข้อมูล ไม่ใช่เลขสัปดาห์สูงสุด** — `excelImport.ts:324` | ไฟล์ที่เลขสัปดาห์เป็น 1, 2, 5 ได้ `totalWeeks: 3` แต่ `weeks.at(-1).weekNumber === 5` และช่วงที่ขาดผ่านเงียบ ๆ ไม่เตือน → อะไรที่วน `1..totalWeeks` หรืออ่านว่า "สัปดาห์สุดท้าย" เพี้ยน · พบรอบ 47 · เทสต์ `gappy week numbers` ใน `excelImport.test.ts` บันทึกพฤติกรรมปัจจุบันไว้แล้ว · แก้ = กระทบ consumer ของ `totalWeeks` ทุกจุด ควรเป็นรอบแยก |
+| ⚠️ | coach edge function เปิดให้ harvest อีเมล — `supabase/functions/coach/index.ts:59` | **ยืนยันว่าเปิดอยู่จริงบน prod**: `:59` `data.users.find(u => u.id.toLowerCase().startsWith(value))` match ด้วย prefix ของ UUID + grep `profiles`/`role` **ไม่เจอในไฟล์เลย** = ไม่เช็ค role จริง + คืน `athleteEmail` เสมอที่ `:91` (active) และ `:107` (pending) → authed คนไหนก็ไล่ prefix ดึงอีเมลได้ · **ตัดสินใจแล้วว่ายังไม่แตะ** (ต้อง deploy edge function แยก) |
 
 ---
 
