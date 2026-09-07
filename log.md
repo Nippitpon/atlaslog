@@ -1,8 +1,75 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-09-04 (รอบ 45 — ✅ SHIPPED: ปุ่ม Skip ปิดวันที่ข้ามมาแล้ว → สัปดาห์/โปรแกรมจบได้ ถ้าไม่กดยังไม่ปิด)
+> อัปเดตล่าสุด: 2026-09-07 (รอบ 46 — ✅ SHIPPED: แยก SheetJS ออกจาก entry chunk — entry gzip 315.9 → 201.9 kB)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-09-07 — รอบ 46 (✅ SHIPPED, deploy main): แยก SheetJS ออกจาก entry chunk (lazy-load `xlsx`)
+
+ที่มา: `pnpm build` เตือน `chunk 1,092 kB (>500 kB)` มานาน — ไล่แล้วเจอว่า `xlsx` (SheetJS, source
+896 kB) ถูก import แบบ static ตลอดเส้น `router.tsx` → `ProgramsPage:10` → `ImportProgramSheet:4` →
+`excelImport.ts:1` จึงตกอยู่ใน chunk เดียวที่**ทุกคนโหลดตั้งแต่วินาทีแรก** ทั้งที่ใช้แค่ตอนกด Import
+from Excel · แก้ที่ไฟล์เดียว ไม่แตะ router ไม่แตะ UI · commit `27b211e` (perf)
+
+**ผลจริงจาก build:**
+
+| | ก่อน | หลัง |
+|---|---|---|
+| entry chunk | 1,092.60 kB / gzip **315.90 kB** | 760.44 kB / gzip **201.85 kB** |
+| xlsx chunk | — (รวมใน entry) | 424.76 kB / gzip 141.51 kB — โหลดตามต้องการ |
+
+entry ที่ผู้ใช้โหลดจริงลด **−114 kB gzip (−36%)**
+
+### ทำอะไร
+
+- **`lib/excelImport.ts`** — บรรทัด 1 `import * as XLSX from 'xlsx'` → `import type { WorkSheet } from 'xlsx'`
+  · ย้ายเป็น `const XLSX = await import('xlsx')` เป็นบรรทัดแรกใน `parseExcelFile` (เป็น `async` อยู่แล้ว
+  ไม่ต้องแก้ signature) · runtime usage ทั้งหมดอยู่ในฟังก์ชันนี้ฟังก์ชันเดียว
+- **ไม่แตะ `ImportProgramSheet.tsx` เลย** — ตรวจแล้วว่ามีครบอยู่ก่อน: `await parseExcelFile` (`:90`) ·
+  `loading` state + `finally setLoading(false)` (`:87,101`) · try/catch (`:99`) · ปุ่ม disabled +
+  `"กำลังอ่านไฟล์..."` (`:214-216`)
+
+### ผลกระทบ (จัดการแล้ว)
+
+- **`XLSX.WorkSheet` ถูกใช้เป็น type 2 จุด** (`findSheet` return type + `as XLSX.WorkSheet[]`) — ถ้าเผลอ
+  ใช้ `import * as` ธรรมดาจะดึง SheetJS กลับเข้า entry ทันที ต้องเป็น **`import type`** ที่ TS ลบทิ้ง
+  ตอน compile (emit runtime import = 0) → เปลี่ยนไปใช้ `WorkSheet` ตรง ๆ
+- **`dist/index.html` ต้องไม่มี `modulepreload` ของ xlsx** — เช็คแล้วมีแค่ `<script src="index-*.js">`
+  ถ้า Vite ใส่ preload มาจะเสียเปล่าทั้งรอบ
+- **error path เน็ตหลุดกลาง dynamic import** — throw เข้า try/catch เดิมที่ `ImportProgramSheet.tsx:99`
+  ขึ้นข้อความเดียวกับ parse error ไม่มี unhandled rejection
+- **byte รวมเพิ่มขึ้น** 1,092.60 → 1,185.20 kB (+92.6 kB) เพราะ `await import()` คืน namespace ทั้งก้อน
+  tree-shake ได้น้อยกว่า `import * as` — **ยอมแลก** เพราะสิ่งที่แพงคือ entry ไม่ใช่ยอดรวม และ chunk
+  `xlsx-*.js` จะ**ไม่เปลี่ยน hash เวลาแก้โค้ดแอป** → ship ถี่แค่ไหนผู้ใช้ก็ไม่ต้องโหลด SheetJS ซ้ำ
+
+### verify
+
+- `pnpm build` ผ่าน (129 modules) — เห็น `xlsx-DGkz7cnk.js` แยกออกมาจริง
+- `pnpm test` **43/43 ผ่าน** · ESLint ผ่าน (exit 0) · grep แล้วไม่มี test เดิมแตะ `excelImport`
+- **parser ยังถูกต้องผ่าน dynamic import** — เขียน vitest ชั่วคราวยิง `parseExcelFile` ด้วยไฟล์จริง
+  `Hybrid_Powerlifting-Template.xlsx`: `errors: []` · 12 สัปดาห์ · 4 วัน/สัปดาห์ · 99 ท่า · phase ครบ 4
+  (Accum/Intens/Peaking/Taper) · label ต่อถูก (`Competition · Top set`) · `id` per-row `w1-Mon-e0`/`e1`
+  ไม่ชนกัน · โน้ตภาษาไทยครบ → ลบไฟล์ทดสอบทิ้งแล้ว
+- **e2e บน production build จริง** (`vite preview` :4173 + Playwright): เปิด `/programs` → redirect
+  `/login` → JS ที่ดึงมีแค่ `index-SvQJmXig.js` **ไม่มี `xlsx-*.js`** · สั่ง `import('/assets/xlsx-*.js')`
+  ในเบราว์เซอร์สำเร็จ expose `read`/`utils`/`CFB` ครบ · หลัง import ยิงแล้ว `xlsx-*.js` โผล่เป็น request
+  ตัวถัดมา = on-demand ทำงานถูก
+- ⚠️ **ยังไม่ได้ click-through e2e ตัวจริง** — `/programs` ถูก auth gate (`AppShell.tsx:55`) และไม่มี
+  credential ในมือ · ที่ควรกดตอนล็อกอินได้: Import from Excel → เลือกไฟล์ → เห็น `"กำลังอ่านไฟล์..."`
+  → preview → setup → save (+ throttle Slow 4G ดูว่า loading ขึ้นจริงไม่ใช่ปุ่มค้างเงียบ)
+
+### ไม่ทำรอบนี้
+
+- **route-level splitting** (`React.lazy` ทั้ง 18 หน้าใน `router.tsx`) — entry ยัง 760 kB **วอร์น
+  `>500 kB` จึงยังขึ้นอยู่** จงใจปล่อย: ต้องทำ Suspense fallback/skeleton ทุกหน้า + เสี่ยงสลับแท็บล่าง
+  เห็นจอกระพริบ ขณะที่ Vercel ตั้ง `Cache-Control: immutable` ให้ `/assets/*` อยู่แล้ว
+  (`apps/web/vercel.json` → `framework: "vite"`) และ `public/sw.js` เป็น push-only ไม่มี offline cache
+  → ผู้ใช้ที่เปิดซ้ำใน deploy เดิมโหลด **0 byte** ต้นทุนจ่ายครั้งเดียวต่อ deploy ไม่ใช่ต่อการเปิดแอป
+- **ไม่ตั้ง `build.chunkSizeWarningLimit`** — คงวอร์นไว้เป็นสัญญาณจริงว่า entry ยังใหญ่ ไม่กลบด้วยการปิดปาก
+- ตัวกระตุ้นให้กลับมาทำ route splitting: บันเดิลโตเกิน ~2 MB หรือมีคนบ่นว่าเปิดครั้งแรกช้า
+  (Phase 6 / 1,324 ท่า **จะไม่ทำให้บวม** — CLAUDE.md ตัดสินใจแล้วว่าดึงผ่าน Supabase + TanStack Query)
 
 ---
 
