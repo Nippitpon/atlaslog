@@ -1,0 +1,7 @@
+# Workbooks are read byte-for-byte — the Excel import suite parses
+# apps/web/src/test/fixtures/hybrid-program.xlsx, and the sample offered for
+# download has to open in Excel. Without this git falls back to guessing, so a
+# contributor with core.autocrlf=true would rewrite line endings inside the zip
+# and corrupt them.
+*.xlsx binary
+*.xls binary
