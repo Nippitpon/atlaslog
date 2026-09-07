@@ -1,4 +1,6 @@
-import * as XLSX from 'xlsx'
+// SheetJS is ~900 kB of source. Loading it on demand keeps it out of the entry
+// chunk that every visitor downloads; `import type` emits no runtime import.
+import type { WorkSheet } from 'xlsx'
 import type { StructuredProgram, StructuredWeek, StructuredDay, StructuredExercise, ProgramPhase } from '@atlaslog/shared'
 
 const VALID_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -95,6 +97,7 @@ function prettifyName(fileName: string): string {
 // ─── Parser ───────────────────────────────────────────────────────────────────
 
 export async function parseExcelFile(file: File): Promise<ImportResult> {
+  const XLSX = await import('xlsx')
   const buffer = await file.arrayBuffer()
   const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' })
   const errors: string[] = []
@@ -116,12 +119,12 @@ export async function parseExcelFile(file: File): Promise<ImportResult> {
 
   // Locate the program sheet: prefer "Program", then "Template", then the first
   // sheet whose header row exposes the required columns.
-  const findSheet = (): { sheet: XLSX.WorkSheet; colIndex: Partial<Record<Canonical, number>> } | null => {
+  const findSheet = (): { sheet: WorkSheet; colIndex: Partial<Record<Canonical, number>> } | null => {
     const candidates = [
       workbook.Sheets['Program'],
       workbook.Sheets['Template'],
       ...workbook.SheetNames.map(n => workbook.Sheets[n]),
-    ].filter(Boolean) as XLSX.WorkSheet[]
+    ].filter(Boolean) as WorkSheet[]
     for (const sheet of candidates) {
       const aoa = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, blankrows: false }) as unknown[][]
       if (!aoa.length) continue
