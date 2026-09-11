@@ -7,6 +7,7 @@ import { CreateProgramPage } from './features/programs/CreateProgramPage.js'
 import { WeekDetailPage } from './features/programs/WeekDetailPage.js'
 import { LoggerPage } from './features/logger/LoggerPage.js'
 import { HistoryPage } from './features/history/HistoryPage.js'
+import { SessionDetailPage } from './features/history/SessionDetailPage.js'
 import { LibraryPage } from './features/library/LibraryPage.js'
 import { ExerciseDetailPage } from './features/library/ExerciseDetailPage.js'
 import { ProfilePage } from './features/profile/ProfilePage.js'
@@ -31,6 +32,7 @@ export const router = createBrowserRouter([
       { path: 'programs/:programId/week/:weekId',            element: <WeekDetailPage /> },
       { path: 'workout',                                     element: <LoggerPage /> },
       { path: 'history',                                     element: <HistoryPage /> },
+      { path: 'history/:sessionId',                          element: <SessionDetailPage /> },
       { path: 'runs',                                        element: <RunsPage /> },
       { path: 'library',                                     element: <LibraryPage /> },
       { path: 'library/:exerciseId',                         element: <ExerciseDetailPage /> },

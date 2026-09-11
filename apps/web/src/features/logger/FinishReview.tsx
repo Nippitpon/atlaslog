@@ -1,18 +1,25 @@
+import { useState } from 'react'
 import type { Workout } from '@atlaslog/shared'
 import { IconCheck } from '../../components/icons/index.js'
-import { getExercise } from '../../lib/utils.js'
+import { DateField } from '../../components/DateField.js'
+import { getExercise, todayYMD } from '../../lib/utils.js'
 import { useAppStore } from '../../store/useAppStore.js'
 import { sessionCalories, latestWeightKg } from '../../lib/calories.js'
 
 interface FinishReviewProps {
   workout: Workout
   now: number
-  onConfirm: () => void
+  // Receives the calendar day to file the session under ('YYYY-MM-DD').
+  onConfirm: (dateYmd: string) => void
   onCancel: () => void
 }
 
 export function FinishReview({ workout, now, onConfirm, onCancel }: FinishReviewProps) {
   const bodyMetrics = useAppStore(s => s.bodyMetrics)
+  const today = todayYMD()
+  // Defaults to today; changing it is the fix for finishing a workout the morning
+  // after you forgot to. Future dates are not offerable — nothing was trained yet.
+  const [dateYmd, setDateYmd] = useState(today)
   const duration = Math.max(1, Math.round((now - workout.startTime) / 60000))
   const volume = workout.exercises.reduce((s, e) =>
     s + e.sets.filter(x => x.done).reduce((ss, st) => ss + (st.w * st.r), 0), 0)
@@ -118,12 +125,25 @@ export function FinishReview({ workout, now, onConfirm, onCancel }: FinishReview
           </div>
         )}
 
+        {/* Backdating: the session date is otherwise fixed at the finish instant */}
+        <div style={{ marginBottom: 16 }}>
+          <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 7, color: 'var(--muted)' }}>
+            SESSION DATE
+          </div>
+          <DateField value={dateYmd} onChange={setDateYmd} max={today} />
+          {dateYmd !== today && (
+            <div className="t-mono" style={{ fontSize: 10, color: 'var(--accent)', marginTop: 7 }}>
+              บันทึกย้อนหลัง — จะไปอยู่ในวันที่เลือก
+            </div>
+          )}
+        </div>
+
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="btn btn-secondary" style={{ flex: 1, height: 52 }} onClick={onCancel}>
             Keep editing
           </button>
           <button className="btn btn-primary" style={{ flex: 1, height: 52, opacity: setCount === 0 ? 0.4 : 1 }}
-            disabled={setCount === 0} onClick={onConfirm}>
+            disabled={setCount === 0} onClick={() => onConfirm(dateYmd)}>
             Confirm &amp; Finish
           </button>
         </div>

@@ -1,157 +1,95 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
-import { resolveDayRef, type DayRefTarget } from '../../lib/programStatus.js'
-import { getExercise, formatPace } from '../../lib/utils.js'
-import { IconRun } from '../../components/icons/index.js'
+import { resolveDayRef } from '../../lib/programStatus.js'
+import {
+  buildScheduleMap, buildTrainedMap, dotFor, monthLabel, monthSummary, shiftMonth, weekStreak,
+  type MonthSummary,
+} from '../../lib/historyCalendar.js'
+import { prDaysByLift } from '../../lib/sessionStats.js'
+import { dateFromYMD, todayYMD } from '../../lib/utils.js'
+import { IconCalendar, IconHistory } from '../../components/icons/index.js'
 import type { Session, RunEntry } from '@atlaslog/shared'
+import { SessionCard } from './SessionCard.js'
+import { RunCard } from './RunCard.js'
+import { HistoryCalendar } from './HistoryCalendar.js'
+import { DayDetailSheet } from './DayDetailSheet.js'
 
 type TimelineItem =
   | { kind: 'session'; date: string; data: Session }
   | { kind: 'run'; date: string; data: RunEntry }
 
-// `target` is the program day this run closed out (null for a free run, and for
-// a dayRef whose program/day no longer exists). With one, the card names the day
-// and taps through to its week — a run is otherwise the only timeline entry that
-// can't say what it belonged to, since SessionCard has the day in its name.
-function RunCard({ r, target, onOpen }: { r: RunEntry; target: DayRefTarget | null; onOpen?: () => void }) {
-  const card = (
-    <div className="card card-tight" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <div style={{
-        width: 48, flexShrink: 0,
-        background: 'var(--surface-2)', border: '1px solid var(--border)',
-        borderRadius: 10, display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', padding: '8px 0',
-      }}>
-        <div className="t-display tnum" style={{ fontSize: 18, lineHeight: 1 }}>
-          {new Date(r.date).getDate()}
-        </div>
-        <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', marginTop: 2 }}>
-          {new Date(r.date).toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()}
-        </div>
+const kkg = (v: number) => `${(v / 1000).toFixed(1)}k kg`
+
+function Stat({ label, value, tone }: { label: string; value: string; tone?: string }) {
+  return (
+    <div>
+      <div className="t-display tnum" style={{ fontSize: 18, lineHeight: 1, color: tone ?? 'var(--text)' }}>
+        {value}
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
-          <IconRun size={15} style={{ color: 'var(--accent)' }} />
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 16 }}>
-            Run{r.note ? ` · ${r.note}` : ''}
-          </div>
-        </div>
-        {target && (
-          <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4 }}>
-            W{target.weekNum} · {target.day.dayOfWeek.toUpperCase()} — {target.day.focus}
-          </div>
-        )}
-        <div className="t-mono tnum" style={{ fontSize: 11, color: 'var(--muted)', display: 'flex', gap: 10 }}>
-          <span><span style={{ color: 'var(--text)', fontWeight: 600 }}>{r.distanceKm}</span>km</span>
-          <span>·</span>
-          <span>{Math.round(r.durationMin)}min</span>
-          <span>·</span>
-          <span>{formatPace(r.distanceKm, r.durationMin)}/km</span>
-        </div>
+      <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', marginTop: 4 }}>
+        {label}
       </div>
     </div>
   )
-
-  // Safe to wrap the whole card: it holds no buttons of its own.
-  if (!onOpen) return card
-  return (
-    <button onClick={onOpen} style={{ all: 'unset', cursor: 'pointer', boxSizing: 'border-box', display: 'block', width: '100%' }}>
-      {card}
-    </button>
-  )
 }
 
-function SessionCard({ h }: { h: Session }) {
-  const doneSets = (h.exercises ?? []).flatMap(e =>
-    e.sets.filter(s => s.done).map(s => ({ exerciseId: e.exerciseId, isMain: e.isMain, w: s.w, r: s.r }))
-  )
-
-  // Group by exerciseId preserving order
-  const exerciseOrder: string[] = []
-  const byExercise: Record<string, { w: number; r: number }[]> = {}
-  doneSets.forEach(s => {
-    if (!byExercise[s.exerciseId]) {
-      exerciseOrder.push(s.exerciseId)
-      byExercise[s.exerciseId] = []
-    }
-    byExercise[s.exerciseId].push({ w: s.w, r: s.r })
-  })
+// How the displayed month went. Adherence counts only days that have come due,
+// so the running month is never punished for days the athlete hasn't reached.
+function StatStrip({
+  summary, prevSummary, prevLabel, streak,
+}: {
+  summary: MonthSummary
+  prevSummary: MonthSummary
+  prevLabel: string
+  streak: number
+}) {
+  const delta = prevSummary.volumeKg > 0
+    ? Math.round(((summary.volumeKg - prevSummary.volumeKg) / prevSummary.volumeKg) * 100)
+    : null
 
   return (
-    <div className="card card-tight">
-      {/* Session header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: exerciseOrder.length > 0 ? 12 : 0 }}>
-        <div style={{
-          width: 48, flexShrink: 0,
-          background: 'var(--surface-2)', border: '1px solid var(--border)',
-          borderRadius: 10, display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', padding: '8px 0',
-        }}>
-          <div className="t-display tnum" style={{ fontSize: 18, lineHeight: 1 }}>
-            {new Date(h.date).getDate()}
-          </div>
-          <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', marginTop: 2 }}>
-            {new Date(h.date).toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()}
-          </div>
+    <div style={{ padding: '0 20px', marginBottom: 18 }}>
+      <div className="card card-tight">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          <Stat
+            label="ตามแผน"
+            value={summary.dueDays ? `${summary.doneDays}/${summary.dueDays}` : '—'}
+          />
+          <Stat
+            label="ADHERENCE"
+            value={summary.dueDays ? `${summary.adherencePct}%` : '—'}
+            tone={summary.dueDays && summary.adherencePct >= 80 ? 'var(--accent)' : undefined}
+          />
+          <Stat label="สัปดาห์ต่อเนื่อง" value={streak ? `🔥 ${streak}` : '0'} />
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 16, marginBottom: 4 }}>
-            {h.name}
-          </div>
-          <div className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', display: 'flex', gap: 10 }}>
-            <span>{h.duration}m</span>
-            <span>·</span>
-            <span>{h.setCount} sets</span>
-            <span>·</span>
-            <span className="tnum">{(h.volume / 1000).toFixed(1)}k kg</span>
-          </div>
+
+        <div style={{
+          borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 10,
+          display: 'flex', flexWrap: 'wrap', gap: '2px 8px', alignItems: 'baseline',
+        }}>
+          <span className="t-mono tnum" style={{ fontSize: 11, color: 'var(--text-2)' }}>
+            {kkg(summary.volumeKg)}
+          </span>
+          {delta !== null && (
+            <span className="t-mono tnum" style={{
+              fontSize: 11,
+              color: delta >= 0 ? 'var(--accent)' : 'var(--danger)',
+            }}>
+              {delta >= 0 ? '+' : ''}{delta}% จาก {prevLabel}
+            </span>
+          )}
+          <span className="t-mono" style={{ fontSize: 11, color: 'var(--muted)' }}>
+            · {summary.sessionCount} sessions
+            {summary.runCount > 0 && ` · ${summary.runCount} runs`}
+            {summary.missedDays > 0 && (
+              <span style={{ color: 'var(--danger)' }}> · พลาด {summary.missedDays} วัน</span>
+            )}
+          </span>
         </div>
       </div>
-
-      {/* Exercise details — every recorded set, heaviest marked TOP */}
-      {exerciseOrder.length > 0 && (
-        <div style={{
-          borderTop: '1px solid var(--border)',
-          paddingTop: 10,
-          display: 'flex', flexDirection: 'column', gap: 9,
-        }}>
-          {exerciseOrder.map(exId => {
-            const meta = getExercise(exId)
-            const sets = byExercise[exId]
-            const topIdx = sets.reduce((bi, s, i) =>
-              s.w > sets[bi].w || (s.w === sets[bi].w && s.r > sets[bi].r) ? i : bi
-            , 0)
-            return (
-              <div key={exId} style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                <div style={{
-                  fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 12,
-                  color: 'var(--text-2)', flexShrink: 0, minWidth: 80,
-                }}>
-                  {meta.name}
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px 8px', minWidth: 0 }}>
-                  {sets.map((s, i) => (
-                    <span key={i} className="t-mono tnum" style={{ fontSize: 11, color: 'var(--muted)' }}>
-                      <span style={{ color: i === topIdx ? 'var(--text)' : 'var(--text-2)', fontWeight: i === topIdx ? 700 : 500 }}>{s.w}</span>
-                      <span style={{ fontSize: 9, marginLeft: 1 }}>kg</span>
-                      <span style={{ color: 'var(--muted)', margin: '0 2px' }}>×</span>
-                      <span style={{ color: i === topIdx ? 'var(--text)' : 'var(--text-2)' }}>{s.r}</span>
-                      {i === topIdx && (
-                        <span className="t-eyebrow" style={{ fontSize: 8, marginLeft: 5, color: 'var(--accent)' }}>
-                          TOP
-                        </span>
-                      )}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
     </div>
   )
 }
@@ -160,7 +98,35 @@ export function HistoryPage() {
   const navigate = useNavigate()
   const { history, runs } = useAppStore()
   const customPrograms = useProgramStore(s => s.customPrograms)
+  const configs = useProgramStore(s => s.configs)
+  const progress = useProgramStore(s => s.progress)
   const programs = useMemo(() => [...STRUCTURED_PROGRAMS, ...customPrograms], [customPrograms])
+
+  const [view, setView] = useState<'list' | 'calendar'>('list')
+  const todayYmd = todayYMD()
+  const [cursor, setCursor] = useState(() => {
+    const d = dateFromYMD(todayYmd)
+    return { year: d.getFullYear(), month: d.getMonth() }
+  })
+  const [selected, setSelected] = useState<string | null>(null)
+
+  const schedule = useMemo(
+    () => buildScheduleMap(programs, configs, progress),
+    [programs, configs, progress],
+  )
+  const trained = useMemo(() => buildTrainedMap(history, runs), [history, runs])
+
+  const summary = useMemo(
+    () => monthSummary(cursor.year, cursor.month, schedule, trained, todayYmd),
+    [cursor, schedule, trained, todayYmd],
+  )
+  const prev = shiftMonth(cursor.year, cursor.month, -1)
+  const prevSummary = useMemo(
+    () => monthSummary(prev.year, prev.month, schedule, trained, todayYmd),
+    [prev.year, prev.month, schedule, trained, todayYmd],
+  )
+  const streak = useMemo(() => weekStreak(trained), [trained])
+  const prs = useMemo(() => prDaysByLift(history), [history])
 
   const groups = useMemo(() => {
     const items: TimelineItem[] = [
@@ -177,7 +143,11 @@ export function HistoryPage() {
     return Object.entries(g)
   }, [history, runs])
 
-  const isEmpty = history.length === 0 && runs.length === 0
+  // A user who has only just set up a program has no sessions but does have a
+  // plan worth looking at, so the "nothing here yet" screen waits for both.
+  const isEmpty = history.length === 0 && runs.length === 0 && schedule.size === 0
+
+  const selectedDot = selected ? dotFor(selected, schedule, trained, todayYmd) : null
 
   return (
     <div className="atlas-screen screen-enter">
@@ -186,6 +156,24 @@ export function HistoryPage() {
           <div className="sub">ALL SESSIONS</div>
           <h1>History</h1>
         </div>
+        {!isEmpty && (
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            <button
+              className={`pill ${view === 'calendar' ? 'pill-active' : ''}`}
+              onClick={() => setView('calendar')}
+              aria-label="Calendar view"
+            >
+              <IconCalendar size={13} />
+            </button>
+            <button
+              className={`pill ${view === 'list' ? 'pill-active' : ''}`}
+              onClick={() => setView('list')}
+              aria-label="List view"
+            >
+              <IconHistory size={13} />
+            </button>
+          </div>
+        )}
       </div>
 
       {isEmpty ? (
@@ -201,6 +189,39 @@ export function HistoryPage() {
             Start a Workout
           </button>
         </div>
+      ) : view === 'calendar' ? (
+        <>
+          <StatStrip
+            summary={summary}
+            prevSummary={prevSummary}
+            prevLabel={monthLabel(prev.year, prev.month).split(' ')[0]!}
+            streak={streak}
+          />
+          <HistoryCalendar
+            year={cursor.year}
+            month={cursor.month}
+            schedule={schedule}
+            trained={trained}
+            prs={prs}
+            todayYmd={todayYmd}
+            onShift={delta => setCursor(c => shiftMonth(c.year, c.month, delta))}
+            onSelectDay={setSelected}
+          />
+        </>
+      ) : groups.length === 0 ? (
+        // Reachable now that a configured program keeps the page out of the
+        // full empty state: there is a plan to show, just nothing logged yet.
+        <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+          <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 20, lineHeight: 1.6 }}>
+            ยังไม่มี session ที่บันทึกไว้<br />
+            ดูวันที่ต้องเล่นได้ในมุมมองปฏิทิน
+          </div>
+          <button className="btn" onClick={() => setView('calendar')} style={{
+            background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)',
+          }}>
+            เปิดปฏิทิน
+          </button>
+        </div>
       ) : groups.map(([month, items]) => (
         <div key={month} style={{ marginBottom: 28 }}>
           <div style={{ padding: '0 20px 12px' }}>
@@ -208,7 +229,9 @@ export function HistoryPage() {
           </div>
           <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
             {items.map(it => {
-              if (it.kind === 'session') return <SessionCard key={it.data.id} h={it.data} />
+              if (it.kind === 'session') {
+                return <SessionCard key={it.data.id} h={it.data} onOpen={() => navigate(`/history/${it.data.id}`)} />
+              }
               const target = resolveDayRef(it.data.dayRef, programs)
               return (
                 <RunCard
@@ -222,6 +245,19 @@ export function HistoryPage() {
           </div>
         </div>
       ))}
+
+      {selected && selectedDot && (
+        <DayDetailSheet
+          ymd={selected}
+          dot={selectedDot}
+          scheduled={schedule.get(selected) ?? []}
+          trained={trained.get(selected) ?? []}
+          prs={prs.get(selected) ?? []}
+          todayYmd={todayYmd}
+          programs={programs}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   )
 }

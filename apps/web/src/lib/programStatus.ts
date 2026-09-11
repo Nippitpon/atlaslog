@@ -20,7 +20,7 @@ export function isWeekDone(
 
 // A day nobody has to come back to. Skipping is the only way to settle a day
 // without training it, and it has to be deliberate.
-const isSettled = (s: DayStatus | undefined): boolean => s === 'done' || s === 'skipped'
+export const isSettled = (s: DayStatus | undefined): boolean => s === 'done' || s === 'skipped'
 
 // Id-aware replacement for the store's old getWeekStatus, which compared a count
 // of recorded keys against week.days.length: progress can hold day ids from an
@@ -236,7 +236,7 @@ export function scheduledWeekNum(startDate: string, totalWeeks: number, now: Dat
 
 // Training weeks run Mon–Sat (StructuredDay.dayOfWeek has no 'Sun'), so Sunday
 // belongs to the week that just ended — otherwise the card jumps on Sunday morning.
-function startOfTrainingWeek(now: Date): Date {
+export function startOfTrainingWeek(now: Date): Date {
   const d = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
   return d

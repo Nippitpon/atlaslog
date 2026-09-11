@@ -6,6 +6,7 @@ import { useProgramStore } from './useProgramStore.js'
 import { syncSession, syncBodyMetric, syncBodyMetricDelete, syncRun, syncRunDelete, syncExercise, syncExerciseDelete, syncOneRM, syncOneRMDelete } from '../lib/syncQueue.js'
 import { latestOneRMs, LIFT_ORDER } from '../lib/oneRM.js'
 import { sessionCalories, latestWeightKg } from '../lib/calories.js'
+import { isoFromYMD, todayYMD } from '../lib/utils.js'
 
 interface OneRMs { squat: number; bench: number; deadlift: number }
 
@@ -32,8 +33,11 @@ interface AppStore {
   startWorkout: (program: Program) => void
   updateWorkout: (w: Workout) => void
   addExerciseToWorkout: (exerciseId: string) => void
-  finishWorkout: () => Session | null
+  // `dateYmd` ('YYYY-MM-DD') backdates the session — for finishing a workout the
+  // day after you forgot to hit Finish. Omitted = now.
+  finishWorkout: (dateYmd?: string) => Session | null
   cancelWorkout: () => void
+  setSessionDate: (id: string, dateYmd: string) => void
 
   addBodyMetric: (entry: BodyMetricEntry) => void
   removeBodyMetric: (id: string) => void
@@ -141,7 +145,7 @@ export const useAppStore = create<AppStore>()(
         return { workout: { ...state.workout, exercises, currentIdx: exercises.length - 1 } }
       }),
 
-      finishWorkout: () => {
+      finishWorkout: (dateYmd) => {
         const { workout, history, bodyMetrics } = get()
         if (!workout) return null
         const duration = Math.max(1, Math.round((Date.now() - workout.startTime) / 60000))
@@ -156,14 +160,22 @@ export const useAppStore = create<AppStore>()(
           id: 'h' + Date.now(),
           programId: workout.programId,
           name: workout.name,
-          date: new Date().toISOString(),
+          // Local noon for a picked day, so the stored timestamptz renders as
+          // that same calendar day everywhere (isoFromYMD); a live finish keeps
+          // the real instant.
+          date: dateYmd && dateYmd !== todayYMD() ? isoFromYMD(dateYmd) : new Date().toISOString(),
           duration,
           volume,
           setCount,
           calories,
           exercises: workout.exercises,
         }
-        set({ history: [session, ...history], workout: null })
+        // Re-sorted rather than just prepended: a backdated session does not
+        // belong at the head, and every reader of `history` assumes newest-first.
+        set({
+          history: [session, ...history].sort((a, b) => b.date.localeCompare(a.date)),
+          workout: null,
+        })
 
         // Sync to cloud; queues for retry if offline / not signed in
         void syncSession(session)
@@ -180,6 +192,23 @@ export const useAppStore = create<AppStore>()(
       },
 
       cancelWorkout: () => set({ workout: null }),
+
+      // Correcting the calendar day a session is filed under. Anchored at local
+      // noon so it cannot drift across a timezone. Deliberately does NOT touch
+      // program progress: which program day this closed out is carried by
+      // Session.programId, and that day stays closed wherever the work is filed.
+      setSessionDate: (id, dateYmd) => {
+        const target = get().history.find(h => h.id === id)
+        if (!target) return
+        const updated: Session = { ...target, date: isoFromYMD(dateYmd) }
+        set(state => ({
+          history: state.history
+            .map(h => (h.id === id ? updated : h))
+            .sort((a, b) => b.date.localeCompare(a.date)),
+        }))
+        // Same upsert finishWorkout uses — the row is keyed by id, so this edits it.
+        void syncSession(updated)
+      },
 
       addBodyMetric: (entry) => {
         set(state => ({ bodyMetrics: [entry, ...state.bodyMetrics.filter(e => e.id !== entry.id)] }))

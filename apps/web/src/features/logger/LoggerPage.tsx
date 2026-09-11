@@ -351,7 +351,7 @@ export function LoggerPage() {
           workout={workout}
           now={reviewNow}
           onCancel={() => setReviewNow(null)}
-          onConfirm={() => { finishWorkout(); navigate('/') }}
+          onConfirm={dateYmd => { finishWorkout(dateYmd); navigate('/') }}
         />
       )}
 

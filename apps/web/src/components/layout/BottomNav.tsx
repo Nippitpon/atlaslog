@@ -14,9 +14,12 @@ export function BottomNav() {
   const navigate = useNavigate()
   const unread = useAuthStore(s => s.notifications.filter(n => !n.readAt).length)
 
-  const activeId = location.pathname === '/library' ? 'programs'
-    : location.pathname === '/' ? 'home'
-    : NAV_ITEMS.find(i => i.path === location.pathname)?.id ?? 'home'
+  // Prefix match, so a detail route keeps its section lit: /history/<id> stays on
+  // History and /library/<id> stays on Programs, both of which used to fall
+  // through to Home. '/' is handled first since every path starts with it.
+  const activeId = location.pathname === '/' ? 'home'
+    : location.pathname.startsWith('/library') ? 'programs'
+    : NAV_ITEMS.slice(1).find(i => location.pathname.startsWith(i.path))?.id ?? 'home'
 
   return (
     <nav className="bottom-nav">

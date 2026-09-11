@@ -45,12 +45,25 @@ export function exerciseGifUrl(gifPath?: string): string | null {
   return MEDIA_HOST && gifPath ? `${MEDIA_HOST}/${gifPath}.gif` : null
 }
 
+// A Date → 'YYYY-MM-DD' in the LOCAL calendar. The only correct way to bucket a
+// timestamp by calendar day here: iso.slice(0, 10) is UTC, so in UTC+7 anything
+// logged after 17:00 local lands on the previous day.
+export function ymdLocal(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// Bucket a stored timestamp by local calendar day. Session.date is a real UTC
+// instant (new Date().toISOString() on finish) while RunEntry.date is anchored at
+// local noon — reading either through local getters is correct.
+export function ymdOfISO(iso: string): string {
+  return ymdLocal(new Date(iso))
+}
+
 // Today as 'YYYY-MM-DD' in the LOCAL calendar, for <input type="date"> defaults.
 // Not toISOString().split('T')[0] — that is UTC, so in UTC+7 it returns yesterday
 // until 07:00 local.
 export function todayYMD(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return ymdLocal(new Date())
 }
 
 // 'YYYY-MM-DD' → LOCAL midnight. new Date('2026-08-18') is UTC midnight, which is
