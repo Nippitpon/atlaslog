@@ -1,8 +1,113 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-09-07 (รอบ 47 — ✅ SHIPPED: excelImport มีเทสต์ 26 เคส + fixture เข้า repo)
+> อัปเดตล่าสุด: 2026-09-11 (รอบ 48 — ✅ SHIPPED: History calendar + session detail + backdate session)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-09-11 — รอบ 48 (✅ SHIPPED, deploy main): History เป็นปฏิทิน + หน้า session detail + แก้วันที่ session ได้
+
+commit `2e6e62b` (feat)
+
+หน้า History เดิมตอบได้แค่ *"เล่นอะไรไปบ้าง"* แต่ตอบไม่ได้ว่า **"ทำตามแผนได้แค่ไหน"** —
+ซึ่งเป็นคำถามหลักของการดู progress ย้อนหลัง ข้อมูลที่ตอบได้มีอยู่ในสโตร์ครบแล้ว
+(`ProgramProgressState` + `ProgramConfig.startDate` + `Session.programId` ที่เป็น composite
+`programId/weekId/dayId`) แค่ไม่มีหน้าไหนเอามาวางบนปฏิทิน · รอบนี้ทำ 3 ก้อน:
+ปฏิทิน + จุดสถานะ, หน้า session detail ที่เทียบกับครั้งก่อน, และแก้วันที่ session ได้
+**ไม่แตะ schema Supabase และไม่เพิ่ม persist key เลย** — derive ทั้งหมด
+
+### ทำอะไร
+
+- **`lib/historyCalendar.ts` (ใหม่, pure)** — `buildScheduleMap` วนทุก program/week/day เรียก
+  `dayDate()` ของเดิมแล้ว bucket ด้วย local YMD (คำนวณครั้งเดียว lookup O(1) ต่อเซลล์) ·
+  `buildTrainedMap` bucket session+run ตามวันจริง · `dotFor` = ลำดับสถานะ · `dayCell` = ทุกอย่างที่เซลล์ต้องใช้ ·
+  `monthGrid` (Mon-start, pad แค่ครบสัปดาห์) · `monthSummary` / `weekStreak` / `dataBounds` /
+  `monthMaxVolume` / `heatBackground`
+- **6 สถานะจุดสี** — 🟢 ยกเหล็ก · 🟡 วิ่ง · 🔵 วันนี้ · ⚪ ตามแผน · 🔴 พลาด · ⭕ ปิดแล้ว ·
+  วันที่ทั้งยกทั้งวิ่ง = **2 จุด** · พื้นเซลล์ทา heat ตาม volume (หารด้วยวันหนักสุด**ของเดือนนั้น**
+  ไม่ใช่ all-time — สัปดาห์ deload จะยังเห็น contrast) · สามเหลี่ยมมุมขวาบน = วัน PR
+- **`lib/sessionStats.ts` (ใหม่, pure)** — `sessionExerciseStats` (นับแค่ set ที่ `done`, รวมแถวที่
+  `exerciseId` ซ้ำ = Top set + Back-off เป็นท่าเดียว) · `compareSession` เทียบ **ต่อท่า ไม่ใช่ต่อ session**
+  (สอง session แทบไม่เคยมีท่าชุดเดียวกัน) หา session ก่อนหน้าที่ใกล้สุด*ที่เล่นท่านั้น* → delta
+  Top set / Volume / e1RM · `prDaysByLift` ตรวจ PR จาก e1RM
+- **`SessionDetailPage.tsx` (ใหม่)** — route `/history/:sessionId` · การ์ด PERSONAL RECORD +
+  stats + ลิงก์ไปวันในโปรแกรม + แถวแก้วันที่ + บล็อกต่อท่าพร้อมบรรทัดเทียบครั้งก่อน
+- **`HistoryCalendar.tsx` / `DayDetailSheet.tsx` (ใหม่)** — ปฏิทิน `repeat(7, 1fr)` + legend ·
+  sheet แตะวันแล้วเด้ง: วันที่เล่นแล้วโชว์การ์ด, วันตามแผนที่ยังไม่เล่นโชว์ท่า+น้ำหนักคำนวณ + ปุ่ม
+  Start (ผ่าน `useStartWorkout`) / Skip / ไป `/runs`
+- **`SessionCard.tsx` / `RunCard.tsx`** — แยกออกจาก `HistoryPage` ให้ sheet ใช้ซ้ำ (ไม่ copy ~90 บรรทัด) ·
+  `SessionCard` แตะได้แล้วทั้งลิสต์และ sheet
+- **`HistoryPage.tsx`** — toggle Calendar/List ด้วย `.pill` ใน slot ขวาของ `.scr-header`
+  (เป็น `space-between` อยู่แล้ว → **ไม่ต้องแก้ CSS**) · แถบ adherence/streak/เทียบเดือน · ลิสต์เดิมไม่แตะ
+- **backdate session 2 ทาง** — `FinishReview` มีช่อง SESSION DATE (default วันนี้, `max` = วันนี้) →
+  `finishWorkout(dateYmd?)` · `setSessionDate(id, ymd)` ใหม่ในสโตร์ สำหรับแก้ข้อมูลเก่าที่วันเพี้ยน
+- **`BottomNav`** — เปลี่ยน exact match → **prefix match** (`/history/<id>` เคยไปไฮไลต์ Home) ·
+  ปิดบั๊กเดิมของ `/library/<id>` ที่เป็นอาการเดียวกันไปด้วย
+- **`lib/utils.ts`** — เพิ่ม `ymdLocal()` + `ymdOfISO()` แล้วให้ `todayYMD()` เรียกใช้ (ลบ logic ซ้ำ)
+- **`lib/programStatus.ts`** — `export` ให้ `isSettled` + `startOfTrainingWeek` (เดิม module-private) ไม่แตะ logic
+
+### ผลกระทบ (จัดการแล้ว)
+
+- **`week.weekNumber` ไม่ใช่ index** ใน `buildScheduleMap` → เลี่ยงบั๊ก `totalWeeks` ที่ยังเปิดอยู่
+  (Excel gappy weeks 1,2,5 ได้ `totalWeeks:3`) เพราะไม่พึ่ง `totalWeeks` เลย · **ไม่ได้แก้ตัวบั๊ก แค่เลี่ยง**
+- **จุดกลวง ⭕ กินสองเคส** — กด Skip เอง **และ** "ปิดวันแล้วแต่ไปเล่นวันอื่น" ซึ่งเกิดได้จริงเพราะ
+  `finishWorkout` เขียน `setDayStatus(...'done')` ที่วันตามแผน แต่ stamp `Session.date` เป็นเวลาจริง
+  → วันตามแผนต้องไม่ขึ้นแดง (มีเทสต์)
+- **แก้วันที่ไม่ย้ายวันที่ปิดในโปรแกรม** — ตัวนั้นผูกกับ `Session.programId` จุดเขียวย้ายตามวันจริง
+  จุดกลวงค้างที่วันตามแผน (ตั้งใจ เขียนบอกใน UI)
+- **`history` sort ใหม่ทุกครั้ง** หลัง finish/แก้วัน — ของเดิมอาศัย prepend แล้วสมมติว่าเรียงใหม่→เก่า
+  ซึ่ง backdate ทำให้สมมติฐานพัง
+- **ไม่ต้องเพิ่ม sync op** — แก้วันที่ใช้ `session-upsert` เดิม (คีย์ด้วย id)
+- **`Sun` ว่างเสมอสำหรับแผน** (`StructuredDay.dayOfWeek` ไม่มี Sun) แต่ session/run ลง Sunday ได้ → คอลัมน์ยังต้อง render
+- **ปฏิทินกับการ์ด "วันนี้" ของ Dashboard ไม่ตรงกันได้โดยชอบธรรม** — `DashboardPage:154` match ชื่อวันกับ
+  สัปดาห์ที่ clamp แล้ว ไม่ได้เรียก `dayDate()` (ปฏิทิน = วันตามแผนจริง, การ์ด = "ตอนนี้ควรทำอะไร")
+- **week-start ในแอปไม่ตรงกัน** — `weeklyVolume`/`weeklyCalories` เป็น Sun-start, ปฏิทินนี้เลือก
+  **Mon-start** ให้ตรงกับ program week (จดไว้ในคอมเมนต์)
+
+### verify
+
+`pnpm test` **69 → 142 tests / 6 files** · `pnpm build` ผ่าน · ESLint ผ่าน · ไม่มี circular import
+(`data.ts` import แค่ type, ไม่มี lib ไหน import store)
+
+**e2e จริงด้วย Playwright ที่ 390px** (ผ่าน `playwright` ใน root node_modules ไม่ใช่ MCP — ดู "ปัญหา MCP" ล่าง):
+seed โปรแกรม `sbd-12w` startDate `2026-08-17` + 4 sessions + 2 runs แล้วช็อต 6 ภาพ
+**dark + light, 0 console/page errors** · ยืนยันครบทุกสถานะในภาพเดียว: 1/3 เขียว, 4 กลวง,
+5 สองจุด, 7 เขียว+heat เข้มสุด+สามเหลี่ยม PR, 8/10 แดง, 9 เหลือง(วิ่ง), 11 น้ำเงิน+ring,
+14+ เทา · legend 7 ชิ้นพอดี 1 บรรทัด · **heat เขียวบนพื้นครีมของ light theme เห็นชัดกว่าที่กลัวไว้**
+
+🐛 **เจอบั๊กจากภาพแล้วแก้** — แถบสรุปบอก "พลาด 3 วัน" แต่ปฏิทินมีจุดแดง 2 จุด:
+`monthSummary` นับ **วันนี้** เป็น missed ทันทีที่ถึงกำหนด ขัดกับกฎของ `isDayPast`
+(Today is NOT past — there is still time to train it) · แก้ให้วันนี้เข้า ratio เฉพาะเมื่อ settled แล้ว
+→ กลายเป็น `3/6 · 50% · พลาด 2 วัน` ตรงกับจุดแดงเป๊ะ · เพิ่มเทสต์ 3 เคสรวม
+**เทสต์ที่ยืนยันว่า `missedDays` ต้องเท่าจำนวนจุดแดงที่ `dotFor` วาด** (กันสองฝั่งแยกกันอีก) ·
+เทสต์เดิม 3 เคสที่เข้ารหัสพฤติกรรมเก่าไว้ถูกอัปเดตตามกฎใหม่
+· polish จากภาพ: PR ใน sheet เคยโชว์ `squat` ตัวเล็กและไม่บอกว่าเป็นค่าประมาณ → ย้าย
+`LIFT_LABEL` เข้า `sessionStats.ts` ใช้ร่วมกัน + ต่อท้าย `(e1RM)`
+
+### ปัญหา MCP ที่เจอระหว่างทาง (แก้แล้ว)
+
+`plugin:playwright:playwright` ต่อไม่ติดทุก session โดยขึ้นว่า "recent failure cached, retries in 15 min"
+แต่ **playwright ฝั่งเครื่องปกติ** (รัน `npx @playwright/mcp@latest` ตรง ๆ handshake ผ่านใน 5 วิ,
+npm ถึง, ไม่มี proxy, browser ติดตั้งครบ) · ต้นเหตุคือ entry ค้างใน
+`~/.claude/mcp-needs-auth-cache.json` จาก session เวลา 13:46 ซึ่ง**อายุ 2 ชม.แล้วยังข้ามอยู่**
+(MCP ต่อครั้งเดียวตอน session start ไม่มี retry กลางทางจริง) · playwright เป็น stdio ไม่มี auth
+เลยไม่มีทาง auth ผ่านได้ → ลบ entry นั้นออก (backup ไว้ `mcp-needs-auth-cache.json.bak-*`, เก็บ Canva ไว้)
+**ต้อง restart Claude Code จึงจะเห็นผล**
+
+> วิธี e2e หน้าที่ติด auth (ต่อจาก memory `e2e-auth-gated-pages`): `/history` อยู่ใต้ `AppShell` ที่
+> `if (!user) return <Navigate to="/login" />` · เริ่มที่ **`/login`** (อยู่นอก AppShell) ไม่งั้น
+> redirect จะทำลาย execution context ตอน seed · แล้ว **no-op `init`** ด้วย
+> `auth.setState({ init: async () => {} })` เพราะ `AppShell` เรียก `init()` ตอน mount แล้วมันจะ
+> เขียนทับ user ปลอมเป็น null (zustand เก็บ action ไว้ใน state จึง override ได้) · sheet ของแอปนี้
+> **ไม่ปิดด้วย Escape** ต้องกดปุ่ม Close หรือ backdrop
+
+### ไม่ทำรอบนี้
+
+- **ลบ session ยังไม่มี** — และ `syncQueue` ไม่มี op `session-delete` ถ้าจะทำต้องเพิ่ม
+- ไม่ลิงก์กราฟ 1RM จากหน้า History (ผู้ใช้ยังไม่เลือก)
+- ไม่แตะงานค้าง 6 ข้อในตาราง 📌 · ไม่แตะ `version`/`migrate` ของ persist
+- สามเหลี่ยม PR กับจุดวิ่งใน **light theme จางกว่า dark** พออ่านออกแต่ยังไม่ได้จูน
 
 ---
 
