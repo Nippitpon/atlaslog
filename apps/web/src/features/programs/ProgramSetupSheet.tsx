@@ -3,12 +3,15 @@ import type { StructuredProgram, ProgramConfig } from '@atlaslog/shared'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAppStore } from '../../store/useAppStore.js'
 import { IconX } from '../../components/icons/index.js'
-import { formatDMY } from '../../lib/utils.js'
+import { formatDMY, programEndDate, todayYMD } from '../../lib/utils.js'
 import { DateField } from '../../components/DateField.js'
 
 interface Props {
   program: StructuredProgram
   onClose: () => void
+  // 'restart' keeps the same fields but wipes the program's progress and day
+  // layouts before writing the new config — see useProgramStore.restartProgram.
+  mode?: 'setup' | 'restart'
 }
 
 function NumInput({ label, value, onChange, placeholder }: {
@@ -47,22 +50,34 @@ function NumInput({ label, value, onChange, placeholder }: {
   )
 }
 
-export function ProgramSetupSheet({ program, onClose }: Props) {
-  const { setConfig } = useProgramStore()
-  const { personalOneRMs } = useAppStore()
+export function ProgramSetupSheet({ program, onClose, mode = 'setup' }: Props) {
+  const { setConfig, restartProgram, getConfig } = useProgramStore()
+  const { personalOneRMs, workout } = useAppStore()
 
-  const todayISO = new Date().toISOString().split('T')[0]
-  const [startDate, setStartDate] = useState(todayISO)
-  const [squatRM, setSquatRM] = useState(personalOneRMs.squat > 0 ? String(personalOneRMs.squat) : '')
-  const [benchRM, setBenchRM] = useState(personalOneRMs.bench > 0 ? String(personalOneRMs.bench) : '')
-  const [deadliftRM, setDeadliftRM] = useState(personalOneRMs.deadlift > 0 ? String(personalOneRMs.deadlift) : '')
+  const isRestart = mode === 'restart'
+  const existingConfig = getConfig(program.id)
+  // Live 1RM first — a restart usually follows a test block. Falls back to what
+  // the program was last set up with so the fields are never blank on a restart.
+  const prefill = (lift: 'squat' | 'bench' | 'deadlift') => {
+    const personal = personalOneRMs[lift]
+    if (personal > 0) return String(personal)
+    const previous = existingConfig?.oneRMs[lift] ?? 0
+    return previous > 0 ? String(previous) : ''
+  }
 
-  const endDate = useMemo(() => {
-    const [y, m, dd] = startDate.split('-').map(Number)
-    const d = new Date(y, m - 1, dd + program.totalWeeks * 7)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-  }, [startDate, program.totalWeeks])
+  const [startDate, setStartDate] = useState(todayYMD())
+  const [squatRM, setSquatRM] = useState(() => prefill('squat'))
+  const [benchRM, setBenchRM] = useState(() => prefill('bench'))
+  const [deadliftRM, setDeadliftRM] = useState(() => prefill('deadlift'))
+
+  const endDate = useMemo(
+    () => programEndDate(startDate, program.totalWeeks),
+    [startDate, program.totalWeeks],
+  )
+
+  // Warned about explicitly: restarting drops it, and it is the one thing here
+  // the user could still lose real work to.
+  const hasLiveWorkout = workout?.programId.split('/')[0] === program.id
 
   const formatDate = formatDMY
 
@@ -80,7 +95,8 @@ export function ProgramSetupSheet({ program, onClose }: Props) {
         deadlift: Number(deadliftRM) || 0,
       },
     }
-    setConfig(program.id, config)
+    if (isRestart) restartProgram(program.id, config)
+    else setConfig(program.id, config)
     onClose()
   }
 
@@ -90,14 +106,38 @@ export function ProgramSetupSheet({ program, onClose }: Props) {
         <div className="sheet-handle" />
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-          <h3 className="t-display" style={{ margin: 0, fontSize: 22 }}>Setup Program</h3>
+          <h3 className="t-display" style={{ margin: 0, fontSize: 22 }}>
+            {isRestart ? 'Restart Program' : 'Setup Program'}
+          </h3>
           <button className="btn-icon" onClick={onClose}><IconX size={18} /></button>
         </div>
-        <p style={{ margin: '0 0 24px', color: 'var(--text-2)', fontSize: 13, lineHeight: 1.5 }}>
-          {isGeneral
-            ? 'เลือกวันเริ่มต้นโปรแกรม — โปรแกรมแบบ General ไม่คำนวณน้ำหนักจาก 1RM (บันทึกน้ำหนักเองตอนเทรน)'
-            : 'กรอกค่า 1RM และวันเริ่มต้น เพื่อให้โปรแกรมคำนวณน้ำหนักแต่ละเซ็ตจากตาราง RPE'}
+        <p style={{ margin: '0 0 16px', color: 'var(--text-2)', fontSize: 13, lineHeight: 1.5 }}>
+          {isRestart
+            ? 'เริ่มโปรแกรมนี้ใหม่ตั้งแต่ Week 1 — เลือกวันเริ่มต้นใหม่ แล้วทุกสัปดาห์จะนับวันที่ใหม่จากวันนั้น'
+            : isGeneral
+              ? 'เลือกวันเริ่มต้นโปรแกรม — โปรแกรมแบบ General ไม่คำนวณน้ำหนักจาก 1RM (บันทึกน้ำหนักเองตอนเทรน)'
+              : 'กรอกค่า 1RM และวันเริ่มต้น เพื่อให้โปรแกรมคำนวณน้ำหนักแต่ละเซ็ตจากตาราง RPE'}
         </p>
+
+        {isRestart && (
+          <div style={{
+            background: 'rgba(255,91,58,0.08)', border: '1px solid rgba(255,91,58,0.3)',
+            borderRadius: 12, padding: '12px 14px', marginBottom: 24,
+          }}>
+            <div className="t-eyebrow" style={{ fontSize: 9, color: 'var(--danger)', marginBottom: 8 }}>
+              สิ่งที่จะถูกล้าง
+            </div>
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--text-2)', lineHeight: 1.7 }}>
+              <li>ความคืบหน้าทุกวัน (done / skipped) ทั้งโปรแกรม</li>
+              <li>ท่าที่ปรับแต่งเองรายวัน — กลับเป็นตารางต้นฉบับ</li>
+              <li>การผูกวันวิ่งกับวันในโปรแกรม (ตัวรายการวิ่งยังอยู่)</li>
+              {hasLiveWorkout && <li>เวิร์กเอาต์ที่ค้างอยู่ของโปรแกรมนี้ จะถูกยกเลิก</li>}
+            </ul>
+            <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-2)', lineHeight: 1.6 }}>
+              ✓ ประวัติการเทรนใน History ยังอยู่ครบทุกเซสชัน
+            </div>
+          </div>
+        )}
 
         {/* 1RM Inputs (powerlifting only — general programs don't calculate weight) */}
         {!isGeneral && (
@@ -133,12 +173,14 @@ export function ProgramSetupSheet({ program, onClose }: Props) {
         </div>
 
         <button
-          className="btn btn-primary"
-          style={{ width: '100%' }}
+          className={isRestart ? 'btn' : 'btn btn-primary'}
+          style={isRestart
+            ? { width: '100%', background: 'var(--danger)', color: '#fff', border: 'none' }
+            : { width: '100%' }}
           onClick={handleConfirm}
           disabled={!isValid}
         >
-          Start Program
+          {isRestart ? 'Restart from Week 1' : 'Start Program'}
         </button>
       </div>
     </div>

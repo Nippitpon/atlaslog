@@ -4,6 +4,7 @@ import type { DayStatus, ProgramProgressState, ProgramConfig, ProgramMeta, Progr
 import { syncProgramUpsert, syncProgramDelete, syncProgramState } from '../lib/syncQueue.js'
 import { resolveDayRef } from '../lib/programStatus.js'
 import { resolveDayExercises } from '../lib/dayLayout.js'
+import { programEndDate } from '../lib/utils.js'
 import { STRUCTURED_PROGRAMS } from '../lib/twelveWeekProgram.js'
 import { useAppStore } from './useAppStore.js'
 
@@ -30,7 +31,7 @@ interface ProgramStore {
   setDayStatus: (programId: string, weekId: string, dayId: string, status: DayStatus) => void
   setRunDayStatus: (dayRef: string, logged: boolean) => void
   markDayStarted: (dayRef: string) => void
-  resetProgram: (programId: string) => void
+  restartProgram: (programId: string, config: ProgramConfig) => void
 
   setConfig: (programId: string, config: ProgramConfig) => void
   getConfig: (programId: string) => ProgramConfig | null
@@ -132,18 +133,33 @@ export const useProgramStore = create<ProgramStore>()(
         }
       },
 
-      resetProgram: (programId) => {
+      // Run the same program again from Week 1. Clearing progress is what actually
+      // rewinds it: pickActiveWeek floors the current week at the first unfinished
+      // one, so a fresh startDate alone leaves the card sitting where it was.
+      // The day layouts go too — a restart returns the program to as-imported.
+      // What survives on purpose: the program itself, the favourite star, and every
+      // Session/RunEntry ever logged against it (those live in useAppStore and are
+      // a training record, not progress).
+      restartProgram: (programId, config) => {
         set(state => {
-          const nextProgress = { ...state.progress }
-          delete nextProgress[programId]
-          const nextConfigs = { ...state.configs }
-          delete nextConfigs[programId]
-          const nextCustom = { ...state.customAccessories }
-          delete nextCustom[programId]
-          const nextMeta = { ...state.programMeta }
-          delete nextMeta[programId]
-          return { progress: nextProgress, configs: nextConfigs, customAccessories: nextCustom, programMeta: nextMeta }
+          const progress = { ...state.progress }
+          delete progress[programId]
+          const customAccessories = { ...state.customAccessories }
+          delete customAccessories[programId]
+          return {
+            progress,
+            customAccessories,
+            configs: { ...state.configs, [programId]: config },
+            // Same stamp setConfig makes — a restart is the newest activation, and
+            // a paused program must come back active rather than stay parked.
+            programMeta: mergeMeta(state.programMeta, programId, { activatedAt: Date.now(), paused: false }),
+          }
         })
+        const app = useAppStore.getState()
+        // An unfinished workout of this program would write setDayStatus(...'done')
+        // back into the progress we just cleared the moment it is finished.
+        if (app.workout?.programId.split('/')[0] === programId) app.cancelWorkout()
+        app.unlinkProgramRuns(programId)
         queueStateSync(get)
       },
 
@@ -245,10 +261,7 @@ export const useProgramStore = create<ProgramStore>()(
             if (program.weekly) {
               delete configs[program.id]
             } else {
-              const [y, m, d] = cfg.startDate.split('-').map(Number)
-              const end = new Date(y, m - 1, d + program.totalWeeks * 7)
-              const endDate = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`
-              configs[program.id] = { ...cfg, endDate }
+              configs[program.id] = { ...cfg, endDate: programEndDate(cfg.startDate, program.totalWeeks) }
             }
           }
 

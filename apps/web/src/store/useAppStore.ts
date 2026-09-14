@@ -45,6 +45,7 @@ interface AppStore {
   addRun: (entry: RunEntry) => void
   removeRun: (id: string) => void
   setRuns: (entries: RunEntry[]) => void
+  unlinkProgramRuns: (programId: string) => void
   addOneRMEntry: (entry: OneRMEntry) => void
   addOneRMEntries: (entries: OneRMEntry[]) => void
   removeOneRMEntry: (id: string) => void
@@ -237,6 +238,22 @@ export const useAppStore = create<AppStore>()(
         }
       },
       setRuns: (runs) => set({ runs }),
+
+      // Cut every run loose from a program's days, keeping the runs themselves.
+      // Restarting a program clears its day statuses, but a run still pointing at
+      // a day keeps rendering on that day's card (WeekDays reads runs by dayRef),
+      // so the fresh week would open already showing last cycle's run.
+      // Deliberately NOT removeRun/setRunDayStatus: both write back into progress.
+      unlinkProgramRuns: (programId) => {
+        const touched = get().runs.filter(r => r.dayRef?.split('/')[0] === programId)
+        if (!touched.length) return
+        const ids = new Set(touched.map(r => r.id))
+        set(state => ({
+          runs: state.runs.map(r => (ids.has(r.id) ? { ...r, dayRef: undefined } : r)),
+        }))
+        // Push the cleared link, or the next sign-in hydrates the old dayRef back.
+        for (const r of touched) void syncRun({ ...r, dayRef: undefined })
+      },
 
       addOneRMEntry: (entry) => { get().addOneRMEntries([entry]) },
       addOneRMEntries: (entries) => {

@@ -43,3 +43,39 @@ export function makeRunProgram(): StructuredProgram {
     }],
   }
 }
+
+export const MULTI_PROGRAM_ID = 'custom-multi'
+
+// Six plain lifting weeks, two days each. Enough to exercise the week-picking
+// rules (pickActiveWeek clamps between a calendar week and the weeks actually
+// reached), which makeRunProgram's single week cannot express.
+export function makeMultiWeekProgram(): StructuredProgram {
+  return {
+    id: MULTI_PROGRAM_ID,
+    name: 'Six Week Block',
+    description: '',
+    totalWeeks: 6,
+    daysPerWeek: 2,
+    focus: '',
+    isCustom: true,
+    weeks: Array.from({ length: 6 }, (_, i) => ({
+      id: `week-${i + 1}`,
+      weekNumber: i + 1,
+      phase: 'Accumulation',
+      days: [
+        {
+          id: `w${i + 1}-mon`,
+          dayOfWeek: 'Mon',
+          focus: 'Squat',
+          exercises: [{ exerciseId: 'squat', name: 'Squat', type: 'main' as const, sets: 3, reps: 5, pct: 0.75 }],
+        },
+        {
+          id: `w${i + 1}-thu`,
+          dayOfWeek: 'Thu',
+          focus: 'Bench',
+          exercises: [{ exerciseId: 'bench', name: 'Bench Press', type: 'main' as const, sets: 3, reps: 5, pct: 0.7 }],
+        },
+      ],
+    })),
+  }
+}

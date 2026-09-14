@@ -73,6 +73,15 @@ export function dateFromYMD(ymd: string): Date {
   return new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1)
 }
 
+// Where a program's plan runs out: startDate + totalWeeks × 7 days, local
+// midnight throughout (see dateFromYMD). Setup, Import, the program editor and
+// Restart all have to agree on this, so it lives here rather than in each sheet.
+export function programEndDate(startDate: string, totalWeeks: number): string {
+  const d = dateFromYMD(startDate)
+  d.setDate(d.getDate() + totalWeeks * 7)
+  return ymdLocal(d)
+}
+
 // 'YYYY-MM-DD' from a date picker → ISO timestamp anchored at LOCAL noon, so the
 // stored timestamptz renders as the same calendar day in any timezone.
 export function isoFromYMD(ymd: string): string {

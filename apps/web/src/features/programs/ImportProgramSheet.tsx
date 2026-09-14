@@ -5,7 +5,7 @@ import { parseExcelFile } from '../../lib/excelImport.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAppStore } from '../../store/useAppStore.js'
 import { IconX, IconUpload, IconCheck } from '../../components/icons/index.js'
-import { formatDMY } from '../../lib/utils.js'
+import { formatDMY, programEndDate } from '../../lib/utils.js'
 import { DateField } from '../../components/DateField.js'
 
 type Step = 'upload' | 'preview' | 'setup'
@@ -62,13 +62,10 @@ export function ImportProgramSheet({ onClose }: Props) {
   const [benchRM, setBenchRM] = useState(personalOneRMs.bench > 0 ? String(personalOneRMs.bench) : '')
   const [deadliftRM, setDeadliftRM] = useState(personalOneRMs.deadlift > 0 ? String(personalOneRMs.deadlift) : '')
 
-  const endDate = useMemo(() => {
-    if (!program) return todayISO
-    const [y, m, dd] = startDate.split('-').map(Number)
-    const d = new Date(y, m - 1, dd + program.totalWeeks * 7)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-  }, [startDate, program, todayISO])
+  const endDate = useMemo(
+    () => (program ? programEndDate(startDate, program.totalWeeks) : todayISO),
+    [startDate, program, todayISO],
+  )
 
   const formatDate = formatDMY
 

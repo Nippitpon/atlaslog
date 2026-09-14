@@ -4,9 +4,9 @@ import type { StructuredProgram } from '@atlaslog/shared'
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
-import { IconChevronLeft, IconChevronRight, IconSettings, IconEdit, IconStar, IconPause, IconPlay } from '../../components/icons/index.js'
+import { IconChevronLeft, IconChevronRight, IconSettings, IconEdit, IconStar, IconPause, IconPlay, IconRefresh } from '../../components/icons/index.js'
 import {
-  getProgramStatus, weekStatus, doneDaysInWeek, programProgress,
+  getProgramStatus, weekStatus, doneDaysInWeek, programProgress, hasStarted,
   PROGRAM_STATUS_STYLE, DAY_STATUS_EDGE,
 } from '../../lib/programStatus.js'
 import { DayStatusBadge } from '../../components/DayStatusBadge.js'
@@ -26,7 +26,7 @@ export function ProgramOverviewPage() {
   const navigate = useNavigate()
   const { getConfig, customPrograms, progress, programMeta, toggleFavorite, setProgramPaused } = useProgramStore()
   const { isCoach, isAdmin } = useAuthStore()
-  const [showSetup, setShowSetup] = useState(false)
+  const [sheetMode, setSheetMode] = useState<'setup' | 'restart' | null>(null)
 
   const program = [...STRUCTURED_PROGRAMS, ...customPrograms].find(p => p.id === programId)
   if (!program) {
@@ -90,7 +90,7 @@ export function ProgramOverviewPage() {
               </button>
             )}
             {!program.weekly && (
-              <button className="btn-icon" onClick={() => setShowSetup(true)} aria-label="Configure program">
+              <button className="btn-icon" onClick={() => setSheetMode('setup')} aria-label="Configure program">
                 <IconSettings size={18} />
               </button>
             )}
@@ -178,11 +178,29 @@ export function ProgramOverviewPage() {
                 </div>
               </div>
               <button className="btn btn-primary" style={{ flexShrink: 0, height: 36, padding: '0 16px', fontSize: 11 }}
-                onClick={() => setShowSetup(true)}>
+                onClick={() => setSheetMode('setup')}>
                 Setup
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Restart — only once there is progress to clear; the gear covers a plain
+          date change on a program that has never been trained. */}
+      {config && hasStarted(program, progress) && (
+        <div style={{ padding: '0 20px', marginTop: -6, marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            onClick={() => setSheetMode('restart')}
+            style={{
+              all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+              fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
+              letterSpacing: '0.08em', color: 'var(--muted)',
+              border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px',
+            }}
+          >
+            <IconRefresh size={13} /> Restart from Week 1
+          </button>
         </div>
       )}
 
@@ -258,8 +276,8 @@ export function ProgramOverviewPage() {
       </>
       )}
 
-      {showSetup && (
-        <ProgramSetupSheet program={program} onClose={() => setShowSetup(false)} />
+      {sheetMode && (
+        <ProgramSetupSheet program={program} mode={sheetMode} onClose={() => setSheetMode(null)} />
       )}
     </div>
   )
