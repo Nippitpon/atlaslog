@@ -19,7 +19,16 @@ const RPE_TABLE: number[][] = [
 
 // Exported so e1RM can invert it (weight → 1RM) without duplicating the table.
 export function getRpePct(reps: number, rpe: number): number {
-  const repsIdx = Math.min(Math.max(reps, 1), 10) - 1
+  // reps indexes a row, so it has to be a whole number: a fractional or NaN reps
+  // lands between rows, RPE_TABLE[idx] is undefined, and the [rpeIdx] read below
+  // throws — white-screening every page that renders a working weight. Callers
+  // validate too (Create Program's inputs, the Excel importer); this is the last
+  // line, because one bad row must not be able to take the whole app down.
+  // Only NaN needs the guard: it survives both Math.round and the clamp below,
+  // and would reach the table as an index. ±Infinity rounds to itself and the
+  // clamp resolves it to the 10-rep / 1-rep row like any other out-of-range number.
+  const whole = Number.isNaN(reps) ? 1 : Math.round(reps)
+  const repsIdx = Math.min(Math.max(whole, 1), 10) - 1
   const rpeIdx = RPE_COLS.findIndex(r => Math.abs(r - rpe) < 0.01)
   if (rpeIdx === -1) {
     // Interpolate between nearest RPE columns

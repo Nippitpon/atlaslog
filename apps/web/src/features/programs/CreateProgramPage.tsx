@@ -505,6 +505,14 @@ function RunPicker({ onPick, onClose }: { onPick: (ex: StructuredExercise) => vo
   )
 }
 
+// Sets and reps index rows and drive loop counts, so they must be whole numbers.
+// `<input type="number">` accepts '2.5' whatever the step, and a fractional reps
+// used to reach RPE_TABLE as a non-integer index and white-screen the app.
+function wholeOr(value: string | undefined, fallback: number): number {
+  const n = Math.round(Number(value))
+  return Number.isFinite(n) && n > 0 ? n : fallback
+}
+
 function ExercisePicker({ weeks, programType, onPick, onClose }: {
   weeks: number
   programType: 'general' | 'powerlifting'
@@ -575,8 +583,8 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
       exerciseId: ex.id,
       name: ex.name + (showWeekly ? suffix : ''),
       type,
-      sets: Number(sets) || 3,
-      reps: Number(reps) || 10,
+      sets: wholeOr(sets, 3),
+      reps: wholeOr(reps, 10),
       ...(rpe ? { rpe: Number(rpe) } : {}),
     }
     if (showWeekly) {
@@ -584,8 +592,9 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
         const p = wPct[i]?.trim()
         const r = (wRpe[i] ?? '').trim() || rpe // blank per-week cell falls back to RPE (BASE)
         return {
-          sets: Number(wSets[i] || sets) || undefined,
-          reps: Number(wReps[i] || reps) || undefined,
+          // fallback 0 → `|| undefined`, so a blank cell stays blank
+          sets: wholeOr(wSets[i] || sets, 0) || undefined,
+          reps: wholeOr(wReps[i] || reps, 0) || undefined,
           pct: p ? Math.max(0, Math.min(1, Number(p) / 100)) : undefined,
           rpe: r ? Number(r) : undefined,
         }
@@ -720,7 +729,9 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
               ].map(({ label, val, set, ph }) => (
                 <div key={label} style={{ flex: 1 }}>
                   <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>{label}</div>
-                  <input className="input-num tnum" type="number" inputMode="numeric" value={val} placeholder={ph}
+                  <input className="input-num tnum" type="number" inputMode="numeric"
+                    {...(label.startsWith('RPE') ? { step: '0.5' } : { step: '1', min: '1' })}
+                    value={val} placeholder={ph}
                     onChange={e => set(e.target.value)} onFocus={e => e.target.select()}
                     style={{ width: '100%', textAlign: 'center' }} />
                 </div>
@@ -756,10 +767,10 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
                     {Array.from({ length: weeks }, (_, i) => (
                       <Fragment key={i}>
                         <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', textAlign: 'center' }}>{i + 1}</div>
-                        <input className="input-num tnum" type="number" inputMode="numeric" value={wSets[i] ?? ''} placeholder={sets || '—'}
+                        <input className="input-num tnum" type="number" inputMode="numeric" step="1" min="1" value={wSets[i] ?? ''} placeholder={sets || '—'}
                           onChange={e => editCell(wSets, setWSets, i, e.target.value)} onFocus={e => e.target.select()}
                           style={{ width: '100%', textAlign: 'center' }} />
-                        <input className="input-num tnum" type="number" inputMode="numeric" value={wReps[i] ?? ''} placeholder={reps || '—'}
+                        <input className="input-num tnum" type="number" inputMode="numeric" step="1" min="1" value={wReps[i] ?? ''} placeholder={reps || '—'}
                           onChange={e => editCell(wReps, setWReps, i, e.target.value)} onFocus={e => e.target.select()}
                           style={{ width: '100%', textAlign: 'center' }} />
                         <input className="input-num tnum" type="number" inputMode="numeric" value={wPct[i] ?? ''} placeholder="—"
