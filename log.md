@@ -1,8 +1,112 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-09-11 (รอบ 48 — ✅ SHIPPED: History calendar + session detail + backdate session)
+> อัปเดตล่าสุด: 2026-09-14 (รอบ 49 — ✅ SHIPPED: restart โปรแกรมกลับไป Week 1 ได้)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-09-14 — รอบ 49 (✅ SHIPPED, deploy main): เริ่มโปรแกรมใหม่ตั้งแต่ Week 1 ได้แล้ว
+
+commit `448a25c` (feat)
+
+โปรแกรมที่เล่นค้างกลางทาง **ไม่มีทางเริ่มใหม่จาก UI เลย** · ในสโตร์มี `resetProgram()` นอนอยู่
+แต่ **ไม่มีใครเรียกทั้งแอป** (dead code) และแรงเกินไป: ลบ config (1RM) + `programMeta`
+(ดาวโปรด, `activatedAt`) ทิ้งหมด → โปรแกรมตกกลับไป `not_setup`
+
+**กับดักหลักของรอบนี้ — ตั้ง Start Date ใหม่อย่างเดียวไม่พอ**
+`pickActiveWeek()` คิด `weekNum = min(max(firstUnfinished, min(scheduled, ceiling)), total)` ·
+`Math.max(firstUnfinished, …)` ตรึงการ์ดไว้ที่สัปดาห์แรกที่ยังไม่จบเสมอ → ต่อให้ตั้งวันเริ่มเป็นวันนี้
+Dashboard ก็ยังโชว์ W6 อยู่ดี **ต้องล้าง `progress` พร้อมกันเสมอ** (มีเทสต์ล็อกไว้)
+
+### ทำอะไร
+
+- **`useProgramStore.restartProgram(programId, config)`** — แทนที่ `resetProgram` ที่ลบทิ้ง ·
+  `set()` ก้อนเดียว: `delete progress[pid]` + `delete customAccessories[pid]` +
+  เขียน `configs[pid]` ใหม่ + `mergeMeta(… { activatedAt: Date.now(), paused: false })`
+  (`mergeMeta` spread ของเดิม → **`favorite`/`updatedAt` รอด**) · จบด้วย `queueStateSync`
+- **`useAppStore.unlinkProgramRuns(programId)` (ใหม่)** — run ที่ `dayRef` ขึ้นต้นด้วย program id
+  ถูกตัด link (`dayRef → undefined`) แต่ **ตัว record ไม่หาย** · ยิง `syncRun()` ต่อ entry ที่แก้
+  ไม่งั้น sign-in ครั้งหน้า cloud hydrate `day_ref` เดิมกลับมา ·
+  ⚠️ **ห้ามใช้ `removeRun`/`setRunDayStatus`** — ทั้งคู่เขียน `progress` กลับ
+- **ยกเลิกเวิร์กเอาต์ค้างของโปรแกรมนั้น** — ถ้า `workout.programId` ขึ้นต้นด้วย program id เรียก
+  `cancelWorkout()` · ไม่งั้น `finishWorkout` จะเขียน `setDayStatus(…'done')` กลับเข้า progress ที่เพิ่งล้าง
+- **`ProgramSetupSheet` มี prop `mode?: 'setup' | 'restart'`** — ชีตเดิมมี DateField + 3 ช่อง 1RM
+  + endDate ครบแล้ว มี call site เดียว → ไม่สร้างชีตใหม่ · โหมด restart เปลี่ยนหัวข้อ + คำอธิบาย +
+  **การ์ดเตือนสีแดง** ลิสต์สิ่งที่จะหาย (บวกบรรทัดเวิร์กเอาต์ค้าง**เฉพาะตอนมีจริง**) + บรรทัด
+  ✓ ยืนยันว่า History ยังอยู่ครบ + ปุ่ม `var(--danger)` "Restart from Week 1" ·
+  prefill 1RM จาก `personalOneRMs` ก่อน ถ้าเป็น 0 ค่อย fallback `config.oneRMs` (ของเดิมดู
+  `personalOneRMs` อย่างเดียว → คนที่ไม่เคยกรอก Personal 1RM เจอช่องว่าง)
+- **ปุ่มใน `ProgramOverviewPage`** — แถวชิดขวา **ใต้การ์ด config** ไม่ยัดเข้าแถวไอคอน 44×44 ที่มี
+  ★/⏸/✎/⚙ อยู่แล้ว (งานทำลายล้างควรมีป้ายข้อความ) · เงื่อนไขโชว์
+  `!program.weekly && config && hasStarted(program, progress)` → โปรแกรมที่ยังไม่เคยเทรน
+  ไม่ต้องมีปุ่มนี้ (⚙️ เปลี่ยนวันพอ) · `showSetup` เดิมกลายเป็น `sheetMode: 'setup' | 'restart' | null`
+- **`lib/utils.ts` → `programEndDate(startDate, totalWeeks)`** — สูตร `dd + totalWeeks * 7`
+  ซ้ำอยู่ **3 ที่** (`ProgramSetupSheet`, `ImportProgramSheet`, `useProgramStore.updateCustomProgram`)
+  รอบนี้จะเป็นที่ 4 จึงดึงออกมาก่อน แล้วให้ทั้ง 3 จุดเดิมเรียกตัวเดียวกัน
+- **`IconRefresh`** ใหม่ใน `components/icons`
+- **root `package.json` เพิ่ม script `lint`** — CLAUDE.md เขียนว่ารัน `pnpm lint` ได้ แต่ root ไม่มี
+  script นี้จริง (มีแต่ใน `apps/web`) เจอตอนจะรัน lint
+
+### ขอบเขต — อะไรหาย อะไรอยู่
+
+| ข้อมูล | หลัง restart |
+|---|---|
+| `progress[pid]` | **ล้าง** — done/skipped/in_progress หายหมด |
+| `customAccessories[pid]` | **ล้าง** — กลับเป็นตารางต้นฉบับ (ผู้ใช้เลือกเอง) |
+| `configs[pid]` | **เขียนทับ** ไม่ใช่ลบ — ต้องอยู่สถานะ `active` ต่อทันที |
+| `programMeta.favorite` | **เก็บ** · `paused` ปลด · `activatedAt` stamp ใหม่ |
+| `RunEntry.dayRef` ของโปรแกรมนั้น | **ตัด link** (record ยังอยู่) |
+| `Session[]` / `RunEntry[]` | **ไม่แตะ** — คนละ store (`atlas:v2` / ตาราง `sessions`,`runs`) |
+| `customPrograms` | ไม่แตะ |
+
+- **วันที่เลื่อนตาม Start Date ใหม่เอง** — ช่วงวันที่ของทุกสัปดาห์ (`ProgramOverviewPage`,
+  `WeekDetailPage`) และ `isDayPast` ที่คุมปุ่ม Skip คำนวณสดจาก `config.startDate` ทุก render
+  ไม่ได้เก็บค่าไว้ · การ์ดวันโชว์แค่ชื่อวัน (Mon/Tue) ไม่มีวันที่ติดมา
+- **ไม่ต้องเพิ่ม sync op** — `program-state-upsert` เป็น snapshot ก้อนเต็ม (และ coalesce ในคิวอยู่แล้ว)
+  → การล้างขึ้น cloud เองอัตโนมัติ · ฝั่ง run ใช้ `run-upsert` เดิม
+- **โบนัสที่ได้ฟรี** — `pickCurrentProgramId` กรองโปรแกรมที่จบครบทุกสัปดาห์ออกจาก candidate
+  → เดิมโปรแกรม 12 สัปดาห์ที่เล่นจบแล้ว **กลับมาเป็นโปรแกรมหลักของ Dashboard ไม่ได้เลย** restart ปลดล็อกจุดนี้
+- **ไม่ใส่ `window.confirm()` ซ้อน** — ชีต + การ์ดเตือน + ปุ่มแดงคือ confirmation แล้ว
+  (pattern เดียวกับชีต "Cancel workout?" ใน `LoggerPage` ซึ่งก็ไม่มี `confirm()`)
+
+### verify
+
+`pnpm test` **142 → 151 tests / 7 files** (ใหม่ `store/restartProgram.test.ts` 9 เคส + fixture
+`makeMultiWeekProgram()` 6 สัปดาห์ เพราะ `makeRunProgram` มีสัปดาห์เดียว ใช้เทส `pickActiveWeek` ไม่ได้)
+· `pnpm build` ผ่าน · ESLint สะอาด
+
+เคสที่ล็อกไว้: ล้าง progress ครบ · เขียน config ใหม่ · `getDayLayout` เป็น `null` · favorite รอด/
+paused ปลด/activatedAt ขยับ · **`history` ไม่ถูกแตะเลย** · run ถูก unlink แต่ไม่หาย และ
+run ของโปรแกรมอื่น/free run ไม่โดน · **regression: log session W6 ในสัปดาห์ปฏิทินนี้ →
+`pickActiveWeek` = 6 → restart → = 1** · โปรแกรมอื่นไม่ถูกแตะ · workout ค้างถูกเคลียร์เฉพาะของโปรแกรมนั้น
+
+**e2e จริงด้วย Playwright MCP ที่ 390px** (MCP ต่อติดแล้วรอบนี้) — seed โปรแกรม Hybrid 12 สัปดาห์
+ให้เทรนไป 21/48 วัน แล้วกดจริงทั้ง flow:
+
+| | ก่อน | หลัง |
+|---|---|---|
+| Progress | 21/48 · 44% · 5/12 weeks · 1 skipped | **0/48 · 0% · 0/12** |
+| Week 1 ช่วงวันที่ | 13-07 – 19-07 | **14-09 – 20-09** |
+| layout week-1/day-1 | `CUSTOMISED ROW` | `null` |
+| การ์ด Dashboard | W1 + ⚠ ช้ากว่าแผน **9 สัปดาห์** | **W1 ไม่มีบรรทัดช้ากว่าแผน** |
+| ⭐ / History / รายการวิ่ง | ติด / 2 sessions / 5km | **ติด / 2 sessions / 5km (unlink แล้ว)** |
+
+ยืนยันเพิ่ม: ปุ่ม **หายเองหลัง restart** (`hasStarted` เป็น false แล้ว) · บรรทัดเตือนเวิร์กเอาต์ค้าง
+โผล่เฉพาะตอนมี workout จริง แล้ว restart เคลียร์ทั้ง workout และ ResumeBar ·
+**โหมด `setup` เดิมไม่เปลี่ยน** (กด ⚙️ → หัวข้อ "Setup Program", ไม่มีการ์ดเตือน,
+ปุ่ม `btn btn-primary` "START PROGRAM")
+
+> ⚠️ seed ผ่าน `localStorage` **ใช้ไม่ได้ตอน sign-in อยู่** — `loadUserData()` ดึง `program_state`
+> จาก cloud มา `setProgramState()` ทับทั้งก้อนตอน mount · ต้องใช้วิธี expose store ชั่วคราวใน
+> `main.tsx` (ตาม memory `e2e-auth-gated-pages`) แล้ว revert — รอบนี้ revert แล้ว ไม่ติดไปกับ commit
+
+### ไม่ทำรอบนี้
+
+- ไม่ลบ `Session`/`RunEntry` ทั้ง local และ cloud
+- ไม่แตะ `pickActiveWeek`/`programStatus.ts` — สูตรเดิมถูกอยู่แล้วเมื่อ progress ถูกล้าง
+- ไม่ทำปุ่ม restart ในหน้า `ProgramsPage` (ผู้ใช้เลือกหน้า Overview)
+- ไม่แตะงานค้างในตาราง 📌 · ไม่แตะ `version`/`migrate` ของ persist (ไม่ได้เพิ่ม/ลบ top-level key)
 
 ---
 
