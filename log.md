@@ -1,8 +1,85 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-09-14 (รอบ 49 — ✅ SHIPPED: restart โปรแกรมกลับไป Week 1 ได้)
+> อัปเดตล่าสุด: 2026-09-14 (รอบ 50 — ✅ SHIPPED: ปิดบั๊กจอขาว reps ทศนิยม + ระยะ/เวลาวิ่ง 2 ตำแหน่ง)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-09-14 — รอบ 50 (✅ SHIPPED, deploy main): ปิดบั๊ก 🔴 จอขาวจาก reps ทศนิยม + ระยะ/เวลาวิ่งเก็บ 2 ตำแหน่ง
+
+commit `2b92157` (fix — reps) · `433e7b1` (fix — ทศนิยมวิ่ง) · **แยก 2 commit เพราะเป็นคนละเรื่อง**
+
+สองงานไม่เกี่ยวกัน: ข้อแรกคือ 🔴 ที่ค้างในตาราง 📌 มานาน (**ปิดแล้วรอบนี้**) ข้อสองมาจากคำถามผู้ใช้
+ว่า DISTANCE/TIME เก็บทศนิยมกี่ตำแหน่ง — ไล่ดูแล้วพบว่า **เก็บไม่จำกัด แต่แสดง 3 แบบไม่ตรงกัน
+และคำนวณจากค่าดิบ** จึงทำให้ตรงกันทั้งสามเส้น
+
+### ทำอะไร — (ก) reps ทศนิยม → จอขาว
+
+- **`rpeTable.ts` `getRpePct`** — `reps` เป็น index ของแถวตาราง ค่า `2.5` เลยตกร่องระหว่างแถว
+  → `RPE_TABLE[1.5]` = `undefined` → อ่าน `[rpeIdx]` ต่อ = **throw** → จอขาวทุกหน้าที่ render น้ำหนัก
+  (Week view, Dashboard) · แก้เป็น `Math.round(reps)` ก่อน clamp
+- ⚠️ **guard ที่ร่างไว้ตอนแรกผิด** — ใช้ `Number.isFinite()` ทำให้ `Infinity` ตกไปเป็น **1 rep = 91% ของ 1RM**
+  (หนักกว่าที่ควรมาก) · เทสต์จับได้ → เปลี่ยนเป็นกันเฉพาะ `NaN` ตัวเดียว แล้วปล่อย `±Infinity`
+  ไหลผ่าน `Math.min(Math.max(…))` เดิมเป็น 10/1 rep ตามธรรมชาติ
+- **`CreateProgramPage.tsx`** — helper `wholeOr(value, fallback)` บังคับจำนวนเต็มบวกตอนสร้าง draft
+  ทั้งช่อง BASE (`:579`) และตารางรายสัปดาห์ (`:588`) · ใส่ `step="1" min="1"` ให้ input ทุกช่อง
+  (RPE ยังเป็น `step="0.5"` เหมือนเดิม) · **`sets` มีรูเดียวกัน** (แถวเดียวกัน ขาด `step` เหมือนกัน) แก้ไปด้วย
+- ทางเข้า Excel ปิดไปแล้วตั้งแต่รอบ 31/47 (มีเทสต์ยืนยัน) → **ทางเข้าที่เหลือปิดครบแล้ว**
+
+### ทำอะไร — (ข) DISTANCE / TIME 2 ตำแหน่ง
+
+สภาพเดิม: **เก็บ** ไม่จำกัด (`Number(dist)` ตามที่พิมพ์, input ไม่มี `step`) ·
+**แสดง** `RunsPage` ดิบ / สรุปสัปดาห์ `.toFixed(1)` / เวลา `Math.round()` ทุกจุด ·
+**คำนวณ** `formatPace` + `runCalories` ใช้ค่าดิบ → ลง 32.5 นาที เห็น "33 min" แต่ pace คิดจาก 32.5
+
+- **`lib/utils.ts`** — `round2(n)` (กัน non-finite → 0) + `formatNum2(n)` (ปัด 2 ตำแหน่งแล้วตัดศูนย์ท้าย:
+  `5` → `"5"`, `5.25` → `"5.25"`) · ย้ายไว้เหนือ `runTarget` ที่เรียกใช้
+- **เก็บ 2 ตำแหน่งทั้ง 3 ทางเข้า** — log run (`RunsPage:55`), สั่งวันวิ่งในโปรแกรม
+  (`CreateProgramPage` RunPicker), import Excel (`excelImport.ts:217`) · input ได้ `step="0.01" min="0"`
+- **คำนวณ** — สรุปรายสัปดาห์ `round2()` ที่**ผลรวม** ไม่ใช่แค่ที่ละตัว (บวก float แล้วเพี้ยน) ·
+  pace/แคลอรีคิดจากค่า 2 ตำแหน่งที่เก็บ = ตรงกับที่แสดง
+- **แสดง** — เลิก `Math.round(durationMin)` ทั้ง 4 จุด (`RunsPage` รายการ, สรุปสัปดาห์, `RunCard`,
+  `WeekDays` LOGGED) · เลิก `.toFixed(1)` · `runTarget()` + confirm ลบ ใช้ `formatNum2` ด้วย
+
+### ผลกระทบ (จัดการแล้ว)
+
+- **ไม่ migrate ข้อมูลเก่า** — row ที่เก็บ `5.126789` ไว้แล้วยังเป็นค่านั้นใน DB แต่ `formatNum2`
+  ปัดตอนแสดง และ `round2` ปัดตอนรวม → เห็น `5.13` ทุกที่ · ตั้งใจไม่เขียนทับข้อมูลเก่า
+- **`formatNum2` ตัดศูนย์ท้าย** → `5` ไม่ใช่ `5.00` · ถ้าต้องการบังคับ 2 ตำแหน่งตลอด แก้ที่ `formatNum2` จุดเดียว
+- **`excelImport.ts` import `utils.js` เพิ่ม** — ไม่กระทบ lazy-load ของรอบ 46: ที่แยกออกคือ `xlsx`
+  ส่วน `utils` อยู่ใน entry chunk อยู่แล้ว
+- **แยก commit ทั้งที่ `CreateProgramPage.tsx` มีทั้ง 2 เรื่อง** — stage ทีละส่วน (ถอด `round2` ออก
+  ชั่วคราว → commit แรก → คืนกลับ → commit สอง) และ **verify ว่า commit แรกยืนเดี่ยวได้**
+  (build + lint + 164 tests เขียวในสถานะนั้น) จะได้ไม่มี commit ที่ checkout แล้วพัง
+
+### verify
+
+`pnpm test` **151 → 177 tests / 9 files** — ใหม่ `rpeTable.test.ts` (13) + `runNumbers.test.ts` (13) ·
+`pnpm build` ผ่าน · ESLint สะอาด
+
+🐛 **เทสต์จับบั๊กที่เพิ่งเขียนได้ 1 ตัว** (Infinity → 91% ข้างบน) และ **assertion ที่ผมเขียนผิดเอง 2 ตัว**:
+`5.1 + 5.2 + 5.0` **บังเอิญลงตัวพอดี** ใน IEEE754 (= 15.3 เป๊ะ) ใช้เป็นตัวอย่าง float drift ไม่ได้ —
+ไล่หาตัวจริงด้วย node ได้ `5.1 + 5.2 + 5.3` = `15.600000000000001` แล้วแก้ทั้งเทสต์และคอมเมนต์ใน `utils.ts`
+
+**e2e จริงด้วย Playwright MCP ที่ 390px** — พิมพ์ `5.126789` km / `32.5` min กด Add Run:
+
+| | ผล |
+|---|---|
+| เก็บในสโตร์ (เช็ค `localStorage` ไม่ใช่แค่หน้าจอ) | `distanceKm: 5.13` · `durationMin: 32.5` |
+| รายการ | `5.13km · 32.5min · 6:20/km` |
+| สรุปสัปดาห์ | `10.13km · 62.5min` — ไม่มีเศษ float |
+| confirm ลบ | `Delete this 5.13km run?` (เดิมจะโชว์ `5.126789`) |
+| run จำนวนเต็มเดิม | `5km` / `30min` — ไม่มี `.00` ต่อท้าย |
+
+ลบ run ทดสอบคืนสภาพเดิมแล้ว · 0 console errors
+
+### ไม่ทำรอบนี้
+
+- **ไม่ migrate ค่าเก่าใน DB** ให้เป็น 2 ตำแหน่ง (ปัดตอนอ่าน/แสดงแทน)
+- ไม่แตะ `version`/`migrate` ของ persist · ไม่แตะงานค้างข้ออื่นในตาราง 📌
+- `prod.js` (785 KB bundle หลุดมาที่ root) ย้ายออกจาก repo ไปพักไว้ที่ scratchpad ตั้งแต่รอบ 49
+  **ยังไม่ตัดสินใจว่าจะลบถาวรหรือใส่ `.gitignore`**
 
 ---
 
@@ -1317,10 +1394,14 @@ commit `7fcaabe` (fix)
 > 📍 **2026-09-07 (รอบ 47): ไล่เช็คทุกข้อกับโค้ดอีกครั้ง — ยังเปิดจริงทั้งหมด ไม่มีข้อไหนถูกปิดไปเงียบ ๆ**
 > แต่เลขบรรทัดเลื่อนแทบทุกข้อ (รอบ 38–47 ผ่านไป 10 รอบ) จึงอัปเดตให้ตามอ่านได้จริง —
 > **เลขบรรทัดในตารางนี้คือของ 2026-09-07** ถ้ากลับมาอ่านหลังผ่านไปหลายรอบ ให้ถือว่าอาจเลื่อนอีก
+>
+> 📍 **2026-09-14 (รอบ 50): ปิด 🔴 reps ทศนิยม ไปแล้ว 1 ข้อ** — เหลือเปิดอยู่ **5 ข้อ**
+> (🔴 sync data-loss · 🟡 accessory periodization · 🟡 persist version/migrate · 🟡 totalWeeks · ⚠️ coach edge function)
+> · ข้อที่เหลือ **ยังไม่ได้ re-verify กับโค้ดรอบนี้** เลขบรรทัดยังเป็นของ 2026-09-07
 
 | ระดับ | ข้อ | ผลกระทบถ้าไม่ทำ |
 |---|---|---|
-| 🔴 | reps ทศนิยมจาก **Create Program** → `rpeTable.ts:22` `repsIdx` = 1.5 → `RPE_TABLE[1.5]` = undefined | **จอขาวถาวร** บนหน้า Week + Dashboard · ระเบิดที่ `rpeTable.ts:28`/`:29`/`:33` (`RPE_TABLE[repsIdx][…]`) ยังไม่มี `Math.round` · ต้นทาง: `CreateProgramPage.tsx:762` input `type="number" inputMode="numeric"` **ไม่มี `step`** → พิมพ์ `2.5` ได้ แล้ว `:579` `Number(reps) \|\| 10` กับ `:588` ไม่กรองจำนวนเต็ม · **ทางเข้า Excel ปิดแล้วจริง มีเทสต์ยืนยัน** (`excelImport.test.ts` เคส reps ต้องเป็นจำนวนเต็มบวกหรือ `AMRAP`) เหลือทางเข้า Create Program ทางเดียว — แก้ 2 ชั้น: `Math.round()` ใน `getRpePct` + validate ฝั่ง input |
+| ~~🔴~~ | ~~reps ทศนิยมจาก **Create Program** → จอขาว~~ | ✅ **ปิดแล้วรอบ 50** (`2b92157`) — `getRpePct` ปัดเป็นจำนวนเต็ม + กัน `NaN` · `CreateProgramPage` บังคับจำนวนเต็มบวก (sets ด้วย) + `step="1" min="1"` · เทสต์ `rpeTable.test.ts` 13 เคสล็อกไว้ |
 | 🔴 | sync data-loss 4 ตัว | (a) `syncQueue.ts:241` `readQueue()` → `await runOp()` → `:266` `writeQueue(remaining)` ใน `finally` **ทับ op ที่ `enqueue` เข้ามาระหว่าง flush** · `flushing` guard (`:240`) กัน flush ซ้อนได้ แต่ไม่กัน enqueue → log เซ็ตระหว่าง flush = เซ็ตนั้นหลุดจากคิว · (b) 9 จุดเรียก `enqueue(op, null)` (`:167,173,179,185,191,197,203,209`) ตอนไม่มี session แล้ว `:255` ตีความ `userId === null` ว่าเป็นของ user ปัจจุบัน → ไปโผล่บัญชีคนถัดไป · (c) `useProgramStore.ts:58` `stateSyncTimer` เป็น module-level ไม่มีใคร clear ตอน sign-out → ยิงหลัง sign-out ได้ snapshot ว่าง (รวมกับ (b) = ทับ progress คนถัดไป) · (d) `useAuthStore.ts:191-192` และ `:207-208` เรียก `loadUserData(u.id)` **ไม่ await** แล้วยิง `void flushQueue()` ต่อ → แข่งกัน · `setHistory` ที่ `:74` ทับเซ็ตที่ log offline (`[]` ก็ truthy) |
 | 🟡 | แก้โปรแกรม Excel → periodization ของ **accessory** หาย | `CreateProgramPage.tsx:64` gate ไว้ว่า `programType === 'powerlifting' && weeks.length > 1 && ex.type === 'main'` เท่านั้นที่ได้ `weekly[]` · ตัวที่ไม่เข้าเงื่อนไขไปเจอ `:152` `if (!weekly) return { ...base, id }` = เขียนค่าเดียวกันทุกสัปดาห์ → accessory ที่ pct ไต่รายสัปดาห์ + โปรแกรม `general` (ทั้งโปรแกรม) แบนราบตอนกด Save · และ `:69` หยิบท่าด้วย **ตำแหน่ง** `w.days[di]?.exercises[ei]` → สัปดาห์หลังที่จำนวน/ลำดับท่าไม่เท่ากันจะได้ผิดตัวหรือ `undefined` (กลไกที่ทำให้ "วัน/ท่าที่มีเฉพาะสัปดาห์หลังหาย") |
 | ~~🟡~~ | ~~ลบ custom program ไม่ confirm~~ | ✅ **ปิดแล้วรอบ 37** — เพิ่ม `confirm()` ใน `ProgramsPage` |
