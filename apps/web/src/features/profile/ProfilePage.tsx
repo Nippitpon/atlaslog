@@ -243,6 +243,15 @@ export function ProfilePage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
           <IconScale size={14} style={{ color: 'var(--muted)' }} />
           <div className="t-eyebrow">BODY COMPOSITION</div>
+          {/* The inputs below stay: weighing in is a daily action and must not
+              cost four taps. This is the way out to the table + chart. */}
+          <button
+            onClick={() => navigate('/body')}
+            className="t-mono"
+            style={{ all: 'unset', cursor: 'pointer', marginLeft: 'auto', fontSize: 10, color: 'var(--muted)' }}
+          >
+            HISTORY →
+          </button>
         </div>
         <div className="card">
           {/* Latest summary */}
