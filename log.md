@@ -1,8 +1,100 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-09-14 (รอบ 50 — ✅ SHIPPED: ปิดบั๊กจอขาว reps ทศนิยม + ระยะ/เวลาวิ่ง 2 ตำแหน่ง)
+> อัปเดตล่าสุด: 2026-09-14 (รอบ 51 — ✅ SHIPPED: หน้า Body Composition — กราฟ + ตารางย้อนหลัง + แก้ไข/ลบ)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-09-14 — รอบ 51 (✅ SHIPPED, deploy main): Body Composition มีหน้าประวัติแล้ว — กราฟเส้น + ตารางรายวัน + แก้ไข/ลบ
+
+commit `bc9253e` (feat)
+
+BODY COMPOSITION ใน `ProfilePage` **ดูย้อนหลังไม่ได้เลย** — มีแค่แถบค่าล่าสุด 3 ช่อง
+(ที่ไม่บอกด้วยซ้ำว่าเป็นของวันไหน) กับ `MiniBars` 10 แท่งของน้ำหนักอย่างเดียว ไม่มีแกนไม่มีวันที่ ·
+ข้อมูลมีครบอยู่แล้ว (`bodyMetrics` มี `date` เป็น ISO เต็ม sync ขึ้น `body_metrics` เรียบร้อย)
+แค่ไม่มีหน้าไหนเอามาแสดง · comment ใน `types.ts:101` เขียนไว้เองว่า `OneRMEntry`
+*"Mirrors BodyMetricEntry so both get the same store/sync/chart treatment"* — 1RM ได้หน้า `/one-rm`
+ไปตั้งแต่รอบ 39 ส่วน body composition ยังไม่ได้ รอบนี้ให้อีกครึ่งที่เหลือ
+
+### ทำอะไร
+
+- **`lib/bodyMetrics.ts` (ใหม่, pure)** — `BODY_MEASURES` (key/label/pill/unit/color/getter) ·
+  `buildBodySeries` (เก่า→ใหม่) · `sortedByDate` (ใหม่→เก่า) · `latestBodyMetric` · `measureDelta`
+- **`components/charts/MetricChart.tsx` (ใหม่)** — กราฟเส้นซีรีส์เดียว ลอกโครง `OneRMChart`
+  (viewBox 320, gridline 3 เส้น, ป้ายวันที่หัว-ท้ายเท่านั้น) แต่ง่ายกว่ามากเพราะไม่ต้องจัด 3 lift × manual/estimated
+- **`features/profile/BodyPage.tsx` (ใหม่)** — route `/body` · pill `WEIGHT|MUSCLE|FAT%` +
+  กราฟ + แถบค่าล่าสุด/delta + **ตาราง** `DATE │ WEIGHT │ MUSCLE │ FAT │ ✎ 🗑` + empty state
+- **`features/profile/LogBodyMetricSheet.tsx` (ใหม่)** — ชีตเพิ่ม/แก้ไข ลอก `LogOneRMSheet` ทั้งโครง
+  (sheet ไม่แตะสโตร์ ไม่ mint id เอง — parent สร้าง entity)
+- **`ProfilePage`** — เพิ่มปุ่ม `HISTORY →` ในแถว eyebrow · **คงฟอร์มกรอกเดิมไว้** เพราะชั่งน้ำหนัก
+  เป็นงานประจำวัน ถ้าย้ายไปหน้าใหม่ทั้งหมดแบบ 1RM จะกลายเป็น 4 แตะแทน 1
+
+### ปิดช่องโหว่ที่เจอระหว่างทาง
+
+- **ลงย้อนหลังไม่ได้** — `handleSaveBody` ฮาร์ดโค้ด `new Date().toISOString()` ไม่มี `DateField`
+  (ต่างจาก Runs/1RM) → ชั่งแล้วลืมลงวันนั้น = หายไปเลย · ชีตใหม่มี `DateField` + anchor เที่ยงวันท้องถิ่น
+- **พิมพ์ผิดแล้วแก้ไม่ได้** — ชั่ง 75.2 พิมพ์ `752` → **แคลอรีทุก session + BMR/TDEE คิดจาก 752 kg ทันที**
+  (`latestWeightKg` หยิบแถวล่าสุด) ทางออกเดียวคือ `clearMetrics()` ที่ล้าง body + runs + 1RM history
+  + custom exercises ทั้งหมด และเรียกได้แค่ตอน sign out
+- **`removeBodyMetric` เป็น dead code** — มีในสโตร์พร้อม `syncBodyMetricDelete` มานาน **ไม่มี UI เรียกเลย**
+- 💡 **แก้ไขไม่ต้องเพิ่ม action ในสโตร์** — `addBodyMetric` เป็น **upsert by id อยู่แล้ว**
+  (`[entry, ...filter(e => e.id !== entry.id)]`) และ `syncBodyMetric` ก็ upsert ด้วย `id` ฝั่ง Supabase
+
+### ผลกระทบ (จัดการแล้ว)
+
+- **`makeScale`/`polyPoints` กลายเป็น generic** — เพิ่ม `ChartPoint { t, value }` (structural,
+  `OneRMPoint` assignable อยู่แล้ว) + พารามิเตอร์ `steps?: number[]` · **ช่วงค่า body แคบกว่า 1RM
+  หนึ่ง order** บน `NICE_STEPS` เดิม ซีรีส์ 74–76 kg ถูกถ่างเป็นแกนกว้าง 2.5 แล้วเส้นแบน →
+  `FINE_STEPS = [0.5, 1, 2.5, 5, 10]` · พื้น `Math.max(1, …)` สองจุดเปลี่ยนเป็น `Math.min(1, steps[0])`
+  ซึ่ง**ให้ผลเท่าเดิมเป๊ะสำหรับ default** (มีเทสต์ pin ไว้ว่า `/one-rm` ไม่ขยับ)
+- **`buildBodySeries` ข้ามแถวที่ค่านั้นว่าง ไม่ใช่เติม 0** — muscle/fat เป็น optional ถ้าเติม 0
+  จะเป็นหลุมดิ่งลงพื้นและทำแกนพัง (มีเทสต์)
+- **ป้าย tick ไม่ใช้ `Math.round`** แบบ `OneRMChart:83` — ช่วงค่าแคบทำให้แกน 72.5/75/77.5
+  กลายเป็น 73/75/78 (ผิดและระยะไม่เท่ากัน) → ใช้ `formatNum2()` จากรอบ 50
+- **ตารางเป็น CSS grid ไม่ใช่ `<table>`** — ทั้งแอปไม่มี `<table>` สักตัว ลอก header-row + grid
+  จาก `LoggerPage:201-207` · ปุ่ม ✎/🗑 ใช้สไตล์ปุ่มเล็กโปร่ง ไม่ใช่ `btn-icon` 44×44 (สองปุ่ม 44px
+  กินความกว้างจนตาราง 5 คอลัมน์ไม่พอที่ 390px)
+- **ค่าล่าสุดยึดวันที่ ไม่ใช่ลำดับใน array** — พอเปิดให้ลงย้อนหลังได้ ข้อนี้กลายเป็นเรื่องจริง
+  (ค่าล่าสุดไปผูกกับแคลอรีและ BMR/TDEE) มีเทสต์คุม
+- ไม่รวมแถวที่วันเดียวกัน — กด Log today ซ้ำได้ 2 แถว ตอนนี้แก้ด้วยปุ่มลบ/แก้ไขที่เพิ่งได้
+
+### verify
+
+`pnpm test` **177 → 194 tests / 10 files** (ใหม่ `bodyMetrics.test.ts` 17 เคส) · `pnpm build` ผ่าน · ESLint สะอาด
+
+**e2e จริงด้วย Playwright MCP ที่ 390px** — seed 7 ครั้ง (น้ำหนัก 74–76, บางแถวเว้น muscle/fat):
+
+| ทดสอบ | ผล |
+|---|---|
+| ไม่มีข้อมูล | empty state ไม่ใช่กราฟเปล่า |
+| MUSCLE (2 แถวไม่มีค่า) | **5 จุด ไม่ใช่ 7** ไม่ดิ่งลง 0 |
+| แกน Y | `32 / 33.5 / 35` ทศนิยมไม่ถูกปัดทิ้ง |
+| แก้ 75.4 → 75.9 | **ยัง 7 แถว ทับของเดิม** วันที่/ค่าอื่นคงเดิม |
+| ลงย้อนหลัง 99 kg ที่ 20/08 | แทรกถูกตำแหน่ง **ไม่กลายเป็นค่าล่าสุด** |
+| ลบ | confirm บอกวันที่+น้ำหนัก → หายทั้งตารางและกราฟ |
+
+🐛 **แก้ 3 จุดจากการดูภาพจริง** (ไม่เจอถ้าดูแต่โค้ด): หน่วย `kg` ทับเลข `77.5` มุมซ้ายบน → ย้ายไปขวาบน ·
+**สีเดลต้าตัดสินคุณค่าแทนผู้ใช้** — `FAT% -0.2` ขึ้นแดงทั้งที่ไขมันลดคือเป้าหมาย น้ำหนักลดก็แดง
+ทั้งที่อาจกำลังคัตอยู่ → เปลี่ยนเป็นสีกลาง ให้เครื่องหมาย +/− บอกทิศทางพอ ·
+ชีตโหมดแก้ไขขึ้น "ยังไม่เคยบันทึกน้ำหนัก" ทั้งที่กำลังแก้ของเดิม → ซ่อนในโหมดแก้ไข
+
+**ESLint จับ 1 บั๊ก** — `onSave={handleSave('bm' + Date.now())}` เรียก `Date.now()` **ตอน render**
+(`react-hooks/purity`) ทำให้ id เปลี่ยนทุก re-render → ย้ายไป mint ตอนกดบันทึก
+
+> ⚠️ **บทเรียน e2e:** seed ผ่าน store **sync ขึ้น cloud จริง** (`addBodyMetric` → `syncBodyMetric`)
+> ไม่ได้อยู่แค่ในหน่วยความจำ · รอบนี้มีแถวทดสอบหลุดขึ้น `body_metrics` ของบัญชีจริง (ลบคืนแล้ว
+> ยืนยันว่าตารางว่างเหมือนเดิม) · และรอบ 49 ก็ทิ้งร่องรอยไว้เหมือนกัน — Hybrid Powerlifting Template
+> **startDate 13/07 → 14/09 และติดดาวโปรด** จากการทดสอบ restart (**ผู้ใช้บอกว่ายังไม่ต้องคืน**) ·
+> ครั้งหน้า: ทดสอบกับบัญชีแยก หรือ seed แล้วลบให้ครบทุกครั้ง
+
+### ไม่ทำรอบนี้
+
+- ไม่แตะหน้าโค้ช (`AthleteDetailPage` ก็มีแถบ+MiniBars ก๊อปมาเหมือนกัน — รวมเป็น component เดียวได้รอบหน้า)
+- ไม่แตะ `calories.ts` / `energy.ts` (ทั้งคู่ sort/รับค่าล่าสุดมาแล้ว ไม่พึ่งลำดับ array)
+- ไม่แตะ schema Supabase · ไม่เพิ่ม persist key · ไม่แตะ `version`/`migrate`
+- 🟡 policy ของ `body_metrics` เป็น `for all using (...)` **ไม่มี `with check`** (`SUPABASE_SETUP.md:359-365`)
+  ยังเปิดอยู่ — ต้อง deploy SQL แยก
 
 ---
 
