@@ -128,11 +128,24 @@ export function muscleColor(group: string) {
   return map[group] ?? '#888'
 }
 
+// Distance (km) and time (min) are stored at 2 decimal places — enough for a
+// GPS-watch readout, and it keeps what is shown equal to what is calculated.
+// Also the fix for float sums: 5.1 + 5.2 + 5.3 is 15.600000000000001.
+export function round2(n: number): number {
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0
+}
+
+// A 2-dp number without the noise of trailing zeros: 5 → "5", 5.5 → "5.5",
+// 5.25 → "5.25". Rounds first, so it never renders more precision than is stored.
+export function formatNum2(n: number): string {
+  return String(round2(n))
+}
+
 // Human label for a program running target, e.g. "5 km · 30 min" (empty if neither set)
 export function runTarget(ex: { distanceKm?: number; durationMin?: number }): string {
   const parts: string[] = []
-  if (ex.distanceKm) parts.push(`${ex.distanceKm} km`)
-  if (ex.durationMin) parts.push(`${ex.durationMin} min`)
+  if (ex.distanceKm) parts.push(`${formatNum2(ex.distanceKm)} km`)
+  if (ex.durationMin) parts.push(`${formatNum2(ex.durationMin)} min`)
   return parts.join(' · ')
 }
 

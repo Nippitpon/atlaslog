@@ -4,7 +4,7 @@ import { useAppStore } from '../../store/useAppStore.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { resolveDayRef } from '../../lib/programStatus.js'
-import { formatDate, formatPace, runTarget } from '../../lib/utils.js'
+import { formatDate, formatPace, runTarget, round2, formatNum2 } from '../../lib/utils.js'
 import { DateField } from '../../components/DateField.js'
 import { IconChevronLeft, IconRun, IconTrash, IconX } from '../../components/icons/index.js'
 import type { RunEntry } from '@atlaslog/shared'
@@ -38,8 +38,8 @@ export function RunsPage() {
     const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - start.getDay())
     const end = new Date(start); end.setDate(end.getDate() + 7)
     const inWeek = runs.filter(r => { const d = new Date(r.date); return d >= start && d < end })
-    const distanceKm = inWeek.reduce((s, r) => s + r.distanceKm, 0)
-    const durationMin = inWeek.reduce((s, r) => s + r.durationMin, 0)
+    const distanceKm = round2(inWeek.reduce((s, r) => s + r.distanceKm, 0))
+    const durationMin = round2(inWeek.reduce((s, r) => s + r.durationMin, 0))
     return { distanceKm, durationMin, pace: formatPace(distanceKm, durationMin) }
   }, [runs])
 
@@ -52,8 +52,8 @@ export function RunsPage() {
     addRun({
       id: 'run' + Date.now(),
       date: iso,
-      distanceKm: Number(dist),
-      durationMin: Number(dur),
+      distanceKm: round2(Number(dist)),
+      durationMin: round2(Number(dur)),
       note: note.trim() || undefined,
       // Only when the ref still resolves — a stale one would never mark a day
       dayRef: target ? dayRef : undefined,
@@ -64,7 +64,7 @@ export function RunsPage() {
   }
 
   const handleDelete = (r: RunEntry) => {
-    if (window.confirm(`Delete this ${r.distanceKm}km run?`)) removeRun(r.id)
+    if (window.confirm(`Delete this ${formatNum2(r.distanceKm)}km run?`)) removeRun(r.id)
   }
 
   return (
@@ -85,8 +85,8 @@ export function RunsPage() {
           <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 10 }}>THIS WEEK</div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             {[
-              { label: 'DISTANCE', val: weekly.distanceKm.toFixed(1), unit: 'km' },
-              { label: 'TIME', val: Math.round(weekly.durationMin), unit: 'min' },
+              { label: 'DISTANCE', val: formatNum2(weekly.distanceKm), unit: 'km' },
+              { label: 'TIME', val: formatNum2(weekly.durationMin), unit: 'min' },
               { label: 'AVG PACE', val: weekly.pace, unit: '/km' },
             ].map(({ label, val, unit }) => (
               <div key={label} style={{ textAlign: 'center', flex: 1 }}>
@@ -138,7 +138,7 @@ export function RunsPage() {
             <div>
               <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>DISTANCE (km)</div>
               <input
-                className="input-num tnum" type="number" inputMode="decimal"
+                className="input-num tnum" type="number" inputMode="decimal" step="0.01" min="0"
                 value={dist} placeholder="0" onChange={e => setDist(e.target.value)}
                 onFocus={e => e.target.select()} style={{ width: '100%', textAlign: 'center' }}
               />
@@ -146,7 +146,7 @@ export function RunsPage() {
             <div>
               <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>TIME (min)</div>
               <input
-                className="input-num tnum" type="number" inputMode="decimal"
+                className="input-num tnum" type="number" inputMode="decimal" step="0.01" min="0"
                 value={dur} placeholder="0" onChange={e => setDur(e.target.value)}
                 onFocus={e => e.target.select()} style={{ width: '100%', textAlign: 'center' }}
               />
@@ -195,9 +195,9 @@ export function RunsPage() {
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="t-mono tnum" style={{ fontSize: 14, fontWeight: 700 }}>
-                    {r.distanceKm}<span style={{ fontSize: 10, color: 'var(--muted)' }}>km</span>
+                    {formatNum2(r.distanceKm)}<span style={{ fontSize: 10, color: 'var(--muted)' }}>km</span>
                     <span style={{ color: 'var(--muted)', margin: '0 6px' }}>·</span>
-                    {Math.round(r.durationMin)}<span style={{ fontSize: 10, color: 'var(--muted)' }}>min</span>
+                    {formatNum2(r.durationMin)}<span style={{ fontSize: 10, color: 'var(--muted)' }}>min</span>
                     <span style={{ color: 'var(--muted)', margin: '0 6px' }}>·</span>
                     {formatPace(r.distanceKm, r.durationMin)}<span style={{ fontSize: 10, color: 'var(--muted)' }}>/km</span>
                   </div>

@@ -1,5 +1,5 @@
 import type { RunEntry } from '@atlaslog/shared'
-import { formatPace } from '../../lib/utils.js'
+import { formatPace, formatNum2 } from '../../lib/utils.js'
 import { IconRun } from '../../components/icons/index.js'
 import type { DayRefTarget } from '../../lib/programStatus.js'
 
@@ -36,9 +36,9 @@ export function RunCard({ r, target, onOpen }: { r: RunEntry; target: DayRefTarg
           </div>
         )}
         <div className="t-mono tnum" style={{ fontSize: 11, color: 'var(--muted)', display: 'flex', gap: 10 }}>
-          <span><span style={{ color: 'var(--text)', fontWeight: 600 }}>{r.distanceKm}</span>km</span>
+          <span><span style={{ color: 'var(--text)', fontWeight: 600 }}>{formatNum2(r.distanceKm)}</span>km</span>
           <span>·</span>
-          <span>{Math.round(r.durationMin)}min</span>
+          <span>{formatNum2(r.durationMin)}min</span>
           <span>·</span>
           <span>{formatPace(r.distanceKm, r.durationMin)}/km</span>
         </div>

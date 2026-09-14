@@ -9,7 +9,7 @@ import { resolveDayExercises } from '../../lib/dayLayout.js'
 import { dayRef as buildDayRef, isDayPast, DAY_STATUS_EDGE } from '../../lib/programStatus.js'
 import { DayStatusBadge } from '../../components/DayStatusBadge.js'
 import { useStartWorkout } from '../../hooks/useStartWorkout.js'
-import { runTarget } from '../../lib/utils.js'
+import { runTarget, formatNum2 } from '../../lib/utils.js'
 import { IconCheck, IconPlay, IconChevronRight, IconEdit, IconRun } from '../../components/icons/index.js'
 import { DayEditSheet } from './DayEditSheet.js'
 
@@ -151,7 +151,7 @@ function DayCard({
             {loggedRun && (
               <div className="t-mono" style={{ fontSize: 10, color: '#4ade80', display: 'flex', alignItems: 'center', gap: 5 }}>
                 <IconCheck size={10} stroke={3} />
-                LOGGED {loggedRun.distanceKm} km · {Math.round(loggedRun.durationMin)} min
+                LOGGED {formatNum2(loggedRun.distanceKm)} km · {formatNum2(loggedRun.durationMin)} min
               </div>
             )}
           </div>

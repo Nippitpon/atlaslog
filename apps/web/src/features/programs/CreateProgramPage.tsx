@@ -5,7 +5,7 @@ import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
 import { createShare } from '../../lib/shareApi.js'
 import { allExercises } from '../../lib/data.js'
-import { getExercise, moveItem, muscleColor, runTarget } from '../../lib/utils.js'
+import { getExercise, moveItem, muscleColor, runTarget, round2 } from '../../lib/utils.js'
 import { ReorderList } from '../../components/ReorderList.js'
 import { IconChevronLeft, IconPlus, IconX, IconCheck, IconSearch, IconCopy, IconRun } from '../../components/icons/index.js'
 
@@ -459,8 +459,8 @@ function RunPicker({ onPick, onClose }: { onPick: (ex: StructuredExercise) => vo
       exerciseId: 'running',
       name: label.trim() || 'Running',
       type: 'running',
-      ...(Number(dist) > 0 ? { distanceKm: Number(dist) } : {}),
-      ...(Number(dur) > 0 ? { durationMin: Number(dur) } : {}),
+      ...(Number(dist) > 0 ? { distanceKm: round2(Number(dist)) } : {}),
+      ...(Number(dur) > 0 ? { durationMin: round2(Number(dur)) } : {}),
     })
   }
 

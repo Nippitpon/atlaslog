@@ -2,6 +2,7 @@
 // chunk that every visitor downloads; `import type` emits no runtime import.
 import type { WorkSheet } from 'xlsx'
 import type { StructuredProgram, StructuredWeek, StructuredDay, StructuredExercise, ProgramPhase } from '@atlaslog/shared'
+import { round2 } from './utils.js'
 
 const VALID_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -214,8 +215,8 @@ export async function parseExcelFile(file: File): Promise<ImportResult> {
     const label = [variant, prescription].filter(Boolean).join(' · ') || undefined
 
     // Running rows carry distance/duration instead of sets/reps.
-    const distance = cellStr(row, 'distance') !== '' ? Number(cell(row, 'distance')) || undefined : undefined
-    const duration = cellStr(row, 'duration') !== '' ? Number(cell(row, 'duration')) || undefined : undefined
+    const distance = cellStr(row, 'distance') !== '' ? round2(Number(cell(row, 'distance'))) || undefined : undefined
+    const duration = cellStr(row, 'duration') !== '' ? round2(Number(cell(row, 'duration'))) || undefined : undefined
 
     let note = cellStr(row, 'note') || undefined
 
