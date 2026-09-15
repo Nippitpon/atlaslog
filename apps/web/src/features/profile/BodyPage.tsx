@@ -5,7 +5,8 @@ import { useAppStore } from '../../store/useAppStore.js'
 import { formatDMY, formatDM, formatNum2 } from '../../lib/utils.js'
 import {
   BODY_MEASURES, measureDef, buildBodySeries, sortedByDate, measureDelta,
-  type BodyMeasure,
+  buildNormalizedSeries, totalPctChange,
+  type BodySelection,
 } from '../../lib/bodyMetrics.js'
 import { MetricChart } from '../../components/charts/MetricChart.js'
 import { LogBodyMetricSheet } from './LogBodyMetricSheet.js'
@@ -22,14 +23,17 @@ export function BodyPage() {
   const navigate = useNavigate()
   const { bodyMetrics, addBodyMetric, removeBodyMetric } = useAppStore()
 
-  const [measure, setMeasure] = useState<BodyMeasure>('weight')
+  const [measure, setMeasure] = useState<BodySelection>('all')
   const [showLog, setShowLog] = useState(false)
   const [editing, setEditing] = useState<BodyMetricEntry | null>(null)
 
   const rows = useMemo(() => sortedByDate(bodyMetrics), [bodyMetrics])
   const latest = rows[0]
-  const points = useMemo(() => buildBodySeries(bodyMetrics, measure), [bodyMetrics, measure])
-  const def = measureDef(measure)
+  const isAll = measure === 'all'
+  const series = useMemo(() => isAll
+    ? buildNormalizedSeries(bodyMetrics)
+    : [{ key: measure, color: measureDef(measure).color, points: buildBodySeries(bodyMetrics, measure) }],
+  [bodyMetrics, measure, isAll])
 
   // `existing` present = edit: addBodyMetric upserts by id, so reusing the id
   // replaces the row. A new entry mints its id HERE, at save time — minting it
@@ -85,39 +89,47 @@ export function BodyPage() {
             </div>
 
             <div className="card">
-              {/* One measure at a time: kg and % cannot share a y-axis, and 75 kg
-                  next to 33 kg would squash both lines flat. */}
+              {/* Raw kg and % still cannot share a y-axis — 75 kg next to 33 kg
+                  squashes both lines flat — so ALL plots percent change from each
+                  measure's own first reading instead, and the strip below keeps
+                  the real numbers. */}
               <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-                {BODY_MEASURES.map(m => {
-                  const active = measure === m.key
+                {(['all', ...BODY_MEASURES.map(m => m.key)] as BodySelection[]).map(k => {
+                  const active = measure === k
+                  // ALL wears the accent on its border only. A drawn line never
+                  // gets it: lime means "you / now / active" everywhere else, so
+                  // a series in it would read as the privileged one.
+                  const color = k === 'all' ? 'var(--accent)' : measureDef(k).color
                   return (
                     <button
-                      key={m.key}
+                      key={k}
                       className="pill"
-                      onClick={() => setMeasure(m.key)}
+                      onClick={() => setMeasure(k)}
                       style={{
                         flexShrink: 0, cursor: 'pointer', fontSize: 10,
                         background: 'transparent',
-                        borderColor: active ? m.color : 'var(--border)',
-                        color: active ? m.color : 'var(--text-2)',
+                        borderColor: active ? color : 'var(--border)',
+                        color: active ? color : 'var(--text-2)',
                       }}
                     >
-                      {m.pill}
+                      {k === 'all' ? 'ALL' : measureDef(k).pill}
                     </button>
                   )
                 })}
               </div>
 
-              <MetricChart points={points} color={def.color} unit={def.unit} />
+              <MetricChart series={series} unit={isAll ? '%Δ' : measureDef(measure).unit} />
 
-              {/* Latest values + change since the previous reading of each measure */}
+              {/* Latest values, and the change the chart is currently drawing:
+                  percent from the first reading in ALL, otherwise the step since
+                  the previous reading. This strip doubles as the colour legend. */}
               <div style={{
                 display: 'flex', justifyContent: 'space-between',
                 background: 'var(--surface-2)', borderRadius: 10, padding: '10px 14px', marginTop: 14,
               }}>
                 {BODY_MEASURES.map(m => {
                   const val = latest ? m.get(latest) : undefined
-                  const d = measureDelta(bodyMetrics, m.key)
+                  const d = isAll ? totalPctChange(bodyMetrics, m.key) : measureDelta(bodyMetrics, m.key)
                   return (
                     <div key={m.key} style={{ textAlign: 'center', flex: 1 }}>
                       <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 3, color: m.color }}>{m.pill}</div>
@@ -130,16 +142,19 @@ export function BodyPage() {
                           it cannot know whether you are cutting or bulking. The
                           sign carries the direction. */}
                       <div className="t-mono tnum" style={{ fontSize: 9, marginTop: 2, minHeight: 11, color: 'var(--text-2)' }}>
-                        {d != null && d !== 0 ? `${d > 0 ? '+' : ''}${formatNum2(d)}` : ''}
+                        {d != null && d !== 0 ? `${d > 0 ? '+' : ''}${formatNum2(d)}${isAll ? '%' : ''}` : ''}
                       </div>
                     </div>
                   )
                 })}
               </div>
 
+              {/* The small number above was shipped unlabelled; now that it has
+                  two meanings it has to say which one is on screen. Folded into
+                  this existing line so the card height does not jump per pill. */}
               {latest && (
                 <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 8, textAlign: 'center' }}>
-                  ล่าสุด {formatDMY(latest.date)}
+                  ล่าสุด {formatDMY(latest.date)} · {isAll ? '% เทียบค่าแรกของแต่ละค่า' : 'เทียบครั้งก่อน'}
                 </div>
               )}
 

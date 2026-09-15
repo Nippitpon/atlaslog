@@ -33,6 +33,10 @@ export interface Box {
 // any other dated series can now feed the same functions.
 export interface ChartPoint { t: number; value: number }
 
+// A named, coloured line. Lives here rather than in a chart .tsx so lib/ modules
+// can build one without type-importing from a component.
+export interface ChartSeries { key: string; color: string; points: ChartPoint[] }
+
 export interface Scale {
   x: (t: number) => number
   y: (v: number) => number

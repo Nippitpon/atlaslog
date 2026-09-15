@@ -1,7 +1,11 @@
 import type { BodyMetricEntry } from '@atlaslog/shared'
-import type { ChartPoint } from '../components/charts/oneRMScale.js'
+import type { ChartPoint, ChartSeries } from '../components/charts/oneRMScale.js'
 
 export type BodyMeasure = 'weight' | 'muscle' | 'fat'
+
+// 'all' draws the three measures together, normalised to percent change.
+export type BodySelection = BodyMeasure | 'all'
+
 
 export interface MeasureDef {
   key: BodyMeasure
@@ -45,7 +49,7 @@ export function buildBodySeries(entries: BodyMetricEntry[], measure: BodyMeasure
   const get = measureDef(measure).get
   return entries
     .map(e => ({ t: Date.parse(e.date), value: get(e) }))
-    .filter((p): p is ChartPoint => p.value !== undefined && Number.isFinite(p.t))
+    .filter((p): p is ChartPoint => Number.isFinite(p.value) && Number.isFinite(p.t))
     .sort((a, b) => a.t - b.t)
 }
 
@@ -55,4 +59,37 @@ export function measureDelta(entries: BodyMetricEntry[], measure: BodyMeasure): 
   const pts = buildBodySeries(entries, measure)
   if (pts.length < 2) return undefined
   return pts[pts.length - 1]!.value - pts[pts.length - 2]!.value
+}
+
+// Percent change from the series' own first reading, so kg and % can share one
+// axis. The first point is exactly 0 (IEEE: v - v is exact), which is what lets
+// the chart draw a baseline at y(0) without widening the domain by hand.
+// Bails out on a non-positive baseline: optional() in LogBodyMetricSheet stores
+// a blank as undefined rather than 0, but nothing guarantees that for rows that
+// arrived from the cloud, and dividing by one would give Infinity.
+export function normalizePct(points: ChartPoint[]): ChartPoint[] {
+  const base = points[0]?.value
+  // NaN <= 0 is false, so the finite check has to be explicit.
+  if (base === undefined || !Number.isFinite(base) || base <= 0) return []
+  return points.map(p => ({ t: p.t, value: ((p.value - base) / base) * 100 }))
+}
+
+// Each measure keeps ITS OWN baseline — not the first row in the table. Muscle
+// and fat are optional and buildBodySeries skips the rows that omit them, so
+// someone who bought a smart scale months into logging bodyweight gets a muscle
+// line that starts at 0 % part-way along the x-axis. That is the honest reading.
+export function buildNormalizedSeries(entries: BodyMetricEntry[]): ChartSeries[] {
+  return BODY_MEASURES.map(m => ({
+    key: m.key,
+    color: m.color,
+    points: normalizePct(buildBodySeries(entries, m.key)),
+  }))
+}
+
+// First reading to last, matching what the ALL chart draws — unlike
+// measureDelta, which is the step between the last two readings.
+export function totalPctChange(entries: BodyMetricEntry[], measure: BodyMeasure): number | undefined {
+  const pts = normalizePct(buildBodySeries(entries, measure))
+  if (pts.length < 2) return undefined
+  return pts[pts.length - 1]!.value
 }
