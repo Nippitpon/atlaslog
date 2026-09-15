@@ -485,7 +485,7 @@ export function DashboardPage() {
       {activeProgramInfo && (() => {
         const { program, week: currentWeek, weekNum: currentWeekNum, doneWeeks, weeksBehind, leftovers } = activeProgramInfo
         const phaseColor = PHASE_COLOR[currentWeek.phase] ?? 'var(--accent)'
-        const pct = Math.round((doneWeeks / program.totalWeeks) * 100)
+        const pct = Math.round((doneWeeks / program.weeks.length) * 100)
         const oldest = leftovers[0]
         return (
           <div style={{ padding: '0 20px', marginBottom: 16 }}>
@@ -578,7 +578,7 @@ export function DashboardPage() {
                   <div style={{ height: '100%', width: `${pct}%`, background: phaseColor, borderRadius: 2, transition: 'width .4s ease' }} />
                 </div>
                 <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase' }}>
-                  {doneWeeks}/{program.totalWeeks} weeks · {pct}%
+                  {doneWeeks}/{program.weeks.length} weeks · {pct}%
                 </div>
               </button>
 

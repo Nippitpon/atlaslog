@@ -71,17 +71,29 @@ export function remainingDays(
   return week.days.filter(d => !isSettled(days[d.id])).length
 }
 
+// Every day accounted for. Derived from remainingDays rather than adding the two
+// counters, so it inherits the "count off week.days, never off recorded keys" rule.
+export function settledDaysInWeek(
+  programId: string,
+  week: StructuredWeek,
+  progress: ProgramProgressState,
+): number {
+  return week.days.length - remainingDays(programId, week, progress)
+}
+
 export function countDoneWeeks(program: StructuredProgram, progress: ProgramProgressState): number {
   return program.weeks.filter(w => isWeekDone(program.id, w, progress)).length
 }
 
 export interface ProgramProgress {
-  doneDays: number
-  skippedDays: number
+  doneDays: number      // trained
+  skippedDays: number   // deliberately skipped
+  settledDays: number   // doneDays + skippedDays
   totalDays: number
   doneWeeks: number
   totalWeeks: number
-  pct: number
+  settledPct: number    // how far through the plan — reaches 100
+  trainedPct: number    // the share actually trained — never above settledPct
 }
 
 // How far through a program the user actually is. Measured in DAYS: counting
@@ -99,15 +111,21 @@ export function programProgress(
     skippedDays += skippedDaysInWeek(program.id, week, progress)
     totalDays += week.days.length
   }
+  // Two percentages, deliberately both: a finished program has to be able to read
+  // 100%, and the training actually done must stay visible inside it. There is no
+  // field called `pct` any more precisely so no caller can keep the old meaning by
+  // accident. Draw the skipped segment as settledPct - trainedPct, never as its own
+  // rounding of skippedDays, or the two segments stop summing to settledPct.
+  const settledDays = doneDays + skippedDays
   return {
     doneDays,
     skippedDays,
+    settledDays,
     totalDays,
     doneWeeks: countDoneWeeks(program, progress),
     totalWeeks: program.weeks.length,
-    // Skipped days never count here — the bar reports training done, not boxes
-    // ticked, so a finished program that skipped days lands under 100%.
-    pct: totalDays ? Math.round((doneDays / totalDays) * 100) : 0,
+    settledPct: totalDays ? Math.round((settledDays / totalDays) * 100) : 0,
+    trainedPct: totalDays ? Math.round((doneDays / totalDays) * 100) : 0,
   }
 }
 
@@ -127,13 +145,31 @@ export function hasStarted(program: StructuredProgram, progress: ProgramProgress
   return Object.values(byWeek).some(week => Object.values(week).some(s => s !== 'not_started'))
 }
 
+// A plan the user has run out of. Three things this must not get wrong:
+// · a weekly routine repeats forever, so 'completed' is a category error for it —
+//   and it would cost the routine its pause button on two screens with no way back;
+// · the denominator is program.weeks, the same list countDoneWeeks iterates —
+//   program.totalWeeks is a separate metadata field that nothing keeps in sync, and
+//   a stale one reports completion early or never at all;
+// · a week with no days can never satisfy isWeekDone, so it must be out of the
+//   denominator rather than let into isWeekDone — a program of nothing but empty
+//   weeks is not complete, it is empty.
+export function isProgramComplete(
+  program: StructuredProgram,
+  progress: ProgramProgressState,
+): boolean {
+  if (program.weekly) return false
+  const trackable = program.weeks.filter(w => w.days.length > 0).length
+  return trackable > 0 && countDoneWeeks(program, progress) === trackable
+}
+
 export function getProgramStatus(
   program: StructuredProgram,
   config: ProgramConfig | null | undefined,
   meta: ProgramMeta | undefined,
   progress: ProgramProgressState,
 ): ProgramStatus {
-  if (program.totalWeeks > 0 && countDoneWeeks(program, progress) === program.totalWeeks) return 'completed'
+  if (isProgramComplete(program, progress)) return 'completed'
   if (meta?.paused) return 'paused'
   // Weekly routines never get a config (useProgramStore drops it), so they only
   // read as active once something has actually been logged against them.
@@ -204,7 +240,7 @@ export function pickCurrentProgramId(
   // no config and still can't drive the current-week card (see log.md round 24).
   const candidates = programs.filter(p => {
     if (!configs[p.id]) return false
-    return !(p.totalWeeks > 0 && countDoneWeeks(p, progress) === p.totalWeeks)
+    return !isProgramComplete(p, progress)
   })
   if (!candidates.length) return null
 
@@ -412,7 +448,14 @@ export const PROGRAM_STATUS_STYLE: Record<
   Exclude<ProgramStatus, 'not_setup'>,
   { label: string; color: string; bg: string; border: string }
 > = {
-  active:    { label: 'ACTIVE',    color: '#4ade80', bg: 'rgba(74,222,128,0.15)',  border: 'rgba(74,222,128,0.4)' },
-  paused:    { label: 'PAUSED',    color: '#f59e0b', bg: 'rgba(245,158,11,0.15)',  border: 'rgba(245,158,11,0.4)' },
-  completed: { label: 'COMPLETED', color: 'var(--muted)', bg: 'var(--surface-2)',  border: 'var(--border)' },
+  // Green means finished, matching DAY_STATUS_STYLE.done — a completed program is
+  // a page of green DONE badges under a green pill, which reads as one idea. Grey
+  // read as "switched off" and made finishing look worse than still going.
+  // ACTIVE takes the #3aaaff family, not the #60a5fa used elsewhere: that hex is
+  // PHASE_COLOR Accumulation, which sits two rows below this pill inside the same
+  // card on ProgramsPage. Both colours come from a token because the bright
+  // variants read at ~1.5:1 on a white card; the 15% tints work in either theme.
+  active:    { label: 'ACTIVE',    color: 'var(--status-active)', bg: 'rgba(58,170,255,0.15)', border: 'rgba(58,170,255,0.4)' },
+  paused:    { label: 'PAUSED',    color: '#f59e0b',              bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.4)' },
+  completed: { label: 'COMPLETED', color: 'var(--status-done)',   bg: 'rgba(74,222,128,0.15)', border: 'rgba(74,222,128,0.4)' },
 }

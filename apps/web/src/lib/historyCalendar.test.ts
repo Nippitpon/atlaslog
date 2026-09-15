@@ -281,7 +281,8 @@ describe('monthSummary', () => {
   })
 
   // A skipped day closes the plan without pretending the training happened, the
-  // same way programProgress keeps skipped out of pct.
+  // same way programProgress keeps skipped out of trainedPct while still counting
+  // it toward settledPct.
   it('counts a skipped day as neither done nor missed', () => {
     const skipped = buildScheduleMap(
       [makeProgram([1, 2, 3, 4])], configFor('2026-09-07'), progressFor({ w1: { d1: 'skipped' } }),

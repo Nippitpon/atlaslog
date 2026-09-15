@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import type { DayStatus, ProgramProgressState, StructuredProgram } from '@atlaslog/shared'
 import {
-  dayRef, resolveDayRef, doneDaysInWeek, remainingDays, programProgress, reachedWeekNum,
-  isWeekDone, weekStatus, getProgramStatus, dayDate, isDayPast,
+  dayRef, resolveDayRef, doneDaysInWeek, settledDaysInWeek, remainingDays, programProgress,
+  reachedWeekNum, isWeekDone, weekStatus, getProgramStatus, isProgramComplete, dayDate, isDayPast,
 } from './programStatus.js'
 import { makeRunProgram, RUN_PROGRAM_ID, RUN_WEEK_ID, RUN_DAY_ID, MIXED_DAY_ID } from '../test/fixtures.js'
 
@@ -95,23 +95,29 @@ describe('programProgress', () => {
     expect(p.doneWeeks).toBe(0)
     expect(p.doneDays).toBe(3)
     expect(p.totalDays).toBe(6)
-    expect(p.pct).toBe(50)
+    expect(p.trainedPct).toBe(50)
+    expect(p.settledPct).toBe(50)   // nothing skipped, so the two agree
   })
 
   it('reads 0% before anything is trained', () => {
-    expect(programProgress(make3WeekProgram(), {})).toMatchObject({ doneDays: 0, pct: 0 })
+    expect(programProgress(make3WeekProgram(), {})).toMatchObject({
+      doneDays: 0, settledDays: 0, trainedPct: 0, settledPct: 0,
+    })
   })
 
   it('reaches 100% with every week counted when the program is finished', () => {
     const p = programProgress(make3WeekProgram(), progressOf({
       w1: { d1: 'done', d2: 'done' }, w2: { d1: 'done', d2: 'done' }, w3: { d1: 'done', d2: 'done' },
     }))
-    expect(p).toMatchObject({ doneDays: 6, totalDays: 6, doneWeeks: 3, totalWeeks: 3, pct: 100 })
+    expect(p).toMatchObject({
+      doneDays: 6, settledDays: 6, totalDays: 6, doneWeeks: 3, totalWeeks: 3,
+      trainedPct: 100, settledPct: 100,
+    })
   })
 
   it('does not divide by zero on a program with no days', () => {
     const empty: StructuredProgram = { ...make3WeekProgram(), weeks: [] }
-    expect(programProgress(empty, {})).toMatchObject({ pct: 0, totalDays: 0 })
+    expect(programProgress(empty, {})).toMatchObject({ trainedPct: 0, settledPct: 0, totalDays: 0 })
   })
 })
 
@@ -148,22 +154,49 @@ describe('skipping a day', () => {
     expect(remainingDays(P, week, progress)).toBe(0)
   })
 
-  it('keeps skipped days out of the trained count and the percentage', () => {
+  it('counts skipped days toward the plan but not toward training', () => {
     const p = programProgress(program, progressOf({
       w1: { d1: 'done', d2: 'skipped' }, w2: { d1: 'done', d2: 'skipped' },
     }))
-    expect(p).toMatchObject({ doneDays: 2, skippedDays: 2, doneWeeks: 2, pct: 33 })
+    expect(p).toMatchObject({
+      doneDays: 2, skippedDays: 2, settledDays: 4, doneWeeks: 2,
+      trainedPct: 33, settledPct: 67,
+    })
   })
 
-  it('lets a program finish on skips while the bar stays honest', () => {
+  it('reaches 100% on skips while the trained share stays honest', () => {
     const progress = progressOf({
       w1: { d1: 'done', d2: 'done' }, w2: { d1: 'done', d2: 'skipped' }, w3: { d1: 'done', d2: 'skipped' },
     })
     const p = programProgress(program, progress)
     expect(p.doneWeeks).toBe(p.totalWeeks)
-    expect(p.pct).toBe(67)
+    expect(p.settledDays).toBe(6)
+    expect(p.settledPct).toBe(100)
+    expect(p.trainedPct).toBe(67)
     expect(getProgramStatus(program, { startDate: '2026-01-01', endDate: '2026-01-21', oneRMs: { squat: 1, bench: 1, deadlift: 1 } }, undefined, progress))
       .toBe('completed')
+  })
+
+  it('reports a settled week as full, so the badge and the count agree', () => {
+    const progress = progressOf({ w1: { d1: 'done', d2: 'skipped' } })
+    expect(settledDaysInWeek(P, week, progress)).toBe(2)
+    expect(doneDaysInWeek(P, week, progress)).toBe(1)
+  })
+
+  // The skipped segment is drawn as settledPct - trainedPct so the two always sum
+  // to settledPct; rounding skippedDays separately would let them drift apart.
+  it('keeps the two percentages orderly for the two-tone bar', () => {
+    const p = programProgress(program, progressOf({
+      w1: { d1: 'done', d2: 'skipped' }, w2: { d1: 'done' }, w3: {},
+    }))
+    expect(p.settledDays).toBe(p.doneDays + p.skippedDays)
+    expect(p.settledPct).toBeGreaterThanOrEqual(p.trainedPct)
+  })
+
+  it('counts an in-progress day as neither trained nor settled', () => {
+    expect(programProgress(program, progressOf({ w1: { d1: 'in_progress' } }))).toMatchObject({
+      doneDays: 0, skippedDays: 0, settledDays: 0, settledPct: 0,
+    })
   })
 
   it('counts a week the user only skipped as touched', () => {
@@ -196,5 +229,76 @@ describe('dayDate / isDayPast', () => {
     expect(isDayPast('2026-09-07', 1, 'Tue', now)).toBe(true)
     expect(isDayPast('2026-09-07', 1, 'Thu', now)).toBe(false)
     expect(isDayPast('2026-09-07', 2, 'Mon', now)).toBe(false)
+  })
+})
+
+const CONFIG = { startDate: '2026-01-01', endDate: '2026-01-21', oneRMs: { squat: 1, bench: 1, deadlift: 1 } }
+
+describe('isProgramComplete', () => {
+  const settledEverywhere = progressOf({
+    w1: { d1: 'done', d2: 'skipped' }, w2: { d1: 'done', d2: 'done' }, w3: { d1: 'skipped', d2: 'done' },
+  })
+  const weeklyRoutine = (): StructuredProgram => ({
+    ...make3WeekProgram(), weekly: true, totalWeeks: 1, weeks: [make3WeekProgram().weeks[0]!],
+  })
+  const routineSettled = progressOf({ w1: { d1: 'done', d2: 'skipped' } })
+
+  it('is true once every week settles on a done/skipped mix', () => {
+    expect(isProgramComplete(make3WeekProgram(), settledEverywhere)).toBe(true)
+  })
+
+  it('is false while any day is still open', () => {
+    expect(isProgramComplete(make3WeekProgram(), progressOf({
+      w1: { d1: 'done', d2: 'skipped' }, w2: { d1: 'done', d2: 'done' }, w3: { d1: 'done' },
+    }))).toBe(false)
+    expect(isProgramComplete(make3WeekProgram(), progressOf({
+      w1: { d1: 'done', d2: 'skipped' }, w2: { d1: 'done', d2: 'done' }, w3: { d1: 'done', d2: 'in_progress' },
+    }))).toBe(false)
+  })
+
+  // A repeating routine has no end to reach. Completing it also took away its
+  // pause button on two screens, with no restart path to get back.
+  it('never completes a weekly routine', () => {
+    expect(isProgramComplete(weeklyRoutine(), routineSettled)).toBe(false)
+    expect(getProgramStatus(weeklyRoutine(), undefined, undefined, routineSettled)).toBe('active')
+  })
+
+  it('leaves a paused weekly routine paused rather than completing it', () => {
+    expect(getProgramStatus(weeklyRoutine(), undefined, { paused: true }, routineSettled)).toBe('paused')
+  })
+
+  // totalWeeks is metadata nothing keeps in sync with the weeks array. Counting
+  // against it reported completion after one week of three.
+  it('ignores a stale totalWeeks that is too small', () => {
+    const stale: StructuredProgram = { ...make3WeekProgram(), totalWeeks: 1 }
+    expect(isProgramComplete(stale, progressOf({ w1: { d1: 'done', d2: 'done' } }))).toBe(false)
+  })
+
+  it('ignores a stale totalWeeks that is too large', () => {
+    const stale: StructuredProgram = { ...make3WeekProgram(), totalWeeks: 99 }
+    expect(isProgramComplete(stale, settledEverywhere)).toBe(true)
+  })
+
+  // A week with no days can never satisfy isWeekDone, so it has to leave the
+  // denominator — but it must not be counted as done either.
+  it('does not let an empty week block completion forever', () => {
+    const withGap = make3WeekProgram()
+    withGap.weeks[1]!.days = []
+    expect(isProgramComplete(withGap, progressOf({
+      w1: { d1: 'done', d2: 'skipped' }, w3: { d1: 'skipped', d2: 'done' },
+    }))).toBe(true)
+  })
+
+  it('is false for a program that is nothing but empty weeks', () => {
+    const hollow = make3WeekProgram()
+    hollow.weeks.forEach(w => { w.days = [] })
+    expect(isProgramComplete(hollow, {})).toBe(false)
+    expect(isProgramComplete({ ...make3WeekProgram(), weeks: [] }, {})).toBe(false)
+  })
+
+  it('drives the completed status, and does not fire before the work is done', () => {
+    const program = make3WeekProgram()
+    expect(getProgramStatus(program, CONFIG, undefined, settledEverywhere)).toBe('completed')
+    expect(getProgramStatus(program, CONFIG, undefined, {})).toBe('active')
   })
 })

@@ -66,10 +66,12 @@ describe('restartProgram', () => {
 
     ps().restartProgram(MULTI_PROGRAM_ID, config('2026-09-14'))
 
-    const { doneDays, skippedDays, pct } = programProgress(multi, ps().progress)
+    const { doneDays, skippedDays, settledDays, settledPct, trainedPct } = programProgress(multi, ps().progress)
     expect(doneDays).toBe(0)
     expect(skippedDays).toBe(0)
-    expect(pct).toBe(0)
+    expect(settledDays).toBe(0)
+    expect(settledPct).toBe(0)
+    expect(trainedPct).toBe(0)
     expect(weekStatus(MULTI_PROGRAM_ID, multi.weeks[0]!, ps().progress)).toBe('not_started')
     expect(weekStatus(MULTI_PROGRAM_ID, multi.weeks[5]!, ps().progress)).toBe('not_started')
   })

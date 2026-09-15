@@ -189,7 +189,7 @@ export function ProgramsPage() {
         <div className="t-eyebrow" style={{ marginBottom: 12 }}>STRUCTURED PROGRAMS</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {sortPrograms(STRUCTURED_PROGRAMS, programMeta, history).map(sp => {
-            const { pct } = programProgress(sp, progress)
+            const { settledPct } = programProgress(sp, progress)
             const started = programHasStarted(sp, progress)
             const weekNum = Math.max(reachedWeekNum(sp, progress), 1)
             const status = getProgramStatus(sp, configs[sp.id], programMeta[sp.id], progress)
@@ -253,12 +253,12 @@ export function ProgramsPage() {
                         </span>
                         {started && (
                           <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
-                            {pct}%
+                            {settledPct}%
                           </span>
                         )}
                       </div>
                       <div style={{ height: 4, background: 'var(--surface-2)', borderRadius: 2, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${pct}%`, background: 'var(--accent)',
+                        <div style={{ height: '100%', width: `${settledPct}%`, background: 'var(--accent)',
                           borderRadius: 2, transition: 'width .4s ease' }} />
                       </div>
                     </div>
@@ -276,7 +276,7 @@ export function ProgramsPage() {
           <div className="t-eyebrow" style={{ marginBottom: 12 }}>MY PROGRAMS</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {myPrograms.map(sp => {
-              const { pct } = programProgress(sp, progress)
+              const { settledPct } = programProgress(sp, progress)
               const started = programHasStarted(sp, progress)
               const weekNum = Math.max(reachedWeekNum(sp, progress), 1)
               const status = getProgramStatus(sp, configs[sp.id], programMeta[sp.id], progress)
@@ -361,12 +361,12 @@ export function ProgramsPage() {
                             </span>
                             {started && (
                               <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
-                                {pct}%
+                                {settledPct}%
                               </span>
                             )}
                           </div>
                           <div style={{ height: 4, background: 'var(--surface-2)', borderRadius: 2, overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${pct}%`, background: '#a78bfa',
+                            <div style={{ height: '100%', width: `${settledPct}%`, background: '#a78bfa',
                               borderRadius: 2, transition: 'width .4s ease' }} />
                           </div>
                         </div>

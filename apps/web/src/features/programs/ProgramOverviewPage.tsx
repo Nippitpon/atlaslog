@@ -6,7 +6,7 @@ import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
 import { IconChevronLeft, IconChevronRight, IconSettings, IconEdit, IconStar, IconPause, IconPlay, IconRefresh } from '../../components/icons/index.js'
 import {
-  getProgramStatus, weekStatus, doneDaysInWeek, programProgress, hasStarted,
+  getProgramStatus, weekStatus, settledDaysInWeek, programProgress, hasStarted,
   PROGRAM_STATUS_STYLE, DAY_STATUS_EDGE,
 } from '../../lib/programStatus.js'
 import { DayStatusBadge } from '../../components/DayStatusBadge.js'
@@ -243,7 +243,7 @@ export function ProgramOverviewPage() {
                       Week {week.weekNumber}
                     </div>
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--muted)', marginTop: 1 }}>
-                      {doneDaysInWeek(program.id, week, progress)}/{week.days.length} DAYS
+                      {settledDaysInWeek(program.id, week, progress)}/{week.days.length} DAYS
                     </div>
                   </div>
 
@@ -283,10 +283,21 @@ export function ProgramOverviewPage() {
   )
 }
 
+function BarKey({ color, text }: { color: string; text: string }) {
+  return (
+    <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+      <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
+      {text}
+    </span>
+  )
+}
+
 function ProgressSummary({ program }: { program: StructuredProgram }) {
   const { progress } = useProgramStore()
   // Days, not finished weeks: skipping one day a week used to hold this at 0%
-  const { doneDays, skippedDays, totalDays, doneWeeks, totalWeeks, pct } = programProgress(program, progress)
+  const {
+    doneDays, skippedDays, settledDays, totalDays, doneWeeks, totalWeeks, settledPct, trainedPct,
+  } = programProgress(program, progress)
 
   return (
     <div style={{ padding: '0 20px', marginBottom: 20 }}>
@@ -295,20 +306,32 @@ function ProgressSummary({ program }: { program: StructuredProgram }) {
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)',
             textTransform: 'uppercase', letterSpacing: '0.08em' }}>Progress</span>
           <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16 }}>
-            {doneDays}/{totalDays}
+            {settledDays}/{totalDays}
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)',
               marginLeft: 4, fontWeight: 400 }}>days</span>
           </span>
         </div>
-        <div style={{ height: 6, background: 'var(--surface-2)', borderRadius: 3, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${pct}%`, background: 'var(--accent)',
-            borderRadius: 3, transition: 'width .4s ease' }} />
+        {/* Two tones so 100% can mean "plan finished" without claiming the skipped
+            days were trained. The track's overflow:hidden owns the corner radius —
+            a radius on a segment notches the seam between them. */}
+        <div style={{ display: 'flex', height: 6, background: 'var(--surface-2)',
+          borderRadius: 3, overflow: 'hidden' }}>
+          <div style={{ width: `${trainedPct}%`, background: 'var(--bar-trained)',
+            transition: 'width .4s ease' }} />
+          <div style={{ width: `${settledPct - trainedPct}%`, background: 'var(--muted)',
+            transition: 'width .4s ease' }} />
         </div>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)',
           marginTop: 6, textTransform: 'uppercase' }}>
-          {pct}% complete · {doneWeeks}/{totalWeeks} weeks done
-          {skippedDays > 0 && ` · ${skippedDays} skipped`}
+          {settledPct}% complete · {doneWeeks}/{totalWeeks} weeks done
         </div>
+        {skippedDays > 0 && (
+          <div style={{ display: 'flex', gap: 12, marginTop: 5, fontFamily: 'var(--font-mono)',
+            fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase' }}>
+            <BarKey color="var(--bar-trained)" text={`${doneDays} trained`} />
+            <BarKey color="var(--muted)" text={`${skippedDays} skipped`} />
+          </div>
+        )}
       </div>
     </div>
   )

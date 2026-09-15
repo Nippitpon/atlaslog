@@ -24,6 +24,12 @@
   --muted-2: #4a4a4a;
   --nav-bg: rgba(20, 20, 20, 0.88);
   --shadow: 0 8px 24px rgba(0,0,0,0.5);
+  /* Program status + the trained share of a progress bar. Theme-aware because the
+     bright variants sit at ~1.5:1 on a white card, and on the two-tone bar that
+     let the grey skipped segment out-shout the trained one. */
+  --status-active: #3aaaff;
+  --status-done: #4ade80;
+  --bar-trained: #d4ff3a;
 }
 
 .theme-light {
@@ -39,6 +45,9 @@
   --muted-2: #b8b7b0;
   --nav-bg: rgba(255, 255, 255, 0.88);
   --shadow: 0 4px 16px rgba(0,0,0,0.06);
+  --status-active: #0369a1;
+  --status-done: #166534;
+  --bar-trained: #6b9213;
 }
 
 * { box-sizing: border-box; }
