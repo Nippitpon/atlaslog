@@ -1,8 +1,112 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-09-15 (รอบ 52 — ✅ SHIPPED: เส้นรวม 3 ค่าในกราฟ Body Composition (pill ALL, %Δ))
+> อัปเดตล่าสุด: 2026-09-15 (รอบ 53 — ✅ SHIPPED: โปรแกรมที่ done ครบ "จบ" จริง — สีสถานะ + % ที่นับ skip)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-09-15 — รอบ 53 (✅ SHIPPED, deploy main): โปรแกรมที่ done ครบ "จบ" จริง — `COMPLETED` เขียว + % ที่นับ skip
+
+commit `986203d` (fix)
+
+ผู้ใช้เล่นโปรแกรมจนครบ ทุก week ขึ้น **Done** (บางวัน **Skip**) แต่รู้สึกว่า "โปรแกรมยังไม่จบ" ·
+ไล่โค้ดแล้ว **ตรรกะสัปดาห์ถูกอยู่แล้ว** — `isSettled` นับ `done`/`skipped` เท่ากัน `getProgramStatus`
+คืน `'completed'` จริง และป้าย `COMPLETED` ก็ขึ้นแล้ว · **ปัญหาอยู่ที่ชั้นรายงานผลล้วน ๆ**:
+ป้ายเป็น**สีเทา** ขณะที่ `ACTIVE` เป็น**สีเขียว** (จบแล้วดูด้อยกว่ากำลังเล่น) · แถบ `pct` จงใจไม่นับ skip
+จึงขึ้น **`94% complete` ข้าง ๆ `COMPLETED`** · แถวสัปดาห์ขึ้น **`3/4 DAYS` ข้าง ๆ `DONE`**
+
+### ทำอะไร
+
+- **`lib/programStatus.ts`** — `settledDaysInWeek` · `ProgramProgress` **ลบ `pct` ทิ้ง** เหลือ
+  `settledPct` (ถึง 100 ได้) + `trainedPct` + `settledDays` · `isProgramComplete()` ตัวใหม่
+  แทนการเทียบผิดฝั่งที่ก๊อปไว้ 2 ที่ · `PROGRAM_STATUS_STYLE` ใช้ token แยกธีม
+- **`ProgramOverviewPage`** — แถบ **สองโทน** (ซ้อมจริง / skip) · เลขหัวเป็น `settledDays/totalDays` ·
+  legend `BarKey` มีสวอตช์สี · แถวสัปดาห์ใช้ `settledDaysInWeek`
+- **`ProgramsPage`** — `pct` → `settledPct` 2 การ์ด (แถบยังโทนเดียว สูง 4px แยกสองโทนไม่ไหว)
+- **`DashboardPage`** — `program.totalWeeks` → `program.weeks.length` ให้ตัวส่วนตรงกับ `doneWeeks`
+  · **คงกรอบ "นับเป็นสัปดาห์" ไว้** เพราะป้ายเขียนว่า `{doneWeeks}/{n} weeks` สอดคล้องในตัว
+- **`index.css`** — token ใหม่แยกธีม `--status-active` / `--status-done` / `--bar-trained`
+
+### 🐛 บั๊กจริงที่เจอระหว่างทาง — weekly routine จบไม่ได้แล้วค้างถาวร
+
+`CreateProgramPage:107-108` ให้ weekly routine `weeksNum = 1` → พอ settle วันครบ สัปดาห์เดียวนั้นจบ →
+`getProgramStatus` คืน `'completed'` **ก่อน**ถึงสาขา `program.weekly` · routine ที่ตั้งใจให้เล่นซ้ำ
+จึงขึ้น COMPLETED ถาวร และ**เสียปุ่ม pause ทั้งสองหน้า** (`ProgramOverviewPage:77`, `ProgramsPage:62`
+gate ด้วย `active|paused`) + **ไม่มีปุ่ม Restart** (อยู่ในสาขา `!program.weekly`) = **ไม่มีทางออกจากสถานะนี้เลย**
+· แถมพอเปลี่ยนสีรอบนี้ ป้ายจะกลายเป็น**เขียว** บนของที่วนซ้ำไม่มีวันจบ
+
+### ผลกระทบ (จัดการแล้ว)
+
+- **ลบชื่อ `pct` ทิ้งแทนที่จะเปลี่ยนความหมาย** — 4 call site destructure `{ pct }` อยู่ ถ้าคงชื่อไว้
+  มันจะ**คอมไพล์ผ่านแล้วเปลี่ยนความหมายเงียบ ๆ** ซึ่งเป็นบั๊กคลาสเดียวกับที่ `totalWeeks` โดนมา ·
+  พอไม่มีฟิลด์ชื่อ `pct` แล้ว **TypeScript ไล่ call site ให้ครบแทนเรา**
+- ⚠️ **แผนแรกจะใส่ escape ให้สัปดาห์ว่างใน `isWeekDone` ซึ่งเป็นบั๊ก** — สัปดาห์ว่างจะกลายเป็น "done"
+  และโปรแกรมที่ว่างทั้งหมดจะขึ้นว่าจบ · ที่ถูกคือกันที่**ตัวส่วน** → รวม 3 guard (weekly / `weeks.length`
+  ไม่ใช่ `totalWeeks` / สัปดาห์ว่าง) ไว้ใน `isProgramComplete()` ตัวเดียว
+- **แถบสองโทนต้องคิดจาก % ที่ปัดแล้วทั้งคู่** (`settledPct - trainedPct`) ห้ามปัด `skippedDays` แยก
+  ไม่งั้นสองท่อนรวมกันไม่เท่า `settledPct` · `Math.round` เป็น monotonic + `settled >= done`
+  จึงไม่มีทางได้ความกว้างติดลบ (มีเทสต์)
+- **legend ใช้สวอตช์ ไม่ใช่ย้อมสีตัวอักษร** — ตัวอักษร 10px สี accent อ่านไม่ออกบนธีมสว่าง
+  (เหมือนเลข 1RM ที่ `ProgramOverviewPage:158`) แต่บล็อกสี 8px ยังอ่านออก
+- **ราง `overflow:hidden` เป็นคนจัดมุมโค้ง** → ท่อนข้างในห้ามใส่ `borderRadius` เอง ไม่งั้นเห็นรอยบากตรงรอยต่อ
+
+### 🎨 ธีมสว่าง — รอบนี้ทำถอยหลังเองแล้วแก้คืน (วัดจริงในเบราว์เซอร์)
+
+เปลี่ยน `COMPLETED` เป็นเขียวแล้ว **contrast ร่วงจาก 4.11:1 (เทา) เหลือ 1.46:1** — มันเป็นป้าย
+*เดียว*ในชุดที่เคยอ่านออกบนธีมสว่าง · และแถบสองโทน **อ่านกลับหัว**: ท่อน trained (lime) ได้ 1.10:1
+แต่ท่อน skip (muted) ได้ 4.11:1 → ส่วนที่ skip เด่นกว่าส่วนที่ซ้อมจริง 83% · แก้ด้วย token แยกธีม
+โดยวัดเทียบผู้สมัครหลายเฉดก่อนเลือก:
+
+| token | dark | light | contrast (light) |
+|---|---|---|---|
+| `--status-done` | `#4ade80` | `#166534` | 1.46 → **5.66:1** |
+| `--status-active` | `#3aaaff` | `#0369a1` | 2.20 → **4.76:1** |
+| `--bar-trained` | `#d4ff3a` | `#6b9213` | 1.10 → **3.47:1** (เทียบ skip 4.11 = เลิกกลับหัว) |
+
+**ACTIVE ใช้ตระกูล `#3aaaff` ไม่ใช่ `#60a5fa`** เพราะ `#60a5fa` คือ `PHASE_COLOR.Accumulation`
+ซึ่งอยู่ห่างแค่ 2 แถวในการ์ดเดียวกันบนหน้า Programs (`StatusPill:226` vs phase chip `:244`) ·
+`#3aaaff` มีในพาเลตต์อยู่แล้ว (จุด "วันนี้" ในปฏิทิน + กลุ่ม Arms) และไม่โผล่ในสองหน้านี้เลย
+
+### verify
+
+`pnpm test` **214 → 226 tests / 10 files** · `pnpm build` ผ่าน · ESLint สะอาด ·
+เทสต์เดิม 2 เคสเขียนใหม่**โดยตั้งใจ** (มันคือ spec เก่าที่เพิ่งเปลี่ยน): `pct: 33` → `settledPct 67`/`trainedPct 33`
+· `pct === 67` → `settledPct === 100`/`trainedPct === 67` · `restartProgram.test.ts` destructure `pct` ก็พังตามและแก้แล้ว
+· describe `isProgramComplete` ใหม่ 9 เคส (weekly / `totalWeeks` เพี้ยนทั้งน้อยไปและมากไป / สัปดาห์ว่าง / ว่างหมด)
+
+**e2e จริงด้วย Playwright MCP ที่ 390px ทั้ง dark + light:**
+
+| ทดสอบ | ผล |
+|---|---|
+| โปรแกรมจบ (6 สัปดาห์ มี skip) | **COMPLETED เขียว** · `6/6 days` · `100% COMPLETE · 6/6 WEEKS DONE` |
+| แถบสองโทน | เต็มความกว้าง แยกสองโทนเห็นชัด**ทั้งสองธีม** · legend `■ 5 TRAINED ■ 1 SKIPPED` |
+| แถวสัปดาห์ | `1/1 DAYS` คู่กับ `DONE` ไม่ขัดกันแล้ว |
+| **weekly routine ซ้อมครบ** | **ACTIVE (น้ำเงิน) ไม่ใช่ COMPLETED** · ปุ่ม pause ยังอยู่ |
+| ปุ่มบนโปรแกรมที่จบ | pause หายถูกต้อง · `RESTART FROM WEEK 1` ยังอยู่ |
+| หน้า Programs | ACTIVE น้ำเงินไม่กวนกับ `ACCUMULATION` |
+| console | 0 error |
+
+✅ **seed ด้วย `useProgramStore.setState()` ไม่ใช่ `setDayStatus`** → ไม่มี `queueStateSync` ยิงเลย
+**คลาวด์ไม่ถูกแตะ** · คืน `progress` กลับเป็น `{ demo }` ตามเดิม · hook ชั่วคราวใน `main.tsx` ถอนแล้ว
+
+### ไม่ทำรอบนี้
+
+- 🟡 **แถบใน `ProgramsPage` ยังโทนเดียวและยัง lime เดิม** — ตัวเลขแก้เป็น `settledPct` แล้ว แต่สูงแค่ 4px
+  แยกสองโทนไม่ไหว และสีในธีมสว่างยังจาง **1.10:1** เหมือนเดิม (ของเก่า ไม่ได้ทำให้แย่ลง)
+- 🟡 **`--accent` ในธีมสว่างจาง 1.10:1 ทั้งแอป** — กระทบ `ProgramOverviewPage:158` (เลข 1RM) และทุกการ์ด
+  ที่ย้อม accent · แก้ได้บรรทัดเดียวใน `.theme-light` แต่เป็นการเปลี่ยนภาพรวมทั้งแอป ควรเป็นรอบแยก
+- 🟡 **ป้าย `PAUSED` (`#f59e0b`) ยังไม่มี token แยกธีม** — 2.15:1 บนธีมสว่าง (ของเก่า) ·
+  รอบนี้แตะเฉพาะสองป้ายที่เปลี่ยนสี
+- 🟡 **weekly routine ที่ซ้อมครบแล้วล้างสถานะวันไม่ได้** — บั๊กถัดไปที่โผล่มาจากการแก้รอบนี้:
+  ตอนนี้เป็น ACTIVE ค้างพร้อมสัปดาห์ที่ done ถาวร ไม่มีปุ่มเคลียร์ (Restart อยู่ในสาขา `!weekly`)
+- **ไม่ทำแบนเนอร์/หน้าฉลองจบโปรแกรม** — จบแล้วยังหายจาก Home ไปเจอ "No active program"
+  หน้าเดียวกับผู้ใช้ใหม่ · เป็นงาน UX คนละเรื่อง
+- **ไม่ยุบสูตร % ของ Dashboard เข้ากับ `programProgress`** · **ไม่ยุบแถบ 4 ที่เป็น `<ProgressBar>` ตัวเดียว**
+- **ไม่แตะ `isSettled` / `isWeekDone` / `setDayStatus` / ปุ่ม Skip** — ตรรกะ skip ถูกอยู่แล้ว ·
+  ไม่แตะ store / persist key / schema Supabase / `packages/shared`
+- **ไม่แก้ `excelImport.ts:324` ที่เป็นต้นเหตุ `totalWeeks` เพี้ยน** — รอบนี้แค่**เลิกพึ่ง** `totalWeeks`
+  ในการตัดสินว่าจบ ตัวฟิลด์ยังเพี้ยนอยู่ (ดูตาราง 📌)
 
 ---
 
@@ -1589,7 +1693,7 @@ commit `7fcaabe` (fix)
 | 🟡 | แก้โปรแกรม Excel → periodization ของ **accessory** หาย | `CreateProgramPage.tsx:64` gate ไว้ว่า `programType === 'powerlifting' && weeks.length > 1 && ex.type === 'main'` เท่านั้นที่ได้ `weekly[]` · ตัวที่ไม่เข้าเงื่อนไขไปเจอ `:152` `if (!weekly) return { ...base, id }` = เขียนค่าเดียวกันทุกสัปดาห์ → accessory ที่ pct ไต่รายสัปดาห์ + โปรแกรม `general` (ทั้งโปรแกรม) แบนราบตอนกด Save · และ `:69` หยิบท่าด้วย **ตำแหน่ง** `w.days[di]?.exercises[ei]` → สัปดาห์หลังที่จำนวน/ลำดับท่าไม่เท่ากันจะได้ผิดตัวหรือ `undefined` (กลไกที่ทำให้ "วัน/ท่าที่มีเฉพาะสัปดาห์หลังหาย") |
 | ~~🟡~~ | ~~ลบ custom program ไม่ confirm~~ | ✅ **ปิดแล้วรอบ 37** — เพิ่ม `confirm()` ใน `ProgramsPage` |
 | 🟡 | persist ไม่มี `version`/`migrate` — `persist(` ที่ `useAppStore.ts:56` และ `useProgramStore.ts:70` (grep `version`/`migrate` ไม่เจอในทั้งสองไฟล์) | วันนี้ยังไม่พัง แต่**ใส่ทีหลังไม่ได้** (zustand ถือ state ที่ไม่มี version = version 0) |
-| 🟡 | `totalWeeks` = **จำนวนสัปดาห์ที่มีข้อมูล ไม่ใช่เลขสัปดาห์สูงสุด** — `excelImport.ts:324` | ไฟล์ที่เลขสัปดาห์เป็น 1, 2, 5 ได้ `totalWeeks: 3` แต่ `weeks.at(-1).weekNumber === 5` และช่วงที่ขาดผ่านเงียบ ๆ ไม่เตือน → อะไรที่วน `1..totalWeeks` หรืออ่านว่า "สัปดาห์สุดท้าย" เพี้ยน · พบรอบ 47 · เทสต์ `gappy week numbers` ใน `excelImport.test.ts` บันทึกพฤติกรรมปัจจุบันไว้แล้ว · แก้ = กระทบ consumer ของ `totalWeeks` ทุกจุด ควรเป็นรอบแยก |
+| 🟡 | `totalWeeks` = **จำนวนสัปดาห์ที่มีข้อมูล ไม่ใช่เลขสัปดาห์สูงสุด** — `excelImport.ts:324` | ไฟล์ที่เลขสัปดาห์เป็น 1, 2, 5 ได้ `totalWeeks: 3` แต่ `weeks.at(-1).weekNumber === 5` และช่วงที่ขาดผ่านเงียบ ๆ ไม่เตือน → อะไรที่วน `1..totalWeeks` หรืออ่านว่า "สัปดาห์สุดท้าย" เพี้ยน · พบรอบ 47 · เทสต์ `gappy week numbers` ใน `excelImport.test.ts` บันทึกพฤติกรรมปัจจุบันไว้แล้ว · แก้ = กระทบ consumer ของ `totalWeeks` ทุกจุด ควรเป็นรอบแยก · 📍 **รอบ 53: `isProgramComplete()` เลิกพึ่ง `totalWeeks` แล้ว** (นับจาก `program.weeks.length`) — consumer ที่อันตรายที่สุดปลอดแล้ว แต่ตัวฟิลด์ยังเพี้ยน **ข้อนี้ยังเปิด** |
 | ⚠️ | coach edge function เปิดให้ harvest อีเมล — `supabase/functions/coach/index.ts:59` | **ยืนยันว่าเปิดอยู่จริงบน prod**: `:59` `data.users.find(u => u.id.toLowerCase().startsWith(value))` match ด้วย prefix ของ UUID + grep `profiles`/`role` **ไม่เจอในไฟล์เลย** = ไม่เช็ค role จริง + คืน `athleteEmail` เสมอที่ `:91` (active) และ `:107` (pending) → authed คนไหนก็ไล่ prefix ดึงอีเมลได้ · **ตัดสินใจแล้วว่ายังไม่แตะ** (ต้อง deploy edge function แยก) |
 
 ---
