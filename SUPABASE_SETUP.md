@@ -369,6 +369,96 @@ create index one_rm_records_user_date_idx on public.one_rm_records(user_id, date
 > 🚨 **ต้องรัน SQL นี้ก่อน deploy client** — ไม่งั้น `one-rm-upsert` จะ 404 → `attempt()` catch →
 > re-enqueue และ `flushQueue` **ไม่มี retry limit** → คิวใน localStorage โตไม่หยุด
 
+## 2l. Username + บังคับเปลี่ยนรหัสผ่าน (รอบ 55) (2026-10-14)
+
+> เพิ่ม `profiles.username` (login ด้วย username ได้) และ `profiles.must_change_password`
+> (admin reset แล้วบังคับเปลี่ยนตอน login ครั้งแรก) · **ไม่เปิด UPDATE policy บน `profiles`** —
+> ไม่งั้นผู้ใช้แก้ `role` ตัวเองเป็น admin ได้ → เขียนผ่าน RPC `security definer` (ผู้ใช้) /
+> edge function `admin-users` (admin) เท่านั้น
+>
+> 🚨 **ลำดับ deploy:** รัน SQL นี้ → deploy edge function `admin-users` + `auth-login` → ค่อย push client
+> (client select คอลัมน์ใหม่ใน `profiles`; ถ้า push ก่อน SQL การอ่าน role จะล้ม)
+
+```sql
+alter table public.profiles
+  add column if not exists username text,
+  add column if not exists must_change_password boolean not null default false;
+
+alter table public.profiles
+  add constraint profiles_username_format
+  check (username is null or username ~ '^[a-z0-9_.]{3,20}$');
+
+create unique index if not exists profiles_username_key
+  on public.profiles (lower(username));
+
+-- สมัครใหม่: copy username จาก metadata ถ้ารูปแบบถูกและยังไม่ซ้ำ ไม่งั้นปล่อย null
+-- (ห้ามให้ signup พังเพราะ username — ใช้ nested block จับ unique_violation แยก
+--  เพราะ `on conflict do nothing` เปล่า ๆ จะกลืนทั้งแถว profile ทิ้งไปด้วย)
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare
+  v_username text := lower(trim(coalesce(new.raw_user_meta_data->>'username', '')));
+begin
+  if v_username !~ '^[a-z0-9_.]{3,20}$' then
+    v_username := null;
+  end if;
+  begin
+    insert into public.profiles (id, username) values (new.id, v_username)
+    on conflict (id) do nothing;
+  exception when unique_violation then
+    insert into public.profiles (id) values (new.id) on conflict (id) do nothing;
+  end;
+  return new;
+end;
+$$;
+
+create or replace function public.username_available(p_username text)
+returns boolean language sql security definer set search_path = '' stable as $$
+  select lower(trim(p_username)) ~ '^[a-z0-9_.]{3,20}$'
+     and not exists (select 1 from public.profiles where username = lower(trim(p_username)));
+$$;
+
+create or replace function public.set_username(p_username text)
+returns text language plpgsql security definer set search_path = '' as $$
+declare
+  v text := lower(trim(p_username));
+begin
+  if auth.uid() is null then raise exception 'not authenticated'; end if;
+  if v !~ '^[a-z0-9_.]{3,20}$' then
+    raise exception 'Username ต้องยาว 3–20 ตัว ใช้ได้เฉพาะ a-z 0-9 _ .';
+  end if;
+  begin
+    update public.profiles set username = v where id = auth.uid();
+  exception when unique_violation then
+    raise exception 'Username นี้ถูกใช้แล้ว';
+  end;
+  return v;
+end;
+$$;
+
+create or replace function public.clear_must_change_password()
+returns void language sql security definer set search_path = '' as $$
+  update public.profiles set must_change_password = false where id = auth.uid();
+$$;
+
+revoke all on function public.username_available(text), public.set_username(text),
+  public.clear_must_change_password() from public;
+grant execute on function public.username_available(text) to anon, authenticated;
+grant execute on function public.set_username(text), public.clear_must_change_password() to authenticated;
+```
+
+**verify:**
+
+```sql
+select column_name from information_schema.columns
+ where table_name = 'profiles' and column_name in ('username','must_change_password');   -- 2 แถว
+select public.username_available('john_doe');                                            -- true
+select tgname from pg_trigger where tgname = 'on_auth_user_created';                      -- 1 แถว
+```
+
+> ⚠️ **เกต "บังคับเปลี่ยนรหัส" เป็นเกตฝั่ง client** — RLS บังคับไม่ได้ ผู้ใช้เรียก
+> `clear_must_change_password()` เองโดยไม่เปลี่ยนรหัสได้ (กระทบแค่บัญชีตัวเอง)
+
 ## 3. Get API Keys
 
 ไปที่ **Settings → API**:

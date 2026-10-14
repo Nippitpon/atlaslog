@@ -1,8 +1,69 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-14 (รอบ 54 — ✅ SHIPPED: เปิด GIF ของ Library กลับ + บันทึกสาเหตุที่เคยปิด)
+> อัปเดตล่าสุด: 2026-10-14 (รอบ 55 — ✅ SHIPPED: Admin reset รหัสผ่าน + Username login)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-10-14 — รอบ 55 (✅ SHIPPED, deploy main): Admin reset รหัสผ่าน + Username
+
+commit `93e76bf` (feat) · SQL §2l รันแล้ว + edge function `admin-users`/`auth-login` deploy แล้ว (เจ้าของทำเอง) **ก่อน** push
+
+### ทำอะไร
+
+- **DB** `SUPABASE_SETUP.md §2l` — `profiles.username` (unique `lower()`, ตัวพิมพ์เล็ก `[a-z0-9_.]{3,20}`) +
+  `profiles.must_change_password` · แก้ trigger `handle_new_user` copy username จาก metadata (ซ้ำ/ผิดรูปแบบ→null ไม่ให้ signup พัง) ·
+  RPC `username_available` (anon) / `set_username` / `clear_must_change_password` · **ไม่เปิด UPDATE policy บน `profiles`**
+  (ไม่งั้นแก้ `role` ตัวเองได้)
+- **Edge** `admin-users` เพิ่ม action `reset-password {userId,password,mustChange}` (ห้ามรีเซ็ตตัวเอง/แอดมินคนอื่น, ≥6 ตัว,
+  เขียน flag หลังเปลี่ยนรหัสสำเร็จ) + `list` คืน `username`/`mustChangePassword` · **ใหม่** `auth-login` — username→email ฝั่ง server
+  แล้ว `signInWithPassword` คืนแค่ token (email ไม่รั่วไป client) · login ด้วย email ยังเรียก Supabase ตรงเหมือนเดิม
+- **Client** `lib/username.ts` (+test) · `lib/authApi.ts` · `useAuthStore` (`username`, `mustChangePassword`, `profileLoaded`,
+  `signIn(identifier)`, `signUp(email,username,password)`) · `AuthPage` (สมัคร 3 ช่อง + เช็ค username ว่าง, login ช่อง "Email or Username") ·
+  `ForceChangePasswordPage` + เกตใน `AppShell` · `ProfilePage` (แสดง/แก้ Username) · `AdminPage` (ปุ่ม **Reset PW**: ช่องรหัส +
+  Generate + checkbox บังคับเปลี่ยน, แสดงรหัสให้แอดมินอ่านให้ผู้ใช้หนเดียว) · `LOGIN_GUIDE.md`
+
+### ผลกระทบ (จัดการแล้ว)
+
+- **client ถูกเขียนให้ทนต่อ DB ที่ยังไม่มีคอลัมน์ใหม่** — `loadProfile` select 3 คอลัมน์ ถ้าล้มจะ fallback ไป `select('role')`
+  (ทดสอบจริงแล้ว: DB ตอนนี้ยังไม่มีคอลัมน์ → ได้ 400 → fallback → role/Coach ยังอยู่) · แต่ username/เกตเปลี่ยนรหัสจะไม่ทำงานจนกว่าจะรัน SQL
+- **`profileLoaded` ตั้งครั้งเดียวต่อการ sign in และไม่ reset ตอน SIGNED_IN ซ้ำ** — Supabase ยิง SIGNED_IN ซ้ำเวลากลับมาที่แท็บ
+  ถ้าเกตผูกกับ `roleLoaded` (ที่ reset ทุกครั้ง) ทั้งแอปจะ unmount กลาง workout
+- **trigger ต้องจับ `unique_violation` แยก** — `on conflict do nothing` เปล่า ๆ จะกลืนทั้งแถว profile เมื่อ username ซ้ำ
+
+### verify
+
+- `pnpm test` ผ่าน 234 เทสต์ (ใหม่: `username.test.ts`) · `pnpm build` ผ่าน · ESLint ผ่าน
+- Playwright 390px (บัญชีทดสอบ coach, **ไม่ได้เขียนข้อมูลลง Supabase**): หน้า Sign Up มี 3 ช่อง + แจ้ง error username สั้นเกิน ·
+  Profile ขึ้นปุ่ม "+ ตั้ง Username" · fallback ตอน DB ไม่มีคอลัมน์ทำงาน (0 พังของ role)
+- **หลังรัน SQL + deploy function แล้ว (2026-10-14)** ทดสอบกับบัญชี `athlete.b@atlaslog.app` (รหัสถูกเปลี่ยนเป็น `AtlasTest!23456` ผ่าน admin Reset PW แล้ว ดู `TEST_ACCOUNTS.md`):
+  RPC ทั้ง 3 · `auth-login` (username ถูก/ผิด/มั่ว, ตัวพิมพ์ใหญ่) · login ด้วย username บนหน้าเว็บ · แก้ Username ซ้ำ/ผิดรูปแบบถูกปฏิเสธ ·
+  non-admin เรียก `reset-password` ได้ 403 · admin Reset PW แบบตั้งรหัสใหม่ใช้งานได้จริง · **แถวหน้า Admin ปรับเป็น 2 ชั้น** (ชื่อ/email ตัดบรรทัดเต็ม,
+  ปุ่มอยู่แถวล่างแบบ wrap) ตรวจที่ 390px ด้วยข้อมูลจำลอง
+- ⚠️ **ยังไม่ได้ทดสอบ:** สมัครด้วย username จริง (trigger ใหม่) · Reset PW แบบ "บังคับเปลี่ยน" + หน้าเปลี่ยนรหัส ·
+  ยังไม่ได้ type-check edge function (ไม่มี Deno) · ข้อสมมติว่า GoTrue คืน "not confirmed" หลังตรวจรหัสผ่านแล้วยังไม่ได้ยืนยัน ·
+  `athlete_b_test` ค้างอยู่ใน `profiles` ของบัญชีทดสอบ (ล้างด้วย SQL ได้)
+
+### ลำดับ deploy (ทำครบแล้ว)
+
+1. รัน SQL `SUPABASE_SETUP.md §2l` (SQL Editor) → 2. deploy `admin-users` (แก้) + `auth-login` (ใหม่) → 3. `/ship` →
+4. ทดสอบรายการ "ยังไม่ได้ทดสอบ" ด้วยบัญชีทดสอบ (ยังค้างอยู่)
+
+### 📌 ค้างต่อ
+
+- ทดสอบ Reset PW แบบ **บังคับเปลี่ยน** + หน้า `ForceChangePasswordPage` ด้วยบัญชีทดสอบ (เช่น Athlete A) ·
+  ทดสอบสมัครด้วย username จริง · ยืนยันว่า `handle_new_user` ตัวใหม่ทำงาน:
+  `select prosrc like '%v_username%' from pg_proc where proname='handle_new_user'` ต้องได้ `true`
+- ปิดสิทธิ์ anon บน RPC (ทดสอบพบว่า anon ยังเรียกได้ แต่ถูกกันด้วย `auth.uid()`):
+  `revoke execute on function public.set_username(text), public.clear_must_change_password() from anon;`
+
+### ไม่ทำรอบนี้ / ข้อจำกัด
+
+- เกต "บังคับเปลี่ยนรหัส" เป็นฝั่ง client — ผู้ใช้เรียก RPC เคลียร์ flag เองได้ (กระทบแค่บัญชีตัวเอง)
+- หลัง reset session เก่าอาจใช้ได้จน refresh token หมดอายุ (ไม่ได้ revoke)
+- `auth-login` ไม่มี rate limit ของเราเอง (พึ่ง Supabase Auth) · ไม่ทำ Forgot-password ทางอีเมล
+- Username แสดงเฉพาะ Profile + Admin (Coach/แจ้งเตือน/push ยังใช้ email)
 
 ---
 

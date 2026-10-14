@@ -60,8 +60,13 @@ Atlaslog ใช้ระบบ Email + Password ผ่าน Supabase Auth
 - ข้อมูลจะโหลดอัตโนมัติหลัง SIGNED_IN event — รอสักครู่
 
 **"Invalid login credentials"**
-- ตรวจสอบ email และ password
-- ถ้าลืม password ให้ใช้ "Forgot password" (ยังไม่มีใน UI — ติดต่อ admin)
+- ตรวจสอบ email (หรือ Username) และ password — ช่อง login รับได้ทั้งสองอย่าง (ถ้ามี `@` = email)
+- ถ้าลืม password: ยังไม่มี "Forgot password" ทางอีเมล — ติดต่อ admin ให้ **Reset PW** ในหน้า Admin
+  (admin ตั้งรหัสใหม่ให้ได้ และเลือกบังคับให้เปลี่ยนรหัสตอน login ครั้งแรกได้)
+
+**Username**
+- สมัครใหม่ต้องกรอก Email / Username / Password · Username 3–20 ตัว ใช้ `a–z 0–9 _ .` (ตัวพิมพ์เล็ก)
+- ผู้ใช้เดิมที่ยังไม่มี Username: login ด้วย email ได้ตามปกติ และตั้ง Username ได้ที่หน้า Profile
 
 ---
 
