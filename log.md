@@ -1,8 +1,58 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-09-15 (รอบ 53 — ✅ SHIPPED: โปรแกรมที่ done ครบ "จบ" จริง — สีสถานะ + % ที่นับ skip)
+> อัปเดตล่าสุด: 2026-10-14 (รอบ 54 — ✅ SHIPPED: เปิด GIF ของ Library กลับ + บันทึกสาเหตุที่เคยปิด)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-10-14 — รอบ 54 (✅ SHIPPED, ยังไม่ push): เปิด GIF ของ Library กลับ + สาเหตุที่เคยปิด
+
+commit `4ac9995` (fix)
+
+GIF ใน Library/detail ถูกปิดตั้งแต่รอบ 17 (`4f025d7`) เพราะบันทึกว่า host `static.exercisedb.dev` ตาย ·
+รอบนี้ตรวจซ้ำแล้ว **host ตอบปกติ** จึงเปิดกลับ (แก้ค่าเดียว) · รอบ 17 เขียนว่า "NXDOMAIN ทั้งโลก"
+ซึ่งเป็น**ข้อสรุปที่เกินหลักฐาน** — ดูหัวข้อสาเหตุด้านล่างก่อนสรุปว่า host ตายอีก
+
+### ทำอะไร
+
+- **`lib/utils.ts:43`** — `MEDIA_HOST = 'https://static.exercisedb.dev/media'` (เดิม `''`) + แก้คอมเมนต์ที่บอกว่า host ตาย
+- **GIF ไม่ได้เก็บในโปรเจกต์และไม่ได้โหลดจาก GitHub** — เบราว์เซอร์ผู้ใช้โหลดตรงจาก
+  `static.exercisedb.dev/media/<gif_path>.gif` (CDN ของ ExerciseDB บน Cloudflare) ทุกครั้ง ไม่ผ่าน Vercel/Supabase ·
+  ในตารางเก็บแค่รหัส `gif_path` · GitHub (`hasaneyldrm/exercises-dataset`) ใช้ครั้งเดียวตอน ETL ดึง `exercises.json`
+
+### 🔍 สาเหตุที่ GIF เคยไม่ขึ้น — ถ้าหายอีก **เช็คตามลำดับนี้ก่อน**
+
+**สาเหตุจริงของเหตุการณ์ 2026-07-01 ยืนยันไม่ได้** · หลักฐานมีแค่ commit `4f025d7` บันทึกว่าได้ NXDOMAIN
+(ไม่ได้จดว่าตรวจจากเครื่อง/เครือข่าย/DNS ไหน) · วันนี้โดเมนเดียวกัน resolve ได้ → มีแค่ข้อสันนิษฐาน:
+
+1. **host ล่ม / DNS ของโดเมนมีปัญหาชั่วคราว** แล้วกลับมาเอง
+2. **DNS ของเครือข่ายที่ใช้ทดสอบตอนนั้น resolve ไม่ได้** (เช่น DNS องค์กร) — คนอื่นอาจเห็นปกติ
+3. **host ย้ายผู้ให้บริการ** (ตอนนี้อยู่หลัง Cloudflare)
+
+**checklist เมื่อ GIF ไม่ขึ้นอีก** (ทำก่อนสรุปว่า "host ตาย"):
+- `Resolve-DnsName static.exercisedb.dev` **จากเครือข่ายอื่นด้วย** (มือถือ 4G / DNS `1.1.1.1`) — ถ้าเครื่องเดียวพัง = ข้อ 2 ไม่ใช่ host
+- `curl -I https://static.exercisedb.dev/media/2gPfomN.gif` → ต้อง `200 image/gif`
+- สุ่ม `gif_path` หลายตัวจาก `supabase/seed/*.sql` (ถ้าพังบางตัว = media_id หาย ไม่ใช่ host ตาย)
+- DevTools → Network ดูว่า error เป็น DNS (`ERR_NAME_NOT_RESOLVED`) / 4xx / CORS / blocked
+- ถ้า host ตายจริง → ตั้ง `MEDIA_HOST = ''` (UI fallback ไอคอนอยู่แล้ว) แล้วค่อยหา host ใหม่
+
+### verify
+
+- `curl` สุ่ม `gif_path` 22 ตัว (ทุก ๆ 60 แถวของ seed) → **200 ครบ** แม้ส่ง `Origin`/`Referer` แบบเว็บแอป
+  · **สุ่มแค่ 22 จาก 1,324 ท่า ไม่ได้ตรวจครบ**
+- Playwright 390px (ใช้ session ที่ล็อกอินอยู่ ไม่เขียนข้อมูลลง Supabase): Library รูปโหลด **31/31** ไม่มีรูปพัง ·
+  detail `/library/db-0001` แสดง GIF ใหญ่ + steps + target + secondary · 0 console errors
+- `pnpm build` ผ่าน · ESLint ผ่าน
+
+### ไม่ทำรอบนี้
+
+- **ยังไม่ push / deploy** — แนะนำ `/ship`
+- **ไม่ host GIF เอง** — repo `hasaneyldrm/exercises-dataset` มีโฟลเดอร์ `images/` `videos/` แต่ **ยังไม่ได้เปิดดู**
+  ว่าข้างในมีอะไร/ตรงกับ `media_id` ไหม/ขนาดเท่าไร · ถ้าจะลดความเสี่ยง host ตายซ้ำ นี่คือทางสำรองที่ควรตรวจต่อ
+  (ต้องดู license non-commercial ด้วย)
+- **ไม่ได้วัดขนาดดาวน์โหลดจริง** (ไฟล์ละ ~90–100KB, 50 ท่าต่อหน้า, `loading="lazy"`)
+- **ยังไม่ได้แก้ `CLAUDE.md`** ที่ยังเขียน Phase 6 เป็น "planned" และบอกว่า builtin 23 ท่า (จริง 19)
 
 ---
 
@@ -2292,8 +2342,8 @@ reuse: `_shared/push.ts`, `send-push/index.ts` (แพตเทิร์น auth
 - **SQL Editor paste limit ~120KB** → seed แตกเป็น 14 ไฟล์ (100 แถว/ไฟล์). ไฟล์รวมไว้ใช้ psql/CLI. (error `relation "a"` = paste ถูกตัดกลางแถว)
 - **ExerciseDetailPage** ต้อง fetch full-row (`select *`) เอง เพื่อให้ hard-load ทำงาน (registry ยังไม่ warm).
 
-### ⚠️ GIF ปิดไว้ (deferred)
-CDN `static.exercisedb.dev` = **NXDOMAIN ทั้งโลก** (host ฟรีของ ExerciseDB ตายแล้ว; แม้แต่ API `oss.exercisedb.dev`
+### ⚠️ GIF ปิดไว้ (deferred) — **เปิดกลับแล้วใน รอบ 54 (2026-10-14)** ดูสาเหตุ + checklist ที่นั่น
+CDN `static.exercisedb.dev` = **NXDOMAIN ทั้งโลก** (ตอนนั้น — ข้อสรุปเกินหลักฐาน, host resolve ได้อีกครั้งใน 2026-10-14) (host ฟรีของ ExerciseDB ตายแล้ว; แม้แต่ API `oss.exercisedb.dev`
 ก็คืน URL ที่ชี้ไป host ตาย; cloudfront เก่าก็ตาย). `exerciseGifUrl()` คืน null ผ่าน `const MEDIA_HOST = ''` ใน `utils.ts`
 — แก้สตริงนี้เพื่อเปิดกลับถ้าเจอ host ที่ใช้ได้. `gif_path` (=media_id) เก็บใน table/registry พร้อมแล้ว. UI fallback ไอคอน.
 
