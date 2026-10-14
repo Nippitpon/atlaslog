@@ -208,11 +208,11 @@ pnpm lint         # ESLint
 | 3.5 | Admin-confirms-users (signup approval gate) — done | Yes |
 | 4 | Social: coach-athlete + program sharing + in-app reminder | Yes |
 | 5 | Push notifications (Web Push / VAPID) — deferred | Yes |
-| 6 | EXERCISES Library dataset migration (1,324 ท่า + GIF) — planned | Yes |
+| 6 | EXERCISES Library dataset migration (1,324 ท่า + GIF) — done (รอบ 17; GIF เปิดกลับรอบ 54) | Yes |
 
 ---
 
-## Phase 6 — EXERCISES Library Dataset Migration (planned)
+## Phase 6 — EXERCISES Library Dataset Migration (✅ shipped รอบ 17; แผนด้านล่างคือแผนเดิม — ของจริง: ตารางมี 1,324 แถวล้วน ไม่ seed builtin, builtin เหลือ 19 ท่า, ดึงผ่าน load-on-init + Zustand registry ไม่ใช่ TanStack Query; ดู `log.md` รอบ 17)
 
 ขยาย Library จาก 23 ท่า (hardcode ใน `data.ts`) → ฐานข้อมูลจริง 1,324 ท่า จาก
 `hasaneyldrm/exercises-dataset` (ต้นฉบับ ExerciseDB v1) พร้อม GIF สาธิต + คำอธิบายทีละขั้น
@@ -221,6 +221,8 @@ pnpm lint         # ESLint
 - Storage: ตาราง Supabase `exercises` + ดึงผ่าน TanStack Query (ไม่ bundle ใน JS); 23 ท่าเดิมเป็น local fallback
 - Fields: ขยาย `Exercise` type เพิ่ม `target`, `secondaryMuscles`, `instructions` (en), `gifPath` (optional ทั้งหมด)
 - Media: ExerciseDB CDN ตรง (`static.exercisedb.dev/media/{id}.gif`) — เก็บ path relative, ประกอบ URL ด้วย `exerciseGifUrl()` จุดเดียว
+  - **สถานะ: เปิดอยู่** (`MEDIA_HOST` ใน `utils.ts`) — เคยปิดช่วงรอบ 17 เพราะได้ NXDOMAIN (สาเหตุยืนยันไม่ได้) เปิดกลับรอบ 54 (2026-10-14)
+  - GIF โหลดตรงจาก CDN ในเบราว์เซอร์ผู้ใช้ ไม่ได้เก็บในโปรเจกต์/ไม่ผ่าน GitHub · ถ้าไม่ขึ้นอีก → ทำตาม checklist ใน `log.md` รอบ 54 ก่อน · host ตายจริง → `MEDIA_HOST = ''` (UI fallback ไอคอน)
 - License: non-commercial เท่านั้น → ใส่ attribution + ห้ามนำไปใช้เชิงพาณิชย์
 
 **ข้อห้าม / ข้อควรระวัง**
