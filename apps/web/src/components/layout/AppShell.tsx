@@ -8,12 +8,13 @@ import { useStartWorkout } from '../../hooks/useStartWorkout.js'
 import { PROGRAMS } from '../../lib/data.js'
 import { IconX, IconChevronRight } from '../icons/index.js'
 import { isSupabaseConfigured } from '../../lib/supabase.js'
+import { ForceChangePasswordPage } from '../../features/auth/ForceChangePasswordPage.js'
 
 export function AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
   const { theme, showPicker, setShowPicker, workout } = useAppStore()
-  const { user, initialized, init } = useAuthStore()
+  const { user, initialized, init, profileLoaded, mustChangePassword } = useAuthStore()
   const startWorkout = useStartWorkout()
 
   useEffect(() => { if (isSupabaseConfigured) init() }, [init])
@@ -53,6 +54,18 @@ export function AppShell() {
   }
 
   if (!user) return <Navigate to="/login" replace />
+
+  // Wait for the profile so a forced password change can't be skipped by racing the
+  // first paint. profileLoaded is set once per sign-in (not reset on a refired
+  // SIGNED_IN), so a tab refocus never unmounts a running workout.
+  if (!profileLoaded) {
+    return (
+      <div className={`atlas-app theme-${theme}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100dvh' }}>
+        <div className="t-mono" style={{ fontSize: 12, color: 'var(--muted)' }}>Loading…</div>
+      </div>
+    )
+  }
+  if (mustChangePassword) return <ForceChangePasswordPage theme={theme} />
 
   const handlePickProgram = (p: typeof PROGRAMS[number]) => {
     // Backing out of the "you have a workout running" confirm keeps the sheet up

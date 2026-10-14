@@ -8,6 +8,7 @@
 //   { action: 'confirm', userId }
 //   { action: 'delete', userId }
 //   { action: 'set-role', userId, role: 'user' | 'coach' }
+//   { action: 'reset-password', userId, password, mustChange }
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
@@ -42,23 +43,29 @@ Deno.serve(async (req) => {
       .from('profiles').select('role').eq('id', userData.user.id).single()
     if (!profile || profile.role !== 'admin') return json({ error: 'Forbidden' }, 403)
 
-    const { action, userId, role } = await req.json()
+    const { action, userId, role, password, mustChange } = await req.json()
 
     if (action === 'list') {
       const { data, error } = await admin.auth.admin.listUsers()
       if (error) return json({ error: error.message }, 500)
 
       const ids = data.users.map((u) => u.id)
-      const { data: profiles } = await admin.from('profiles').select('id, role').in('id', ids)
-      const roleMap = new Map((profiles ?? []).map((p) => [p.id, p.role]))
+      const { data: profiles } = await admin
+        .from('profiles').select('id, role, username, must_change_password').in('id', ids)
+      const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]))
 
-      const users = data.users.map((u) => ({
-        id: u.id,
-        email: u.email ?? '',
-        createdAt: u.created_at,
-        emailConfirmedAt: u.email_confirmed_at ?? null,
-        role: roleMap.get(u.id) ?? 'user',
-      }))
+      const users = data.users.map((u) => {
+        const p = profileMap.get(u.id)
+        return {
+          id: u.id,
+          email: u.email ?? '',
+          createdAt: u.created_at,
+          emailConfirmedAt: u.email_confirmed_at ?? null,
+          role: p?.role ?? 'user',
+          username: p?.username ?? null,
+          mustChangePassword: p?.must_change_password ?? false,
+        }
+      })
       return json({ users })
     }
 
@@ -81,6 +88,27 @@ Deno.serve(async (req) => {
       const { error } = await admin
         .from('profiles').update({ role }).eq('id', userId)
       if (error) return json({ error: error.message }, 500)
+      return json({ ok: true })
+    }
+
+    if (action === 'reset-password') {
+      if (!userId) return json({ error: 'userId required' }, 400)
+      if (typeof password !== 'string' || password.length < 6) {
+        return json({ error: 'Password must be at least 6 characters' }, 400)
+      }
+      if (userId === userData.user.id) return json({ error: 'Cannot reset your own password here' }, 400)
+
+      // Same rule as set-role: an admin account is never touched by another admin.
+      const { data: target } = await admin.from('profiles').select('role').eq('id', userId).single()
+      if (target?.role === 'admin') return json({ error: 'Cannot reset an admin\'s password' }, 400)
+
+      const { error } = await admin.auth.admin.updateUserById(userId, { password })
+      if (error) return json({ error: error.message }, 500)
+
+      // Flag is written AFTER the password so a failed reset never leaves a stray forced-change flag.
+      const { error: flagErr } = await admin
+        .from('profiles').upsert({ id: userId, must_change_password: mustChange === true })
+      if (flagErr) return json({ error: `Password changed but flag failed: ${flagErr.message}` }, 500)
       return json({ ok: true })
     }
 

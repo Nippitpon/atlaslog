@@ -17,6 +17,8 @@ export interface AdminUser {
   createdAt: string
   emailConfirmedAt: string | null
   role: string
+  username?: string | null
+  mustChangePassword?: boolean
 }
 
 export interface ProgramSet {

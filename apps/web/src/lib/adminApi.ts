@@ -34,6 +34,10 @@ export function deleteUser(userId: string): Promise<void> {
   return call<{ ok: true }>({ action: 'delete', userId }).then(() => undefined)
 }
 
+export function resetUserPassword(userId: string, password: string, mustChange: boolean): Promise<void> {
+  return call<{ ok: true }>({ action: 'reset-password', userId, password, mustChange }).then(() => undefined)
+}
+
 export function setUserRole(userId: string, role: 'user' | 'coach'): Promise<void> {
   return call<{ ok: true }>({ action: 'set-role', userId, role }).then(() => undefined)
 }

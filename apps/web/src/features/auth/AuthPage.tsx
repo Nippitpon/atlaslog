@@ -1,19 +1,43 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/useAuthStore.js'
+import { isUsernameAvailable } from '../../lib/authApi.js'
+import { validateUsername, normalizeUsername } from '../../lib/username.js'
 
 type Mode = 'signin' | 'signup'
+
+const inputStyle: React.CSSProperties = {
+  width: '100%', height: 48,
+  background: 'var(--surface-2)', border: '1px solid var(--border)',
+  borderRadius: 12, color: 'var(--text)',
+  fontFamily: 'var(--font-mono)', fontSize: 14,
+  padding: '0 14px', outline: 'none', boxSizing: 'border-box',
+}
 
 export function AuthPage() {
   const navigate = useNavigate()
   const { signIn, signUp } = useAuthStore()
 
   const [mode, setMode] = useState<Mode>('signin')
+  // Sign-in: this field holds an email OR a username. Sign-up: email only.
   const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [usernameHint, setUsernameHint] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [signupDone, setSignupDone] = useState(false)
+
+  const checkUsername = async (): Promise<boolean> => {
+    const bad = validateUsername(username)
+    if (bad) { setUsernameHint(bad); return false }
+    if (!(await isUsernameAvailable(normalizeUsername(username)))) {
+      setUsernameHint('Username นี้ถูกใช้แล้ว')
+      return false
+    }
+    setUsernameHint(null)
+    return true
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -21,7 +45,8 @@ export function AuthPage() {
     setLoading(true)
 
     if (mode === 'signup') {
-      const err = await signUp(email, password)
+      if (!(await checkUsername())) { setLoading(false); return }
+      const err = await signUp(email, username, password)
       if (err) { setError(err); setLoading(false); return }
       setSignupDone(true)
       setLoading(false)
@@ -74,7 +99,7 @@ export function AuthPage() {
           {(['signin', 'signup'] as Mode[]).map(m => (
             <button
               key={m}
-              onClick={() => { setMode(m); setError(null) }}
+              onClick={() => { setMode(m); setError(null); setUsernameHint(null) }}
               style={{
                 flex: 1, height: 40, borderRadius: 9, border: 'none', cursor: 'pointer',
                 fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, textTransform: 'uppercase',
@@ -90,22 +115,40 @@ export function AuthPage() {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
-            <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 6 }}>EMAIL</div>
+            <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 6 }}>
+              {mode === 'signin' ? 'EMAIL OR USERNAME' : 'EMAIL'}
+            </div>
             <input
-              type="email"
+              type={mode === 'signin' ? 'text' : 'email'}
               value={email}
               onChange={e => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder={mode === 'signin' ? 'you@example.com or username' : 'you@example.com'}
+              autoCapitalize="none"
+              autoCorrect="off"
               required
-              style={{
-                width: '100%', height: 48,
-                background: 'var(--surface-2)', border: '1px solid var(--border)',
-                borderRadius: 12, color: 'var(--text)',
-                fontFamily: 'var(--font-mono)', fontSize: 14,
-                padding: '0 14px', outline: 'none', boxSizing: 'border-box',
-              }}
+              style={inputStyle}
             />
           </div>
+
+          {mode === 'signup' && (
+            <div>
+              <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 6 }}>USERNAME</div>
+              <input
+                type="text"
+                value={username}
+                onChange={e => { setUsername(e.target.value); setUsernameHint(null) }}
+                onBlur={() => { if (username) void checkUsername() }}
+                placeholder="john_doe"
+                autoCapitalize="none"
+                autoCorrect="off"
+                required
+                style={inputStyle}
+              />
+              <div className="t-mono" style={{ fontSize: 10, marginTop: 6, color: usernameHint ? '#ef4444' : 'var(--muted)' }}>
+                {usernameHint ?? '3–20 ตัว · a–z 0–9 _ . · ใช้ login แทน email ได้'}
+              </div>
+            </div>
+          )}
 
           <div>
             <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 6 }}>PASSWORD</div>
@@ -116,13 +159,7 @@ export function AuthPage() {
               placeholder="••••••••"
               required
               minLength={6}
-              style={{
-                width: '100%', height: 48,
-                background: 'var(--surface-2)', border: '1px solid var(--border)',
-                borderRadius: 12, color: 'var(--text)',
-                fontFamily: 'var(--font-mono)', fontSize: 14,
-                padding: '0 14px', outline: 'none', boxSizing: 'border-box',
-              }}
+              style={inputStyle}
             />
           </div>
 

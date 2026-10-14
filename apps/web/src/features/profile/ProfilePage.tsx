@@ -9,6 +9,7 @@ import { calcEnergy, ACTIVITY, ACTIVITY_ORDER, suggestActivityFromDays } from '.
 import { IconBolt, IconUsers, IconScale, IconX, IconBell, IconTrendingUp } from '../../components/icons/index.js'
 import { DateField } from '../../components/DateField.js'
 import { MiniBars } from '../../components/charts/MiniBars.js'
+import { validateUsername, normalizeUsername } from '../../lib/username.js'
 import { isPushSupported, isIosNeedsInstall, getPermission, isSubscribed, subscribeToPush, unsubscribeFromPush } from '../../lib/pushApi.js'
 
 const todayISO = new Date().toISOString().split('T')[0]
@@ -17,7 +18,29 @@ export function ProfilePage() {
   const navigate = useNavigate()
   const { history, theme, setTheme, personalOneRMs, clearHistory, bodyMetrics, addBodyMetric, clearMetrics, bio, setBio, oneRMHistory } = useAppStore()
   const { clearCustomPrograms, setProgramState, configs, customPrograms } = useProgramStore()
-  const { user, isAdmin, isCoach, signOut } = useAuthStore()
+  const { user, isAdmin, isCoach, signOut, username, setUsername } = useAuthStore()
+
+  const [showUsername, setShowUsername] = useState(false)
+  const [usernameDraft, setUsernameDraft] = useState('')
+  const [usernameError, setUsernameError] = useState<string | null>(null)
+  const [usernameBusy, setUsernameBusy] = useState(false)
+  const displayName = username ?? user?.email ?? 'Athlete'
+
+  const openUsername = () => {
+    setUsernameDraft(username ?? '')
+    setUsernameError(null)
+    setShowUsername(true)
+  }
+  const handleSaveUsername = async () => {
+    const bad = validateUsername(usernameDraft)
+    if (bad) { setUsernameError(bad); return }
+    if (normalizeUsername(usernameDraft) === username) { setShowUsername(false); return }
+    setUsernameBusy(true)
+    const err = await setUsername(normalizeUsername(usernameDraft))
+    setUsernameBusy(false)
+    if (err) { setUsernameError(err); return }
+    setShowUsername(false)
+  }
 
   const handleSignOut = async () => {
     await signOut()
@@ -130,14 +153,20 @@ export function ProfilePage() {
       {/* Avatar card */}
       <div style={{ padding: '0 20px 20px' }}>
         <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div className="avatar">{user?.email?.[0]?.toUpperCase() ?? 'A'}</div>
+          <div className="avatar">{displayName[0]?.toUpperCase() ?? 'A'}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18, letterSpacing: '-0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user?.email ?? 'Athlete'}
+              {displayName}
             </div>
-            <div className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-              POWERLIFTER
+            <div className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {username ? user?.email : 'POWERLIFTER'}
             </div>
+            <button
+              onClick={openUsername}
+              style={{ all: 'unset', cursor: 'pointer', marginTop: 6, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--accent)' }}
+            >
+              {username ? 'แก้ Username' : '+ ตั้ง Username'}
+            </button>
           </div>
           <button className="btn btn-secondary" style={{ height: 34, fontSize: 11, padding: '0 12px', flexShrink: 0 }} onClick={handleSignOut}>
             Sign Out
@@ -459,6 +488,43 @@ export function ProfilePage() {
         )}
       </div>
 
+
+      {/* Username popup */}
+      {showUsername && (
+        <div className="sheet-backdrop" onClick={() => setShowUsername(false)} style={{ zIndex: 100 }}>
+          <div className="sheet" onClick={e => e.stopPropagation()}>
+            <div className="sheet-handle" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <h3 className="t-display" style={{ margin: 0, fontSize: 20 }}>Username</h3>
+              <button className="btn-icon" onClick={() => setShowUsername(false)}><IconX size={18} /></button>
+            </div>
+            <p className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 16 }}>
+              ใช้ login แทน email ได้ · 3–20 ตัว · a–z 0–9 _ .
+            </p>
+            <input
+              type="text"
+              value={usernameDraft}
+              onChange={e => { setUsernameDraft(e.target.value); setUsernameError(null) }}
+              placeholder="john_doe"
+              autoCapitalize="none"
+              autoCorrect="off"
+              autoFocus
+              style={{
+                width: '100%', height: 48, background: 'var(--surface-2)', border: '1px solid var(--border)',
+                borderRadius: 12, color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 14,
+                padding: '0 14px', outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+            {usernameError && (
+              <div className="t-mono" style={{ fontSize: 11, color: '#ef4444', marginTop: 8 }}>{usernameError}</div>
+            )}
+            <button className="btn btn-primary" style={{ width: '100%', marginTop: 16 }}
+              disabled={usernameBusy} onClick={() => void handleSaveUsername()}>
+              {usernameBusy ? '...' : 'Save'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Bio & Energy popup */}
       {showBio && (

@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase.js'
 import { flushQueue } from '../lib/syncQueue.js'
 import { fetchNotifications } from '../lib/notificationsApi.js'
 import { latestOneRMs } from '../lib/oneRM.js'
+import { loginWithUsername, saveUsername, completeForcedPasswordChange } from '../lib/authApi.js'
+import { isEmailIdentifier, normalizeUsername } from '../lib/username.js'
 import { useAppStore } from './useAppStore.js'
 import { useProgramStore } from './useProgramStore.js'
 
@@ -13,19 +15,43 @@ interface AuthStore {
   isAdmin: boolean
   isCoach: boolean
   roleLoaded: boolean
+  username: string | null
+  mustChangePassword: boolean
+  // Set once per signed-in user (NOT reset on a refired SIGNED_IN) so the app
+  // can wait for the forced-change flag without unmounting on a tab refocus.
+  profileLoaded: boolean
   notifications: AppNotification[]
   initialized: boolean
   init: () => void
-  signIn: (email: string, password: string) => Promise<string | null>
-  signUp: (email: string, password: string) => Promise<string | null>
+  signIn: (identifier: string, password: string) => Promise<string | null>
+  signUp: (email: string, username: string, password: string) => Promise<string | null>
   signOut: () => Promise<void>
   resendConfirmation: (email: string) => Promise<string | null>
   refreshNotifications: () => Promise<void>
+  setUsername: (username: string) => Promise<string | null>
+  completeForcedPasswordChange: (newPassword: string) => Promise<string | null>
 }
 
-async function loadRole(userId: string): Promise<string> {
-  const { data } = await supabase.from('profiles').select('role').eq('id', userId).single()
-  return data?.role ?? 'user'
+interface ProfileRow { role: string; username: string | null; mustChangePassword: boolean }
+
+// Never throws and never loses the role: if the new columns aren't deployed yet
+// (client shipped before SQL §2l) fall back to reading role alone.
+async function loadProfile(userId: string): Promise<ProfileRow> {
+  try {
+    const full = await supabase
+      .from('profiles').select('role, username, must_change_password').eq('id', userId).single()
+    if (!full.error && full.data) {
+      return {
+        role: full.data.role ?? 'user',
+        username: full.data.username ?? null,
+        mustChangePassword: full.data.must_change_password === true,
+      }
+    }
+    const basic = await supabase.from('profiles').select('role').eq('id', userId).single()
+    return { role: basic.data?.role ?? 'user', username: null, mustChangePassword: false }
+  } catch {
+    return { role: 'user', username: null, mustChangePassword: false }
+  }
 }
 
 // A user counts as a coach if an admin assigned the 'coach' role OR they already
@@ -175,11 +201,32 @@ async function loadUserData(userId: string) {
   }
 }
 
-export const useAuthStore = create<AuthStore>()((set) => ({
+const SIGNED_OUT_STATE = {
+  user: null, isAdmin: false, isCoach: false, username: null,
+  mustChangePassword: false, profileLoaded: false, notifications: [],
+} as const
+
+export const useAuthStore = create<AuthStore>()((set) => {
+  const applyProfile = (userId: string) => {
+    loadProfile(userId).then(p => {
+      set({
+        isAdmin: p.role === 'admin',
+        username: p.username,
+        mustChangePassword: p.mustChangePassword,
+        profileLoaded: true,
+      })
+      loadIsCoach(userId, p.role).then(isCoach => set({ isCoach, roleLoaded: true }))
+    })
+  }
+
+  return {
   user: null,
   isAdmin: false,
   isCoach: false,
   roleLoaded: false,
+  username: null,
+  mustChangePassword: false,
+  profileLoaded: false,
   notifications: [],
   initialized: false,
 
@@ -190,10 +237,7 @@ export const useAuthStore = create<AuthStore>()((set) => ({
       if (u) {
         loadUserData(u.id)
         void flushQueue()
-        loadRole(u.id).then(role => {
-          set({ isAdmin: role === 'admin' })
-          loadIsCoach(u.id, role).then(isCoach => set({ isCoach, roleLoaded: true }))
-        })
+        applyProfile(u.id)
         fetchNotifications(u.id).then(notifications => set({ notifications })).catch(() => {})
       } else {
         set({ roleLoaded: true })
@@ -206,30 +250,49 @@ export const useAuthStore = create<AuthStore>()((set) => ({
         set({ roleLoaded: false })
         loadUserData(u.id)
         void flushQueue()
-        loadRole(u.id).then(role => {
-          set({ isAdmin: role === 'admin' })
-          loadIsCoach(u.id, role).then(isCoach => set({ isCoach, roleLoaded: true }))
-        })
+        applyProfile(u.id)
         fetchNotifications(u.id).then(notifications => set({ notifications })).catch(() => {})
       }
-      if (event === 'SIGNED_OUT') set({ isAdmin: false, isCoach: false, notifications: [], roleLoaded: true })
+      if (event === 'SIGNED_OUT') set({ ...SIGNED_OUT_STATE, notifications: [], roleLoaded: true })
     })
     window.addEventListener('online', () => { void flushQueue() })
   },
 
-  signIn: async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+  // An identifier with '@' is an email and signs in directly; anything else is a
+  // username, resolved server-side by the auth-login edge function.
+  signIn: async (identifier, password) => {
+    const id = identifier.trim()
+    if (!isEmailIdentifier(id)) return loginWithUsername(normalizeUsername(id), password)
+    const { error } = await supabase.auth.signInWithPassword({ email: id, password })
     return error?.message ?? null
   },
 
-  signUp: async (email, password) => {
-    const { error } = await supabase.auth.signUp({ email, password })
+  signUp: async (email, username, password) => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { username: normalizeUsername(username) } },
+    })
     return error?.message ?? null
   },
 
   signOut: async () => {
     await supabase.auth.signOut()
-    set({ user: null, isAdmin: false, isCoach: false, notifications: [] })
+    set({ ...SIGNED_OUT_STATE, notifications: [] })
+  },
+
+  setUsername: async (username) => {
+    const res = await saveUsername(username)
+    if ('error' in res) return res.error
+    set({ username: res.username })
+    return null
+  },
+
+  completeForcedPasswordChange: async (newPassword) => {
+    const err = await completeForcedPasswordChange(newPassword)
+    if (err) return err
+    set({ mustChangePassword: false })
+    return null
   },
 
   resendConfirmation: async (email) => {
@@ -245,4 +308,5 @@ export const useAuthStore = create<AuthStore>()((set) => ({
       set({ notifications })
     } catch { /* ignore */ }
   },
-}))
+  }
+})
