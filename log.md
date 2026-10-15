@@ -1,8 +1,34 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-14 (รอบ 55 — ✅ SHIPPED: Admin reset รหัสผ่าน + Username login)
+> อัปเดตล่าสุด: 2026-10-15 (รอบ 56 — ✅ SHIPPED: Profile weight trend เปลี่ยนเป็นกราฟเส้น)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-10-15 — รอบ 56 (✅ SHIPPED, deploy main): Profile weight trend เปลี่ยนจากแท่งเป็นกราฟเส้น
+
+commit `15f33b6` (feat) · แก้ไฟล์เดียว `apps/web/src/features/profile/ProfilePage.tsx`
+
+### ทำอะไร
+
+- การ์ด BODY COMPOSITION ใน Profile: แท่ง `MiniBars` ใต้ "WEIGHT TREND · min–max kg" (น้ำหนัก 10 ครั้งล่าสุด, 1 แท่ง = 1 ครั้งชั่ง, ไม่มีแกน/วันที่) →
+  `MetricChart` ตัวเดียวกับหน้า `/body` (เส้นสี `measureDef('weight').color`, แกน + วันที่, `height={120}`) ·
+  ป้อนข้อมูลด้วย `buildBodySeries(trend, 'weight')` · import `MiniBars` ออกจาก ProfilePage
+
+### ผลกระทบ (จัดการแล้ว)
+
+- guard `trend.length >= 2` เดิมยังอยู่ · ยังใช้ 10 ครั้งล่าสุด (`trend`) ไม่ใช่ทั้งหมดแบบ `/body`
+- `MiniBars.tsx` **ไม่ลบ** — `AthleteDetailPage` (coach) ยังใช้อยู่
+
+### verify
+
+- `pnpm build` ผ่าน · ESLint ผ่าน
+- ⚠️ **ยังไม่ได้ดูหน้าจริง** ที่ 390px (ความสูง 120 พอดีไหม, ป้ายแกนอ่านได้ไหม) · ไม่ได้รัน `pnpm test` (ไม่มี logic ใหม่)
+
+### ไม่ทำรอบนี้
+
+- ไม่เปลี่ยนเป็นข้อมูลทั้งหมดแบบ `/body` · ไม่แตะกราฟใน `AthleteDetailPage`
 
 ---
 
