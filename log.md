@@ -1,8 +1,29 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-15 (รอบ 56 — ✅ SHIPPED: Profile weight trend เปลี่ยนเป็นกราฟเส้น)
+> อัปเดตล่าสุด: 2026-10-15 (รอบ 57 — ✅ SHIPPED: Profile trend เป็นกราฟ 3 เส้นแบบ ALL)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-10-15 — รอบ 57 (✅ SHIPPED, deploy main): Profile trend เป็นกราฟ 3 เส้นเหมือน PROGRESSION (ALL)
+
+ต่อจากรอบ 56 (ที่ทำเป็นเส้น weight เส้นเดียว) · แก้ไฟล์เดียว `apps/web/src/features/profile/ProfilePage.tsx`
+
+### ทำอะไร
+
+- `MetricChart` ในการ์ด BODY COMPOSITION ใช้ `buildNormalizedSeries(bodyMetrics)` (Weight/Muscle/Fat เป็น %Δ เทียบค่าแรกของแต่ละค่า, `unit="%Δ"`)
+  เหมือนโหมด ALL ของ `/body` · หัวข้อเป็น "TREND · % เทียบค่าแรกของแต่ละค่า" · guard `bodyMetrics.length >= 2`
+- ลบ `trend`/`trendMin`/`trendMax` (ไม่ใช้แล้ว) · ใช้ข้อมูลทั้งหมด ไม่จำกัด 10 ครั้งล่าสุดแล้ว (ต่างจากรอบ 56)
+
+### ผลกระทบ (จัดการแล้ว)
+
+- กล่อง WEIGHT/MUSCLE/FAT ด้านบนยังโชว์ค่าจริง (kg/%) · Muscle/Fat ที่มีไม่ถึง 2 ครั้งเส้นอาจไม่ขึ้น (พฤติกรรมเดียวกับ `/body`)
+
+### verify
+
+- `pnpm build` ผ่าน · ESLint ผ่าน
+- ⚠️ ยังไม่ได้ดูหน้าจริงที่ 390px · ไม่ได้รัน `pnpm test`
 
 ---
 
