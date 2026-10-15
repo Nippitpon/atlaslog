@@ -9,7 +9,7 @@ import { calcEnergy, ACTIVITY, ACTIVITY_ORDER, suggestActivityFromDays } from '.
 import { IconBolt, IconUsers, IconScale, IconX, IconBell, IconTrendingUp } from '../../components/icons/index.js'
 import { DateField } from '../../components/DateField.js'
 import { MetricChart } from '../../components/charts/MetricChart.js'
-import { buildBodySeries, measureDef } from '../../lib/bodyMetrics.js'
+import { buildNormalizedSeries } from '../../lib/bodyMetrics.js'
 import { validateUsername, normalizeUsername } from '../../lib/username.js'
 import { isPushSupported, isIosNeedsInstall, getPermission, isSubscribed, subscribeToPush, unsubscribeFromPush } from '../../lib/pushApi.js'
 
@@ -110,10 +110,7 @@ export function ProfilePage() {
     setBodySaved(true); setTimeout(() => setBodySaved(false), 1500)
   }
 
-  // Weight trend — oldest→newest, last 10 entries
-  const trend = useMemo(() => sortedMetrics.slice(0, 10).reverse(), [sortedMetrics])
-  const trendMin = Math.min(...trend.map(e => e.weightKg))
-  const trendMax = Math.max(...trend.map(e => e.weightKg))
+  const trendSeries = useMemo(() => buildNormalizedSeries(bodyMetrics), [bodyMetrics])
 
   // Bio & Energy (BMR / TDEE)
   const energy = useMemo(() => calcEnergy(bio, latestBody), [bio, latestBody])
@@ -307,16 +304,12 @@ export function ProfilePage() {
           )}
 
           {/* Weight trend */}
-          {trend.length >= 2 && (
+          {bodyMetrics.length >= 2 && (
             <div style={{ marginBottom: 14 }}>
               <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 6 }}>
-                WEIGHT TREND · {trendMin}–{trendMax} kg
+                TREND · % เทียบค่าแรกของแต่ละค่า
               </div>
-              <MetricChart
-                series={[{ key: 'weight', color: measureDef('weight').color, points: buildBodySeries(trend, 'weight') }]}
-                unit="kg"
-                height={120}
-              />
+              <MetricChart series={trendSeries} unit="%Δ" height={120} />
             </div>
           )}
 
