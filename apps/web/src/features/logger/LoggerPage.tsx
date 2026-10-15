@@ -2,13 +2,14 @@ import { useState, useMemo } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
-import { getExercise, muscleColor } from '../../lib/utils.js'
+import { getExercise, muscleColor, exerciseGifUrl } from '../../lib/utils.js'
 import { SwapSheet } from './SwapSheet.js'
+import { ExerciseGifSheet } from './ExerciseGifSheet.js'
 import { ReorderSheet } from './ReorderSheet.js'
 import { FinishReview } from './FinishReview.js'
 import { EmptyWorkout } from './EmptyWorkout.js'
 import {
-  IconX, IconCheck, IconPlus, IconChevronLeft, IconChevronRight, IconSwap, IconGrip,
+  IconX, IconCheck, IconPlus, IconChevronLeft, IconChevronRight, IconSwap, IconGrip, IconPlay,
 } from '../../components/icons/index.js'
 import type { Workout, WorkoutSet } from '@atlaslog/shared'
 
@@ -17,6 +18,7 @@ export function LoggerPage() {
   const { workout, updateWorkout, addExerciseToWorkout, finishWorkout, cancelWorkout, history } = useAppStore()
   const [showSwap, setShowSwap] = useState(false)
   const [showReorder, setShowReorder] = useState(false)
+  const [showGif, setShowGif] = useState(false)
   const [showAddExercise, setShowAddExercise] = useState(false)
   const [showCancel, setShowCancel] = useState(false)
   const [reviewNow, setReviewNow] = useState<number | null>(null)
@@ -187,6 +189,12 @@ export function LoggerPage() {
             )}
           </div>
           <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            {/* Built-ins carry no gifPath — no button rather than an empty popup. */}
+            {exerciseGifUrl(exMeta.gifPath) && (
+              <button className="btn-icon" onClick={() => setShowGif(true)} aria-label="Show exercise demo">
+                <IconPlay size={16} />
+              </button>
+            )}
             <button className="btn-icon" onClick={() => setShowReorder(true)} aria-label="Reorder exercises">
               <IconGrip size={18} />
             </button>
@@ -319,6 +327,14 @@ export function LoggerPage() {
             setShowSwap(false)
           }}
           onClose={() => setShowSwap(false)}
+        />
+      )}
+
+      {showGif && (
+        <ExerciseGifSheet
+          exerciseId={cur.exerciseId}
+          name={cur.name}
+          onClose={() => setShowGif(false)}
         />
       )}
 
