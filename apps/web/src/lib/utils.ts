@@ -1,7 +1,9 @@
-import type { Session } from '@atlaslog/shared'
+import type { Session, RunEntry } from '@atlaslog/shared'
 import { EXERCISES, CUSTOM_EXERCISES, DB_EXERCISES } from './data.js'
 
-export function weeklyVolume(history: Session[]) {
+// Lift volume (kg × reps) and run distance per day of the current week. Kept as
+// two numbers, never summed: kg and km have no common unit.
+export function weeklyVolume(history: Session[], runs: RunEntry[] = []) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
@@ -18,10 +20,14 @@ export function weeklyVolume(history: Session[]) {
     const vol = history
       .filter(h => { const hd = new Date(h.date); return hd >= d && hd < next })
       .reduce((sum, h) => sum + h.volume, 0)
+    const km = runs
+      .filter(r => { const rd = new Date(r.date); return rd >= d && rd < next })
+      .reduce((sum, r) => sum + r.distanceKm, 0)
     days.push({
       date: d,
       label: ['S','M','T','W','T','F','S'][d.getDay()],
       volume: vol,
+      runKm: km,
       isToday: d.getTime() === today.getTime(),
     })
   }

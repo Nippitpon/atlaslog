@@ -302,6 +302,7 @@ describe('monthSummary', () => {
     expect(s.volumeKg).toBe(5000)
     expect(s.sessionCount).toBe(1)
     expect(s.runCount).toBe(1)
+    expect(s.runKm).toBe(5)
     expect(s.trainedDays).toBe(2)
   })
 

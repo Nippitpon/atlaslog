@@ -8,7 +8,7 @@ import { respondCoachRequest } from '../../lib/coachApi.js'
 import { STRUCTURED_PROGRAMS, buildDayProgram } from '../../lib/twelveWeekProgram.js'
 import { structuredWeight, resolveCalcRMs } from '../../lib/rpeTable.js'
 import { resolveDayExercises } from '../../lib/dayLayout.js'
-import { weeklyVolume, getDayOfWeek, runTarget } from '../../lib/utils.js'
+import { weeklyVolume, getDayOfWeek, runTarget, formatNum2 } from '../../lib/utils.js'
 import { latestWeightKg, weeklyCalories } from '../../lib/calories.js'
 import { CalorieRing } from './CalorieRing.js'
 import { useStartWorkout } from '../../hooks/useStartWorkout.js'
@@ -90,8 +90,14 @@ export function DashboardPage() {
   const caloriesToday = calWeek.find(d => d.isToday)?.calories ?? 0
   const caloriesPeak = Math.max(0, ...calWeek.map(d => d.calories))
 
-  const week = weeklyVolume(history)
+  const week = weeklyVolume(history, runs)
   const maxVol = Math.max(1, ...week.map(d => d.volume))
+  // Each series scales to its own peak — kg and km cannot share an axis, so the
+  // header carries the real week totals instead of a single PEAK.
+  const maxKm = Math.max(0.1, ...week.map(d => d.runKm))
+  const hasRuns = week.some(d => d.runKm > 0)
+  const weekKg = week.reduce((s, d) => s + d.volume, 0)
+  const weekKm = week.reduce((s, d) => s + d.runKm, 0)
 
   // SBD Total: best Squat + Bench + Deadlift from main sets this calendar week (Sun–Sat)
   const sbdTotal = useMemo(() => {
@@ -378,21 +384,37 @@ export function DashboardPage() {
 
           <div>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 }}>
-              <div className="t-eyebrow">WEEKLY VOLUME</div>
+              <div className="t-eyebrow">{hasRuns ? 'WEEKLY TRAINING' : 'WEEKLY VOLUME'}</div>
               <div className="t-mono" style={{ fontSize: 11, color: 'var(--muted)' }}>
-                PEAK {Math.round(maxVol).toLocaleString()} kg
+                {hasRuns
+                  ? `${Math.round(weekKg).toLocaleString()} kg · ${formatNum2(weekKm)} km`
+                  : `PEAK ${Math.round(maxVol).toLocaleString()} kg`}
               </div>
             </div>
+            {hasRuns && (
+              <div className="t-mono" style={{ display: 'flex', gap: 12, fontSize: 9, color: 'var(--muted)' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--accent)' }} />LIFT kg
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 2, background: '#60a5fa' }} />RUN km
+                </span>
+              </div>
+            )}
             <div className="bar-chart">
               {week.map((d, i) => {
                 const h = d.volume > 0 ? Math.max(4, (d.volume / maxVol) * 100) : 4
+                const hr = d.runKm > 0 ? Math.max(4, (d.runKm / maxKm) * 100) : 4
                 return (
                   <div key={i} className="bar-col">
-                    <div style={{ height: 100, width: '100%', display: 'flex', alignItems: 'flex-end' }}>
+                    <div style={{ height: 100, width: '100%', display: 'flex', alignItems: 'flex-end', gap: 2 }}>
                       <div
                         className={`bar-fill ${d.isToday ? 'today' : d.volume > 0 ? 'active' : ''}`}
                         style={{ height: `${h}%` }}
                       />
+                      {hasRuns && (
+                        <div className={`bar-fill ${d.runKm > 0 ? 'run' : ''}`} style={{ height: `${hr}%` }} />
+                      )}
                     </div>
                     <div className="bar-label" style={{
                       color: d.isToday ? 'var(--accent)' : 'var(--muted)',

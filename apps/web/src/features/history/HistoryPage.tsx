@@ -9,7 +9,7 @@ import {
   type MonthSummary,
 } from '../../lib/historyCalendar.js'
 import { prDaysByLift } from '../../lib/sessionStats.js'
-import { dateFromYMD, todayYMD } from '../../lib/utils.js'
+import { dateFromYMD, todayYMD, formatNum2 } from '../../lib/utils.js'
 import { IconCalendar, IconHistory } from '../../components/icons/index.js'
 import type { Session, RunEntry } from '@atlaslog/shared'
 import { SessionCard } from './SessionCard.js'
@@ -84,6 +84,9 @@ function StatStrip({
           <span className="t-mono" style={{ fontSize: 11, color: 'var(--muted)' }}>
             · {summary.sessionCount} sessions
             {summary.runCount > 0 && ` · ${summary.runCount} runs`}
+            {summary.runKm > 0 && (
+              <span style={{ color: '#60a5fa' }}> · {formatNum2(summary.runKm)} km</span>
+            )}
             {summary.missedDays > 0 && (
               <span style={{ color: 'var(--danger)' }}> · พลาด {summary.missedDays} วัน</span>
             )}

@@ -238,6 +238,7 @@ export interface MonthSummary {
   doneDays: number
   missedDays: number
   volumeKg: number
+  runKm: number
   adherencePct: number
 }
 
@@ -251,7 +252,7 @@ export function monthSummary(
   todayYmd: string,
 ): MonthSummary {
   let trainedDays = 0, sessionCount = 0, runCount = 0
-  let dueDays = 0, doneDays = 0, missedDays = 0, volumeKg = 0
+  let dueDays = 0, doneDays = 0, missedDays = 0, volumeKg = 0, runKm = 0
 
   for (const ymd of monthGrid(year, month)) {
     if (!ymd) continue
@@ -261,7 +262,7 @@ export function monthSummary(
       trainedDays++
       for (const e of entries) {
         if (e.kind === 'session') { sessionCount++; volumeKg += e.session.volume }
-        else runCount++
+        else { runCount++; runKm += e.run.distanceKm }
       }
     }
 
@@ -279,7 +280,7 @@ export function monthSummary(
   }
 
   return {
-    trainedDays, sessionCount, runCount, dueDays, doneDays, missedDays, volumeKg,
+    trainedDays, sessionCount, runCount, dueDays, doneDays, missedDays, volumeKg, runKm,
     adherencePct: dueDays ? Math.round((doneDays / dueDays) * 100) : 0,
   }
 }
