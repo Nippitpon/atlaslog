@@ -1,8 +1,34 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-15 (รอบ 58 — ✅ SHIPPED: สีป้าย Weight/Muscle/Fat% บน Profile ตรงกับ PROGRESSION)
+> อัปเดตล่าสุด: 2026-10-15 (รอบ 59 — ✅ SHIPPED: ปุ่ม popup GIF ท่าในหน้า RECORDING)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-10-15 — รอบ 59 (✅ SHIPPED, deploy main): ปุ่ม popup GIF ท่าในหน้า RECORDING
+
+งาน frontend ล้วน — ไม่แตะ DB / SQL / edge function (`gif_path` อยู่ใน registry ตั้งแต่โหลดแอปแล้ว, GIF โหลดตรงจาก CDN)
+
+### ทำอะไร
+
+- **ใหม่** `features/logger/ExerciseGifSheet.tsx` — bottom sheet (`.sheet-backdrop`/`.sheet` แบบ `SwapSheet`): ชื่อท่า · GIF 1:1
+  (กรอบเดียวกับ `ExerciseDetailPage`, onError → `IconDumbbell`) · pill group/equipment · attribution ExerciseDB · ปิดด้วย × หรือแตะ backdrop
+- `LoggerPage.tsx` — state `showGif` + ปุ่ม `IconPlay` หน้าปุ่ม Reorder/Swap · แสดงเฉพาะเมื่อ `exerciseGifUrl(exMeta.gifPath)` ไม่ null
+
+### ผลกระทบ (จัดการแล้ว)
+
+- ท่า builtin 19 ท่า (`squat`/`bench`/`deadlift` ฯลฯ) ไม่มี `gifPath` → **ไม่มีปุ่ม** (เจ้าของตกลงให้ข้าม) · ท่า `db-*` เท่านั้นที่มี
+- ไม่ต้องปิด popup ตอนเปลี่ยนท่า — backdrop บังทั้งจอ เปลี่ยนท่าระหว่างเปิดไม่ได้
+
+### verify
+
+- `pnpm build` ผ่าน · ESLint ผ่าน
+- ⚠️ ยังไม่ได้ดูหน้าจริงที่ 390px — เช็ค: ชื่อท่ายาว + 3 ปุ่มไม่ล้น · GIF ใน sheet ไม่สูงเกินจอ · ท่า builtin ไม่มีปุ่ม
+
+### ไม่ทำรอบนี้
+
+- GIF ให้ท่า builtin (map ไป id dataset ใน `data.ts`) — เจ้าของให้ข้าม · INSTRUCTIONS ใน popup (ต้อง fetch Supabase ทุกครั้ง)
 
 ---
 
