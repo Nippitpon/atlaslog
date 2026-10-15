@@ -8,7 +8,8 @@ import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { calcEnergy, ACTIVITY, ACTIVITY_ORDER, suggestActivityFromDays } from '../../lib/energy.js'
 import { IconBolt, IconUsers, IconScale, IconX, IconBell, IconTrendingUp } from '../../components/icons/index.js'
 import { DateField } from '../../components/DateField.js'
-import { MiniBars } from '../../components/charts/MiniBars.js'
+import { MetricChart } from '../../components/charts/MetricChart.js'
+import { buildBodySeries, measureDef } from '../../lib/bodyMetrics.js'
 import { validateUsername, normalizeUsername } from '../../lib/username.js'
 import { isPushSupported, isIosNeedsInstall, getPermission, isSubscribed, subscribeToPush, unsubscribeFromPush } from '../../lib/pushApi.js'
 
@@ -311,7 +312,11 @@ export function ProfilePage() {
               <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 6 }}>
                 WEIGHT TREND · {trendMin}–{trendMax} kg
               </div>
-              <MiniBars values={trend.map(e => e.weightKg)} />
+              <MetricChart
+                series={[{ key: 'weight', color: measureDef('weight').color, points: buildBodySeries(trend, 'weight') }]}
+                unit="kg"
+                height={120}
+              />
             </div>
           )}
 
