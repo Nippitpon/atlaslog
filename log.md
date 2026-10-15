@@ -1,8 +1,23 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-15 (รอบ 57 — ✅ SHIPPED: Profile trend เป็นกราฟ 3 เส้นแบบ ALL)
+> อัปเดตล่าสุด: 2026-10-15 (รอบ 58 — ✅ SHIPPED: สีป้าย Weight/Muscle/Fat% บน Profile ตรงกับ PROGRESSION)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-10-15 — รอบ 58 (✅ SHIPPED, deploy main): สีป้าย Body Composition บน Profile ตรงกับ PROGRESSION
+
+ต่อจากรอบ 57 · แก้ไฟล์เดียว `apps/web/src/features/profile/ProfilePage.tsx`
+
+### ทำอะไร
+
+- ป้าย WEIGHT / MUSCLE / FAT% ในกล่องสรุปค่าล่าสุดใช้สีจาก `measureDef(...).color` (น้ำเงิน/เขียว/ส้ม) เหมือนกล่องใน `/body` ·
+  ป้าย `FAT` → `FAT%` ให้ตรงกัน · ตัวเลขยังสี `var(--text)` เหมือนเดิม
+
+### verify
+
+- `pnpm build` ผ่าน · ESLint ผ่าน · ⚠️ ยังไม่ได้ดูหน้าจริงที่ 390px
 
 ---
 
