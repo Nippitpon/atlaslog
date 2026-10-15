@@ -1,8 +1,30 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-15 (รอบ 60 — ✅ SHIPPED: ลบ Dynamic Island + home indicator ปลอม)
+> อัปเดตล่าสุด: 2026-10-15 (รอบ 61 — ✅ SHIPPED: ระยะวิ่งใน Dashboard WEEKLY TRAINING + สรุปเดือน History)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-10-15 — รอบ 61 (✅ SHIPPED, deploy main): ระยะวิ่ง (km) ใน Dashboard + สรุปเดือน History
+
+ต้นเรื่อง: วิ่งแล้ว WEEKLY VOLUME ไม่ขึ้น เพราะ `weeklyVolume` รวมแค่ `Session.volume` (kg×reps) — `runs` (`RunEntry`) เก็บแยก มีแค่ km/นาที ไม่มี kg ·
+วงแหวนแคลอรี่นับวิ่งอยู่แล้ว (`weeklyCalories`) · ไม่แตะ DB/types
+
+### ทำอะไร
+
+- **Dashboard** — `weeklyVolume(history, runs = [])` (`lib/utils.ts`) คืน `runKm` ต่อวันเพิ่ม (ช่วง `[d, next)` local เดิม) ·
+  `DashboardPage.tsx`: ถ้าสัปดาห์มีวิ่ง → หัว `WEEKLY TRAINING` + ขวา `N kg · X km` (ยอดรวมสัปดาห์) + legend `LIFT kg / RUN km` +
+  แท่งคู่ต่อวัน (ยก = accent/`.today` เดิม, วิ่ง = `.bar-fill.run` `#60a5fa`) · แต่ละ series scale กับ peak ของตัวเอง (kg/km แชร์แกนไม่ได้) ·
+  ไม่มีวิ่งในสัปดาห์ → กราฟเดิมทุกอย่าง (`WEEKLY VOLUME · PEAK … kg`)
+- **History** — `MonthSummary.runKm` (`lib/historyCalendar.ts` `monthSummary`) · `HistoryPage` StatStrip ต่อท้าย `· X km` สีน้ำเงิน (เฉพาะเดือนที่มีวิ่ง)
+- หน่วย km เลือกเพราะ "volume" ของการวิ่ง = ระยะ (นาทีให้รางวัลการวิ่งช้า, kcal ซ้ำกับวงแหวน) — เจ้าของเลือก "แท่งซ้อนในกราฟเดียว"
+
+### verify
+
+- `pnpm test` 237 ผ่าน (ใหม่ `lib/weeklyVolume.test.ts` 3 เคส: แยก kg/km รายวัน · วิ่ง 23:30 local อยู่วันเดิม · นอกสัปดาห์=0;
+  `historyCalendar.test.ts` เช็ค `runKm`) · `pnpm build` ผ่าน · ESLint ผ่าน
+- เปิด `pnpm dev` ให้เจ้าของดูแล้ว · ⚠️ ผมยังไม่ได้ตรวจ 390px เอง — เช็คหัว+ยอดรวมบรรทัดเดียว, แท่งคู่ 7 วันไม่แคบเกิน
 
 ---
 
