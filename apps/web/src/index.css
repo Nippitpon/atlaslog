@@ -586,35 +586,3 @@ body {
 .list-row:active { background: var(--surface-2); }
 
 .no-select { user-select: none; -webkit-user-select: none; }
-
-.dynamic-island {
-  position: absolute;
-  top: 11px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 126px;
-  height: 37px;
-  border-radius: 24px;
-  background: #000;
-  z-index: 50;
-  pointer-events: none;
-}
-
-.home-indicator {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 60;
-  height: 34px;
-  display: flex;
-  justify-content: center;
-  align-items: flex-end;
-  padding-bottom: 8px;
-  pointer-events: none;
-}
-.home-indicator-bar {
-  width: 139px;
-  height: 5px;
-  border-radius: 100px;
-}

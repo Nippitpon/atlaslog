@@ -18,7 +18,6 @@ export function AppShell() {
   const startWorkout = useStartWorkout()
 
   useEffect(() => { if (isSupabaseConfigured) init() }, [init])
-  const isDark = theme === 'dark'
   const isLogger = location.pathname === '/workout'
   // The bar sits above the nav, so screens need extra bottom padding while it shows
   const showResumeBar = !!workout && !isLogger
@@ -74,8 +73,6 @@ export function AppShell() {
 
   return (
     <div className={`atlas-app theme-${theme}${showResumeBar ? ' has-resume-bar' : ''}`}>
-      <div className="dynamic-island" />
-
       <Outlet />
 
       {showResumeBar && <ResumeBar workout={workout} onOpen={() => navigate('/workout')} />}
@@ -111,10 +108,6 @@ export function AppShell() {
           </div>
         </div>
       )}
-
-      <div className="home-indicator">
-        <div className="home-indicator-bar" style={{ background: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.25)' }} />
-      </div>
     </div>
   )
 }
