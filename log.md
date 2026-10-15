@@ -1,8 +1,34 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-15 (รอบ 59 — ✅ SHIPPED: ปุ่ม popup GIF ท่าในหน้า RECORDING)
+> อัปเดตล่าสุด: 2026-10-15 (รอบ 60 — ✅ SHIPPED: ลบ Dynamic Island + home indicator ปลอม)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-10-15 — รอบ 60 (✅ SHIPPED, deploy main): ลบ Dynamic Island + home indicator ปลอม
+
+ของตกแต่งเลียนแบบ iPhone ที่ติดมาจาก mockup ตั้งแต่ commit แรก (`a7b285c`) — บน iPhone จริงซ้อนกับของจริง, บน Android/คอมโผล่มาเปล่า ๆ
+
+### ทำอะไร
+
+- `components/layout/AppShell.tsx` — ลบ `<div className="dynamic-island" />` (กล่องดำ 126×37 กลางขอบบน) + `.home-indicator` (ขีด 139×5 ล่างจอ) + ตัวแปร `isDark` ที่ใช้แค่ตรงนั้น
+- `index.css` — ลบ `.dynamic-island` / `.home-indicator` / `.home-indicator-bar`
+
+### ผลกระทบ
+
+- ทั้งคู่เป็น `pointer-events: none` → ไม่มี interaction หาย
+- ระยะขอบ**ไม่ได้แตะ**: `.atlas-screen` `padding-top: 56px` · `.bottom-nav` `padding-bottom: 24px` ยังเป็นค่าตายตัว ·
+  ไม่มี `env(safe-area-inset-*)` เลยทั้งแอป แม้ `index.html` ตั้ง `viewport-fit=cover` · กรอบ 402×874 มุมมน 48px บนจอ >440px (desktop mockup) ยังอยู่
+
+### verify
+
+- `pnpm build` ผ่าน · ESLint ผ่าน · grep ไม่เหลือ reference
+- ⚠️ ยังไม่ได้ดูบน iPhone จริง — เช็คว่าหัวข้อไม่ชนรอยบาก/BottomNav ไม่ชนแถบล่าง
+
+### 📌 ค้างต่อ (ถ้าเจอปัญหา)
+
+- เปลี่ยน padding ตายตัวเป็น `max(56px, env(safe-area-inset-top))` / `env(safe-area-inset-bottom)` ที่ `.atlas-screen`, `.bottom-nav`, `.sheet`, `.resume-bar`
 
 ---
 
