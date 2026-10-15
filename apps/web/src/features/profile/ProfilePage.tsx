@@ -9,7 +9,7 @@ import { calcEnergy, ACTIVITY, ACTIVITY_ORDER, suggestActivityFromDays } from '.
 import { IconBolt, IconUsers, IconScale, IconX, IconBell, IconTrendingUp } from '../../components/icons/index.js'
 import { DateField } from '../../components/DateField.js'
 import { MetricChart } from '../../components/charts/MetricChart.js'
-import { buildNormalizedSeries } from '../../lib/bodyMetrics.js'
+import { buildNormalizedSeries, measureDef } from '../../lib/bodyMetrics.js'
 import { validateUsername, normalizeUsername } from '../../lib/username.js'
 import { isPushSupported, isIosNeedsInstall, getPermission, isSubscribed, subscribeToPush, unsubscribeFromPush } from '../../lib/pushApi.js'
 
@@ -288,12 +288,12 @@ export function ProfilePage() {
               background: 'var(--surface-2)', borderRadius: 10, padding: '10px 14px', marginBottom: 14,
             }}>
               {[
-                { label: 'WEIGHT', val: latestBody.weightKg, unit: 'kg' },
-                { label: 'MUSCLE', val: latestBody.skeletalMuscleKg, unit: 'kg' },
-                { label: 'FAT', val: latestBody.bodyFatPct, unit: '%' },
-              ].map(({ label, val, unit }) => (
+                { label: 'WEIGHT', val: latestBody.weightKg, unit: 'kg', color: measureDef('weight').color },
+                { label: 'MUSCLE', val: latestBody.skeletalMuscleKg, unit: 'kg', color: measureDef('muscle').color },
+                { label: 'FAT%', val: latestBody.bodyFatPct, unit: '%', color: measureDef('fat').color },
+              ].map(({ label, val, unit, color }) => (
                 <div key={label} style={{ textAlign: 'center', flex: 1 }}>
-                  <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 3 }}>{label}</div>
+                  <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 3, color }}>{label}</div>
                   <div className="t-mono tnum" style={{ fontSize: 16, fontWeight: 700, color: val != null ? 'var(--text)' : 'var(--muted)' }}>
                     {val != null ? val : '—'}
                     {val != null && <span style={{ fontSize: 9, color: 'var(--muted)', marginLeft: 1 }}>{unit}</span>}
