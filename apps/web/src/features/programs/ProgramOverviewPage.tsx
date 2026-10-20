@@ -19,6 +19,7 @@ const PHASE_COLOR: Record<string, string> = {
   Intensification: '#f97316',
   Peaking:         '#a78bfa',
   Taper:           '#4ade80',
+  Deload:          '#94a3b8',
 }
 
 export function ProgramOverviewPage() {

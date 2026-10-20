@@ -98,7 +98,7 @@ const WEEKS: StructuredWeek[] = [
   ]),
 
   // ── Week 4 — Accumulation Deload ─────────────────────────────────────────────
-  wk(4, 'Accumulation', [
+  wk(4, 'Deload', [
     mon([
       e('squat',    'Back Squat',           'main',      1, 5, 0.725, 6.5),
       e('squat',    'Back Squat Back-off',  'main',      2, 5, 0.65,  5.5),
@@ -186,7 +186,7 @@ const WEEKS: StructuredWeek[] = [
   ]),
 
   // ── Week 8 — Intensification Deload ──────────────────────────────────────────
-  wk(8, 'Intensification', [
+  wk(8, 'Deload', [
     mon([
       e('squat',    'Back Squat',       'main',      3, 3, 0.80, 7.5),
       e('bench',    'Speed Bench',      'accessory', 6, 3, 0.70, 6),

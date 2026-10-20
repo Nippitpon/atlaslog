@@ -72,6 +72,7 @@ const LIFT_DICTIONARY: Record<string, { id: string; name: string }> = {
 
 function mapPhase(raw: string): ProgramPhase {
   const v = raw.toLowerCase()
+  if (v.includes('deload')) return 'Deload'
   if (v.includes('accum')) return 'Accumulation'
   if (v.includes('intens')) return 'Intensification'
   if (v.includes('peak')) return 'Peaking'

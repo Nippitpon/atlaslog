@@ -156,7 +156,7 @@ export interface RunEntry {
 // the whole program) unfinished, which is the point — the plan isn't closed until
 // the athlete says what happened to that day.
 export type DayStatus = 'not_started' | 'in_progress' | 'done' | 'skipped'
-export type ProgramPhase = 'Accumulation' | 'Intensification' | 'Peaking' | 'Taper'
+export type ProgramPhase = 'Accumulation' | 'Intensification' | 'Peaking' | 'Taper' | 'Deload'
 
 export interface StructuredExercise {
   id?: string
