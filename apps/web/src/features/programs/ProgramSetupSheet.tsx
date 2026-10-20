@@ -71,7 +71,7 @@ export function ProgramSetupSheet({ program, onClose, mode = 'setup' }: Props) {
   const [deadliftRM, setDeadliftRM] = useState(() => prefill('deadlift'))
 
   const endDate = useMemo(
-    () => programEndDate(startDate, program.totalWeeks),
+    () => (startDate ? programEndDate(startDate, program.totalWeeks) : ''),
     [startDate, program.totalWeeks],
   )
 
@@ -83,7 +83,7 @@ export function ProgramSetupSheet({ program, onClose, mode = 'setup' }: Props) {
 
   const isGeneral = program.programType === 'general'
   const has1RMs = !!(squatRM && benchRM && deadliftRM && Number(squatRM) > 0 && Number(benchRM) > 0 && Number(deadliftRM) > 0)
-  const isValid = isGeneral ? !!startDate : has1RMs
+  const isValid = !!startDate && (isGeneral || has1RMs)
 
   const handleConfirm = () => {
     const config: ProgramConfig = {
@@ -154,7 +154,7 @@ export function ProgramSetupSheet({ program, onClose, mode = 'setup' }: Props) {
         {/* Start Date */}
         <div className="t-eyebrow" style={{ marginBottom: 6, fontSize: 10 }}>START DATE</div>
         <div style={{ marginBottom: 16 }}>
-          <DateField value={startDate} onChange={iso => iso && setStartDate(iso)} />
+          <DateField value={startDate} onChange={setStartDate} />
         </div>
 
         {/* End Date (read only) */}
@@ -165,7 +165,7 @@ export function ProgramSetupSheet({ program, onClose, mode = 'setup' }: Props) {
         }}>
           <div>
             <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 3 }}>PROGRAM END DATE</div>
-            <div className="t-mono" style={{ fontSize: 14, fontWeight: 600 }}>{formatDate(endDate)}</div>
+            <div className="t-mono" style={{ fontSize: 14, fontWeight: 600 }}>{endDate ? formatDate(endDate) : 'DD/MM/YYYY'}</div>
           </div>
           <div className="t-mono" style={{ fontSize: 11, color: 'var(--muted)' }}>
             {program.totalWeeks} WEEKS

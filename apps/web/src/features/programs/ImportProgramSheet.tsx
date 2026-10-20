@@ -63,7 +63,7 @@ export function ImportProgramSheet({ onClose }: Props) {
   const [deadliftRM, setDeadliftRM] = useState(personalOneRMs.deadlift > 0 ? String(personalOneRMs.deadlift) : '')
 
   const endDate = useMemo(
-    () => (program ? programEndDate(startDate, program.totalWeeks) : todayISO),
+    () => (program ? (startDate ? programEndDate(startDate, program.totalWeeks) : '') : todayISO),
     [startDate, program, todayISO],
   )
 
@@ -72,7 +72,7 @@ export function ImportProgramSheet({ onClose }: Props) {
   const isGeneral = program?.programType === 'general'
   const has1RMs = !!(squatRM && benchRM && deadliftRM &&
     Number(squatRM) > 0 && Number(benchRM) > 0 && Number(deadliftRM) > 0)
-  const isSetupValid = isGeneral ? !!startDate : has1RMs
+  const isSetupValid = !!startDate && (isGeneral || has1RMs)
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -344,7 +344,7 @@ export function ImportProgramSheet({ onClose }: Props) {
 
             <div className="t-eyebrow" style={{ marginBottom: 6, fontSize: 10 }}>START DATE</div>
             <div style={{ marginBottom: 16 }}>
-              <DateField value={startDate} onChange={iso => iso && setStartDate(iso)} />
+              <DateField value={startDate} onChange={setStartDate} />
             </div>
 
             <div style={{
@@ -354,7 +354,7 @@ export function ImportProgramSheet({ onClose }: Props) {
             }}>
               <div>
                 <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 3 }}>PROGRAM END DATE</div>
-                <div className="t-mono" style={{ fontSize: 14, fontWeight: 600 }}>{formatDate(endDate)}</div>
+                <div className="t-mono" style={{ fontSize: 14, fontWeight: 600 }}>{endDate ? formatDate(endDate) : 'DD/MM/YYYY'}</div>
               </div>
               <div className="t-mono" style={{ fontSize: 11, color: 'var(--muted)' }}>
                 {program.totalWeeks} WEEKS
