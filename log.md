@@ -1,8 +1,41 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-20 (รอบ 63 — ✅ SHIPPED: จำกัดสิทธิ์ปุ่ม Edit โปรแกรมตาม role)
+> อัปเดตล่าสุด: 2026-10-20 (รอบ 64 — ✅ SHIPPED: Home เลือกโปรแกรมตามช่วงวัน + หน้า Programs จัดกลุ่มตาม status + ล้าง START DATE ได้)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-10-20 — รอบ 64 (✅ SHIPPED, deploy main): Home เลือกโปรแกรมตามช่วงวัน + Programs จัดกลุ่มตาม status
+
+บั๊กที่เจอ: ตั้ง 12 Weeks SBD Peaking เริ่ม 26/10 ทั้งที่วันนี้ 20/10 แล้ว Hybrid (END 26/10) ยังเล่นอยู่ → Home ขึ้น 12 Weeks เพราะ `pickCurrentProgramId` ดูแค่ `activatedAt`/เล่นล่าสุด (setConfig stamp `activatedAt = now` จึงแซงตัวที่เล่นอยู่) และ `scheduledWeekNum` บีบ ≥ W1 ก่อนถึงวันเริ่ม ·
+commit `b6a9cd6` (หลัก) · `2322cb3` (ล้าง START DATE ในฟอร์ม)
+
+### ทำอะไร
+
+- **สถานะตามวัน** (`lib/programStatus.ts`) — `programDateState(config, now)` → `upcoming | running | over` (endDate เป็น "วันถัดจากวันสุดท้าย" = `programEndDate` → 26/10 สลับพอดี · `startDate` ว่าง = running) · `daysUntilStart` ·
+  `ProgramStatus` เพิ่ม `ended` (เลย endDate + ทำไม่ครบ) · **ไม่มี status `upcoming`** — ยังไม่ถึงวันเริ่มถือเป็น `active` · `getProgramStatus(…, now)` · completed/paused ชนะสถานะวัน
+- **Home** — `pickHomeProgram` แทน `pickCurrentProgramId`: ① โปรแกรมที่ช่วงวันครอบวันนี้ (รวม paused) → เล่นล่าสุดชนะ, เท่ากัน → startDate ใหม่กว่า ② ไม่มี → **การ์ด UPCOMING PROGRAM** นับถอยหลังของตัวที่เริ่มใกล้สุด (`DashboardPage.tsx`) ③ ไม่มี → ตัวที่เลย endDate แต่ยังไม่ครบ (คนทำช้ายังเห็นโปรแกรม; รอบ 38) · upcoming ชนะ overdue กันโปรแกรมที่เลิกเล่นบังคิว
+- **Programs** (`ProgramsPage.tsx`) — รวม STRUCTURED + MY PROGRAMS เป็นลิสต์เดียวจัดกลุ่ม `groupProgramsByStatus`: **ACTIVE → PAUSED → ENDED → COMPLETED → NOT STARTED** (กลุ่มว่างไม่แสดง) ·
+  ใน ACTIVE: ตัวที่เล่นอยู่ก่อน (ซ้อมล่าสุด) แล้วตัวที่ยังไม่ถึงวันเริ่ม (เริ่มใกล้สุดก่อน) · การ์ดตัวที่ยังไม่เริ่มเขียน "เริ่ม DD/MM/YYYY · อีก N วัน" · แถบสีซ้ายตาม status (`statusStripe` = สีเดียวกับป้าย) · การ์ด built-in เพิ่มป้าย `BUILT-IN` · ปุ่มพักกดได้ใน active/paused/ended
+- **ล้าง START DATE** (`2322cb3`, `ProgramSetupSheet.tsx` + `ImportProgramSheet.tsx`) — กด clear แล้วล้างทั้ง START DATE และ PROGRAM END DATE ในฟอร์ม · ปุ่ม Start/Restart กดไม่ได้จนกว่าจะเลือกวันใหม่ (กันไม่ให้ `startDate` ว่างลง config)
+
+### ผลกระทบ (จัดการแล้ว)
+
+เทสต์เดิมที่ใช้ config ปี 2026-01 แล้วคาด `active` ต้องส่ง `now` คงที่ · PHASE `Deload` สี/ป้ายอื่น ๆ ไม่เกี่ยว · สถานะคำนวณจากวันที่ตอน render ไม่เก็บ → ไม่ migrate, ไม่แตะ Supabase
+
+### verify
+
+`pnpm build` ผ่าน · ESLint ผ่าน · `pnpm test` 252 ผ่าน (ใหม่ใน `programStatus.test.ts`: date state / status ตามวัน / `pickHomeProgram` กรณีเจ้าของเป๊ะ — 20/10 → Hybrid, 26/10 → 12 Weeks / countdown / overdue fallback / overlap / paused / `groupProgramsByStatus` ลำดับ) ·
+e2e 390px (Playwright, seed ผ่าน `setState`): Home ขึ้นตัวที่กำลังเล่นแม้ตัวอื่น activate ทีหลัง · เอาตัวที่เล่นออก → การ์ด countdown "6 วันก่อนเริ่ม" · ล้าง START DATE ใน Setup sheet → ทั้งสองช่อง `DD/MM/YYYY`, ปุ่ม disabled, เลือกใหม่ → END DATE คำนวณถูก ·
+⚠️ ยังไม่ได้ดูหน้า Programs แบบจัดกลุ่มใหม่ทั้งหมด (หลังรวมสองส่วน/แถบสี/กลุ่ม PAUSED) ด้วยตาเองใน e2e · ยังไม่ได้ทดสอบ `ImportProgramSheet` (ต้องอัปโหลด Excel) และโหมด Restart
+
+### ไม่ทำรอบนี้
+
+- ช่อง SESSION DATE ใน `FinishReview.tsx:133` — กด clear แล้ววันที่ว่าง + ขึ้น "บันทึกย้อนหลัง" ทั้งที่บันทึกเป็นวันนี้ (store ตกไปใช้เวลาปัจจุบัน) ยังไม่แก้ → แก้ได้ด้วย `iso || today` เหมือนช่องอื่น
+- แถบ progress ในการ์ดยังสีเดิม (ไม่ตามสถานะ)
+- ใช้ `endDate` ที่เก็บใน config — ถ้าผู้ใช้เคยตั้งผิด สถานะ ENDED จะผิดตาม
+- ล้างวันที่ของโปรแกรมที่เริ่มไปแล้วยังทำไม่ได้ (ล้างได้เฉพาะในฟอร์มตั้งค่า/Restart)
 
 ---
 
