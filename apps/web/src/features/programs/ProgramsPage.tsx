@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, useMemo, type CSSProperties } from 'react'
+import { Fragment, useState, useEffect, useCallback, useMemo, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { Program } from '@atlaslog/shared'
+import type { Program, StructuredProgram } from '@atlaslog/shared'
 import { useAppStore } from '../../store/useAppStore.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
-import { programVolume } from '../../lib/utils.js'
+import { programVolume, formatDMY } from '../../lib/utils.js'
 import { canEditProgram } from '../../lib/programPermissions.js'
 import { PROGRAMS } from '../../lib/data.js'
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
@@ -12,7 +12,8 @@ import { ImportProgramSheet } from './ImportProgramSheet.js'
 import { useStartWorkout } from '../../hooks/useStartWorkout.js'
 import { createShare, importShare, listPublicPrograms, type PublicProgram } from '../../lib/shareApi.js'
 import {
-  programProgress, reachedWeekNum, hasStarted as programHasStarted, getProgramStatus, sortPrograms,
+  programProgress, reachedWeekNum, hasStarted as programHasStarted, groupProgramsByStatus, daysUntilStart,
+  programDateState,
   PROGRAM_STATUS_STYLE, type ProgramStatus,
 } from '../../lib/programStatus.js'
 import {
@@ -45,6 +46,17 @@ function StatusPill({ status }: { status: ProgramStatus }) {
   )
 }
 
+const GROUP_EYEBROW: CSSProperties = { fontSize: 9, color: 'var(--muted)', margin: '2px 0 -2px' }
+
+function statusStripe(status: ProgramStatus): string {
+  return status === 'not_setup' ? 'var(--border-strong)' : PROGRAM_STATUS_STYLE[status].color
+}
+
+function startsLabel(startDate: string): string {
+  const days = daysUntilStart(startDate)
+  return `เริ่ม ${formatDMY(startDate)} · ${days === 1 ? 'พรุ่งนี้' : `อีก ${days} วัน`}`
+}
+
 function FavoriteButton({ programId, on, onToggle }: { programId: string; on: boolean; onToggle: (id: string) => void }) {
   return (
     <button
@@ -61,7 +73,7 @@ function FavoriteButton({ programId, on, onToggle }: { programId: string; on: bo
 function PauseButton({ programId, status, onSetPaused }: {
   programId: string; status: ProgramStatus; onSetPaused: (id: string, paused: boolean) => void
 }) {
-  if (status !== 'active' && status !== 'paused') return null
+  if (status !== 'active' && status !== 'paused' && status !== 'ended') return null
   const paused = status === 'paused'
   return (
     <button
@@ -86,11 +98,12 @@ export function ProgramsPage() {
   const canCreate = isCoach || isAdmin
   const [showImport, setShowImport] = useState(false)
 
-  // Favourites first, then most recently trained / edited / set up
-  const myPrograms = useMemo(
-    () => sortPrograms(customPrograms, programMeta, history),
-    [customPrograms, programMeta, history],
+  // Grouped by status (ACTIVE first), each group favourites → recency → name.
+  // `now` is read at render, so a program flips to ACTIVE on its start date.
+  const groups = groupProgramsByStatus(
+    [...STRUCTURED_PROGRAMS, ...customPrograms], configs, programMeta, progress, history,
   )
+  const customIds = useMemo(() => new Set(customPrograms.map(p => p.id)), [customPrograms])
 
   const handleDelete = (sp: typeof customPrograms[number]) => {
     if (!confirm(`ลบโปรแกรม "${sp.name}"?\nความคืบหน้าและการตั้งค่าของโปรแกรมนี้จะหายถาวร`)) return
@@ -161,6 +174,194 @@ export function ProgramsPage() {
     if (shareCode) void navigator.clipboard.writeText(shareCode).catch(() => {})
   }
 
+  // Set up but not yet started: still ACTIVE, the line under the name says when
+  const queuedLabel = (id: string) => {
+    const config = configs[id]
+    return config && programDateState(config) === 'upcoming' ? startsLabel(config.startDate) : null
+  }
+
+  const renderBuiltIn = (sp: StructuredProgram, status: ProgramStatus) => {
+    const { settledPct } = programProgress(sp, progress)
+    const started = programHasStarted(sp, progress)
+    const weekNum = Math.max(reachedWeekNum(sp, progress), 1)
+
+    // Phase of the week actually reached, not of the last one finished
+    const currentWeek = sp.weeks[weekNum - 1] ?? sp.weeks[sp.totalWeeks - 1]
+    const phaseColor = PHASE_COLOR[currentWeek.phase]
+
+    return (
+      <div key={sp.id}
+        role="button"
+        tabIndex={0}
+        onClick={() => navigate(`/programs/${sp.id}`)}
+        onKeyDown={e => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            navigate(`/programs/${sp.id}`)
+          }
+        }}
+        style={{ cursor: 'pointer', display: 'block', width: '100%' }}>
+        <div className="card" style={{ position: 'relative', overflow: 'hidden' }}>
+          {/* Stripe follows the status, same colour as its pill */}
+          <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0,
+            width: 3, background: statusStripe(status) }} />
+          <div style={{ paddingLeft: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start',
+              justifyContent: 'space-between', marginBottom: 8 }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700,
+                    fontSize: 20, letterSpacing: '-0.02em' }}>
+                    {sp.name}
+                  </div>
+                  <span className="pill" style={{ fontSize: 8 }}>BUILT-IN</span>
+                  <StatusPill status={status} />
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-2)' }}>{sp.focus}</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                <FavoriteButton programId={sp.id} on={!!programMeta[sp.id]?.favorite} onToggle={toggleFavorite} />
+                <PauseButton programId={sp.id} status={status} onSetPaused={setProgramPaused} />
+                <IconChevronRight size={18} style={{ color: 'var(--muted)' }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+              {[`${sp.totalWeeks}W`, `${sp.daysPerWeek} DAYS/WK`].map(tag => (
+                <span key={tag} className="pill" style={{ fontSize: 9 }}>{tag}</span>
+              ))}
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600,
+                color: phaseColor, textTransform: 'uppercase', letterSpacing: '0.06em',
+                display: 'flex', alignItems: 'center' }}>
+                {currentWeek.phase}
+              </span>
+            </div>
+
+            {/* Progress bar */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
+                  {queuedLabel(sp.id) ?? (started ? `Week ${weekNum}/${sp.totalWeeks}` : 'Not started')}
+                </span>
+                {started && (
+                  <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
+                    {settledPct}%
+                  </span>
+                )}
+              </div>
+              <div style={{ height: 4, background: 'var(--surface-2)', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${settledPct}%`, background: 'var(--accent)',
+                  borderRadius: 2, transition: 'width .4s ease' }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const renderCustom = (sp: StructuredProgram, status: ProgramStatus) => {
+    const { settledPct } = programProgress(sp, progress)
+    const started = programHasStarted(sp, progress)
+    const weekNum = Math.max(reachedWeekNum(sp, progress), 1)
+
+    return (
+      <div key={sp.id} style={{ position: 'relative' }}>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => navigate(`/programs/${sp.id}`)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              navigate(`/programs/${sp.id}`)
+            }
+          }}
+          style={{ cursor: 'pointer', display: 'block', width: '100%' }}>
+          <div className="card" style={{ position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0,
+              width: 3, background: statusStripe(status) }} />
+            <div style={{ paddingLeft: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start',
+                justifyContent: 'space-between', marginBottom: 8 }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700,
+                      fontSize: 18, letterSpacing: '-0.02em' }}>
+                      {sp.name}
+                    </div>
+                    <span className="pill" style={{ fontSize: 8, background: 'rgba(167,139,250,0.15)',
+                      borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }}>
+                      {sp.source === 'coach' ? 'FROM COACH' : sp.source === 'manual' ? 'CUSTOM' : 'EXCEL'}
+                    </span>
+                    <StatusPill status={status} />
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-2)' }}>{sp.focus}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                  <FavoriteButton programId={sp.id} on={!!programMeta[sp.id]?.favorite} onToggle={toggleFavorite} />
+                  <PauseButton programId={sp.id} status={status} onSetPaused={setProgramPaused} />
+                  {sp.source !== 'coach' && canEditProgram(true, { isAdmin, isCoach }) && (
+                    <button
+                      onClick={e => { e.stopPropagation(); navigate(`/programs/${sp.id}/edit`) }}
+                      style={CARD_BTN}
+                      aria-label="Edit program"
+                    >
+                      <IconEdit size={14} />
+                    </button>
+                  )}
+                  <button
+                    onClick={e => { e.stopPropagation(); void handleShare(sp) }}
+                    disabled={sharing}
+                    style={CARD_BTN}
+                    aria-label="Share program"
+                  >
+                    <IconShare size={14} />
+                  </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); handleDelete(sp) }}
+                    style={CARD_BTN}
+                    aria-label="Remove program"
+                  >
+                    <IconTrash size={14} />
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+                {(sp.weekly
+                  ? ['WEEKLY', `${sp.daysPerWeek} DAYS/WK`]
+                  : [`${sp.totalWeeks}W`, `${sp.daysPerWeek} DAYS/WK`]
+                ).map(tag => (
+                  <span key={tag} className="pill" style={{ fontSize: 9 }}>{tag}</span>
+                ))}
+              </div>
+
+              {!sp.weekly && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                  <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
+                    {queuedLabel(sp.id) ?? (started ? `Week ${weekNum}/${sp.totalWeeks}` : 'Not started')}
+                  </span>
+                  {started && (
+                    <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
+                      {settledPct}%
+                    </span>
+                  )}
+                </div>
+                <div style={{ height: 4, background: 'var(--surface-2)', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${settledPct}%`, background: '#a78bfa',
+                    borderRadius: 2, transition: 'width .4s ease' }} />
+                </div>
+              </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="atlas-screen screen-enter">
       <div className="scr-header">
@@ -186,202 +387,19 @@ export function ProgramsPage() {
         </div>
       </div>
 
-      {/* ── Structured Programs ─────────────────────────────── */}
+      {/* ── Programs, grouped by status (ACTIVE first) ───────── */}
       <div style={{ padding: '0 20px', marginBottom: 28 }}>
-        <div className="t-eyebrow" style={{ marginBottom: 12 }}>STRUCTURED PROGRAMS</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {sortPrograms(STRUCTURED_PROGRAMS, programMeta, history).map(sp => {
-            const { settledPct } = programProgress(sp, progress)
-            const started = programHasStarted(sp, progress)
-            const weekNum = Math.max(reachedWeekNum(sp, progress), 1)
-            const status = getProgramStatus(sp, configs[sp.id], programMeta[sp.id], progress)
-
-            // Phase of the week actually reached, not of the last one finished
-            const currentWeek = sp.weeks[weekNum - 1] ?? sp.weeks[sp.totalWeeks - 1]
-            const phaseColor = PHASE_COLOR[currentWeek.phase]
-
-            return (
-              <div key={sp.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => navigate(`/programs/${sp.id}`)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    navigate(`/programs/${sp.id}`)
-                  }
-                }}
-                style={{ cursor: 'pointer', display: 'block', width: '100%' }}>
-                <div className="card" style={{ position: 'relative', overflow: 'hidden' }}>
-                  {/* Accent stripe */}
-                  <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0,
-                    width: 3, background: 'var(--accent)' }} />
-                  <div style={{ paddingLeft: 12 }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start',
-                      justifyContent: 'space-between', marginBottom: 8 }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
-                          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700,
-                            fontSize: 20, letterSpacing: '-0.02em' }}>
-                            {sp.name}
-                          </div>
-                          <StatusPill status={status} />
-                        </div>
-                        <div style={{ fontSize: 12, color: 'var(--text-2)' }}>{sp.focus}</div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-                        <FavoriteButton programId={sp.id} on={!!programMeta[sp.id]?.favorite} onToggle={toggleFavorite} />
-                        <PauseButton programId={sp.id} status={status} onSetPaused={setProgramPaused} />
-                        <IconChevronRight size={18} style={{ color: 'var(--muted)' }} />
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-                      {[`${sp.totalWeeks}W`, `${sp.daysPerWeek} DAYS/WK`].map(tag => (
-                        <span key={tag} className="pill" style={{ fontSize: 9 }}>{tag}</span>
-                      ))}
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600,
-                        color: phaseColor, textTransform: 'uppercase', letterSpacing: '0.06em',
-                        display: 'flex', alignItems: 'center' }}>
-                        {currentWeek.phase}
-                      </span>
-                    </div>
-
-                    {/* Progress bar */}
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                        <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
-                          {started ? `Week ${weekNum}/${sp.totalWeeks}` : 'Not started'}
-                        </span>
-                        {started && (
-                          <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
-                            {settledPct}%
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ height: 4, background: 'var(--surface-2)', borderRadius: 2, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${settledPct}%`, background: 'var(--accent)',
-                          borderRadius: 2, transition: 'width .4s ease' }} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
+          {groups.map(group => (
+            <Fragment key={group.key}>
+              <div className="t-eyebrow" style={GROUP_EYEBROW}>{group.label}</div>
+              {group.items.map(({ program: sp, status }) =>
+                customIds.has(sp.id) ? renderCustom(sp, status) : renderBuiltIn(sp, status))}
+            </Fragment>
+          ))}
         </div>
       </div>
 
-      {/* ── Custom Imported Programs ─────────────────────── */}
-      {customPrograms.length > 0 && (
-        <div style={{ padding: '0 20px', marginBottom: 28 }}>
-          <div className="t-eyebrow" style={{ marginBottom: 12 }}>MY PROGRAMS</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {myPrograms.map(sp => {
-              const { settledPct } = programProgress(sp, progress)
-              const started = programHasStarted(sp, progress)
-              const weekNum = Math.max(reachedWeekNum(sp, progress), 1)
-              const status = getProgramStatus(sp, configs[sp.id], programMeta[sp.id], progress)
-
-              return (
-                <div key={sp.id} style={{ position: 'relative' }}>
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => navigate(`/programs/${sp.id}`)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        navigate(`/programs/${sp.id}`)
-                      }
-                    }}
-                    style={{ cursor: 'pointer', display: 'block', width: '100%' }}>
-                    <div className="card" style={{ position: 'relative', overflow: 'hidden' }}>
-                      <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0,
-                        width: 3, background: '#a78bfa' }} />
-                      <div style={{ paddingLeft: 12 }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start',
-                          justifyContent: 'space-between', marginBottom: 8 }}>
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
-                              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700,
-                                fontSize: 18, letterSpacing: '-0.02em' }}>
-                                {sp.name}
-                              </div>
-                              <span className="pill" style={{ fontSize: 8, background: 'rgba(167,139,250,0.15)',
-                                borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }}>
-                                {sp.source === 'coach' ? 'FROM COACH' : sp.source === 'manual' ? 'CUSTOM' : 'EXCEL'}
-                              </span>
-                              <StatusPill status={status} />
-                            </div>
-                            <div style={{ fontSize: 12, color: 'var(--text-2)' }}>{sp.focus}</div>
-                          </div>
-                          <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
-                            <FavoriteButton programId={sp.id} on={!!programMeta[sp.id]?.favorite} onToggle={toggleFavorite} />
-                            <PauseButton programId={sp.id} status={status} onSetPaused={setProgramPaused} />
-                            {sp.source !== 'coach' && canEditProgram(true, { isAdmin, isCoach }) && (
-                              <button
-                                onClick={e => { e.stopPropagation(); navigate(`/programs/${sp.id}/edit`) }}
-                                style={CARD_BTN}
-                                aria-label="Edit program"
-                              >
-                                <IconEdit size={14} />
-                              </button>
-                            )}
-                            <button
-                              onClick={e => { e.stopPropagation(); void handleShare(sp) }}
-                              disabled={sharing}
-                              style={CARD_BTN}
-                              aria-label="Share program"
-                            >
-                              <IconShare size={14} />
-                            </button>
-                            <button
-                              onClick={e => { e.stopPropagation(); handleDelete(sp) }}
-                              style={CARD_BTN}
-                              aria-label="Remove program"
-                            >
-                              <IconTrash size={14} />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-                          {(sp.weekly
-                            ? ['WEEKLY', `${sp.daysPerWeek} DAYS/WK`]
-                            : [`${sp.totalWeeks}W`, `${sp.daysPerWeek} DAYS/WK`]
-                          ).map(tag => (
-                            <span key={tag} className="pill" style={{ fontSize: 9 }}>{tag}</span>
-                          ))}
-                        </div>
-
-                        {!sp.weekly && (
-                        <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                            <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
-                              {started ? `Week ${weekNum}/${sp.totalWeeks}` : 'Not started'}
-                            </span>
-                            {started && (
-                              <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
-                                {settledPct}%
-                              </span>
-                            )}
-                          </div>
-                          <div style={{ height: 4, background: 'var(--surface-2)', borderRadius: 2, overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${settledPct}%`, background: '#a78bfa',
-                              borderRadius: 2, transition: 'width .4s ease' }} />
-                          </div>
-                        </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
 
       {/* ── Public Programs (Discover) ───────────────────────── */}
       {publicPrograms.length > 0 && (

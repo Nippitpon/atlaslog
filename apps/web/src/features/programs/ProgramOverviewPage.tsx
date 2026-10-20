@@ -75,7 +75,7 @@ export function ProgramOverviewPage() {
             >
               <IconStar size={18} fill={meta?.favorite ? 'currentColor' : 'none'} />
             </button>
-            {(status === 'active' || status === 'paused') && (
+            {(status === 'active' || status === 'paused' || status === 'ended') && (
               <button
                 className="btn-icon"
                 onClick={() => setProgramPaused(program.id, status !== 'paused')}

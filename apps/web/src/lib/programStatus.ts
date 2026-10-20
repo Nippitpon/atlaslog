@@ -4,7 +4,33 @@ import type {
 } from '@atlaslog/shared'
 import { dateFromYMD } from './utils.js'
 
-export type ProgramStatus = 'not_setup' | 'active' | 'paused' | 'completed'
+export type ProgramStatus = 'not_setup' | 'active' | 'paused' | 'ended' | 'completed'
+
+export type ProgramDateState = 'upcoming' | 'running' | 'over'
+
+// Where today sits against the plan's own dates. endDate is the day AFTER the last
+// training day (programEndDate = start + weeks × 7), so a program ending on the
+// 26th hands over to one starting on the 26th. A missing or unparseable startDate
+// reads as running — configs saved before dates mattered must not vanish.
+export function programDateState(config: ProgramConfig, now: Date = new Date()): ProgramDateState {
+  if (!config.startDate) return 'running'
+  const start = dateFromYMD(config.startDate)
+  if (Number.isNaN(start.getTime())) return 'running'
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  if (today < start) return 'upcoming'
+  if (config.endDate) {
+    const end = dateFromYMD(config.endDate)
+    if (!Number.isNaN(end.getTime()) && today >= end) return 'over'
+  }
+  return 'running'
+}
+
+// Whole calendar days from today to startDate (0 = starts today). Rounded, not
+// floored: a DST change makes a local-midnight difference 23 or 25 hours.
+export function daysUntilStart(startDate: string, now: Date = new Date()): number {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  return Math.round((dateFromYMD(startDate).getTime() - today.getTime()) / 86400000)
+}
 
 // Every day accounted for — trained, or explicitly skipped by the user. Derived
 // from the program's own day list, not the recorded keys (`every(s => s ===
@@ -168,12 +194,18 @@ export function getProgramStatus(
   config: ProgramConfig | null | undefined,
   meta: ProgramMeta | undefined,
   progress: ProgramProgressState,
+  now: Date = new Date(),
 ): ProgramStatus {
   if (isProgramComplete(program, progress)) return 'completed'
   if (meta?.paused) return 'paused'
+  if (config) {
+    // A start date still ahead is not a status of its own: the plan is set up, so it
+    // sits with the active ones (Home's countdown is driven by programDateState).
+    return programDateState(config, now) === 'over' ? 'ended' : 'active'
+  }
   // Weekly routines never get a config (useProgramStore drops it), so they only
   // read as active once something has actually been logged against them.
-  if (config || (program.weekly && hasStarted(program, progress))) return 'active'
+  if (program.weekly && hasStarted(program, progress)) return 'active'
   return 'not_setup'
 }
 
@@ -226,37 +258,117 @@ export function sortPrograms(
   })
 }
 
-// Pick the program the Dashboard should show. Deliberately includes paused
-// programs: pausing must not silently promote a different program — the user
-// sees a "paused" card until they set up a new one (which stamps activatedAt).
-export function pickCurrentProgramId(
+export type HomePick =
+  | { kind: 'current'; id: string }
+  | { kind: 'upcoming'; id: string; startDate: string; daysUntil: number }
+
+// Pick what Home shows, dates first:
+//   1. a program whose dates cover today — the one trained/activated most recently
+//      wins when several overlap (paused ones stay in the running: pausing must not
+//      silently promote a different program, the user sees the "paused" card);
+//   2. otherwise the nearest upcoming one, as a countdown;
+//   3. otherwise a program past its endDate that was never finished, so someone
+//      running behind still finds their plan (log.md round 38).
+// An upcoming program outranks an overdue one so an abandoned plan can't hold the
+// slot forever. Setting a program up stamps activatedAt, which is why activity
+// alone can't decide: it put a program starting next week ahead of the running one.
+export function pickHomeProgram(
   programs: StructuredProgram[],
   configs: { [programId: string]: ProgramConfig },
   metas: ProgramMetaState,
   progress: ProgramProgressState,
   history: Session[],
-): string | null {
+  now: Date = new Date(),
+): HomePick | null {
   // Config-only, matching the Dashboard's existing scope — weekly routines have
   // no config and still can't drive the current-week card (see log.md round 24).
-  const candidates = programs.filter(p => {
-    if (!configs[p.id]) return false
-    return !isProgramComplete(p, progress)
-  })
-  if (!candidates.length) return null
+  const open = programs.filter(p => configs[p.id] && !isProgramComplete(p, progress))
+  if (!open.length) return null
 
-  const active = candidates
-    .map(p => ({ p, at: programActivity(p.id, metas[p.id], history) }))
-    .filter(x => x.at > 0)
-  if (active.length) {
-    return active.reduce((best, x) => (x.at > best.at ? x : best)).p.id
+  const inState = (state: ProgramDateState) =>
+    open.filter(p => programDateState(configs[p.id]!, now) === state)
+  const order = Object.keys(configs)
+  // Most recently trained/activated, then latest startDate, then the old
+  // insertion order so users with neither a session nor activatedAt don't shift.
+  const newest = (list: StructuredProgram[]) => [...list].sort((a, b) =>
+    programActivity(b.id, metas[b.id], history) - programActivity(a.id, metas[a.id], history)
+    || configs[b.id]!.startDate.localeCompare(configs[a.id]!.startDate)
+    || order.indexOf(a.id) - order.indexOf(b.id),
+  )[0]!
+
+  const running = inState('running')
+  if (running.length) return { kind: 'current', id: newest(running).id }
+
+  const upcoming = inState('upcoming')
+  if (upcoming.length) {
+    const next = [...upcoming].sort((a, b) =>
+      configs[a.id]!.startDate.localeCompare(configs[b.id]!.startDate)
+      || order.indexOf(a.id) - order.indexOf(b.id),
+    )[0]!
+    const startDate = configs[next.id]!.startDate
+    return { kind: 'upcoming', id: next.id, startDate, daysUntil: daysUntilStart(startDate, now) }
   }
-  // Pre-existing users have neither a session nor activatedAt — keep the old
-  // behaviour (first configured program in insertion order) so nothing shifts.
-  for (const programId of Object.keys(configs)) {
-    const found = candidates.find(p => p.id === programId)
-    if (found) return found.id
+
+  const over = inState('over')
+  if (over.length) return { kind: 'current', id: newest(over).id }
+  return null
+}
+
+export type ProgramGroupKey = 'active' | 'paused' | 'ended' | 'completed' | 'not_started'
+
+export const PROGRAM_GROUP_LABEL: Record<ProgramGroupKey, string> = {
+  active: 'ACTIVE',
+  paused: 'PAUSED',
+  ended: 'ENDED',
+  completed: 'COMPLETED',
+  not_started: 'NOT STARTED',
+}
+
+export interface ProgramGroup {
+  key: ProgramGroupKey
+  label: string
+  items: { program: StructuredProgram; status: ProgramStatus }[]
+}
+
+const GROUP_OF: Record<ProgramStatus, ProgramGroupKey> = {
+  active: 'active', paused: 'paused',
+  ended: 'ended', completed: 'completed', not_setup: 'not_started',
+}
+
+// Programs page order: ACTIVE → PAUSED → ENDED → COMPLETED → NOT STARTED. Empty
+// groups are dropped. Inside a group the usual order (favourites, then recency,
+// then name) holds, except ACTIVE: programs already running lead (most recently
+// trained first), then the ones whose start date is still ahead, soonest first.
+// Without that, a plan set up for next week (fresh activatedAt) would sit above
+// the one being trained.
+export function groupProgramsByStatus(
+  programs: StructuredProgram[],
+  configs: { [programId: string]: ProgramConfig },
+  metas: ProgramMetaState,
+  progress: ProgramProgressState,
+  history: Session[],
+  now: Date = new Date(),
+): ProgramGroup[] {
+  const groups = (Object.keys(PROGRAM_GROUP_LABEL) as ProgramGroupKey[])
+    .map((key): ProgramGroup => ({ key, label: PROGRAM_GROUP_LABEL[key], items: [] }))
+  const byKey = new Map(groups.map(g => [g.key, g]))
+  for (const program of sortPrograms(programs, metas, history)) {
+    const status = getProgramStatus(program, configs[program.id], metas[program.id], progress, now)
+    byKey.get(GROUP_OF[status])!.items.push({ program, status })
   }
-  return candidates[0]!.id
+  const queued = (id: string) => {
+    const config = configs[id]
+    return !!config && programDateState(config, now) === 'upcoming'
+  }
+  byKey.get('active')!.items.sort((a, b) => {
+    const qa = queued(a.program.id)
+    const qb = queued(b.program.id)
+    if (qa !== qb) return qa ? 1 : -1
+    if (qa) return configs[a.program.id]!.startDate.localeCompare(configs[b.program.id]!.startDate)
+    return programActivity(b.program.id, metas[b.program.id], history)
+      - programActivity(a.program.id, metas[a.program.id], history)
+  })
+  return groups.filter(g => g.items.length > 0)
 }
 
 // Where the plan's dates say you should be. Local midnight on both sides —
@@ -458,4 +570,5 @@ export const PROGRAM_STATUS_STYLE: Record<
   active:    { label: 'ACTIVE',    color: 'var(--status-active)', bg: 'rgba(58,170,255,0.15)', border: 'rgba(58,170,255,0.4)' },
   paused:    { label: 'PAUSED',    color: '#f59e0b',              bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.4)' },
   completed: { label: 'COMPLETED', color: 'var(--status-done)',   bg: 'rgba(74,222,128,0.15)', border: 'rgba(74,222,128,0.4)' },
+  ended:     { label: 'ENDED',     color: 'var(--text-2)',        bg: 'var(--surface-2)',      border: 'var(--border-strong)' },
 }

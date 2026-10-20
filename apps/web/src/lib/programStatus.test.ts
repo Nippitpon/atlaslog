@@ -3,6 +3,7 @@ import type { DayStatus, ProgramProgressState, StructuredProgram } from '@atlasl
 import {
   dayRef, resolveDayRef, doneDaysInWeek, settledDaysInWeek, remainingDays, programProgress,
   reachedWeekNum, isWeekDone, weekStatus, getProgramStatus, isProgramComplete, dayDate, isDayPast,
+  programDateState, daysUntilStart, pickHomeProgram, groupProgramsByStatus,
 } from './programStatus.js'
 import { makeRunProgram, RUN_PROGRAM_ID, RUN_WEEK_ID, RUN_DAY_ID, MIXED_DAY_ID } from '../test/fixtures.js'
 
@@ -299,6 +300,140 @@ describe('isProgramComplete', () => {
   it('drives the completed status, and does not fire before the work is done', () => {
     const program = make3WeekProgram()
     expect(getProgramStatus(program, CONFIG, undefined, settledEverywhere)).toBe('completed')
-    expect(getProgramStatus(program, CONFIG, undefined, {})).toBe('active')
+    expect(getProgramStatus(program, CONFIG, undefined, {}, new Date(2026, 0, 10))).toBe('active')
+  })
+})
+
+const cfg = (startDate: string, endDate: string) =>
+  ({ startDate, endDate, oneRMs: { squat: 1, bench: 1, deadlift: 1 } })
+const prog = (id: string): StructuredProgram => ({ ...make3WeekProgram(), id, name: id })
+const progressFor = (id: string, weeks: Record<string, Record<string, DayStatus>>): ProgramProgressState =>
+  ({ [id]: weeks })
+const day = (y: number, m: number, d: number) => new Date(y, m - 1, d, 15, 30)
+
+describe('programDateState / getProgramStatus by date', () => {
+  const c = cfg('2026-10-26', '2027-01-18')
+
+  it('reads upcoming before the start date, running on it, over on endDate', () => {
+    expect(programDateState(c, day(2026, 10, 25))).toBe('upcoming')
+    expect(programDateState(c, day(2026, 10, 26))).toBe('running')
+    expect(programDateState(c, day(2027, 1, 17))).toBe('running')
+    expect(programDateState(c, day(2027, 1, 18))).toBe('over')
+  })
+
+  it('treats a missing startDate as running so old configs do not vanish', () => {
+    expect(programDateState(cfg('', ''), day(2026, 10, 20))).toBe('running')
+  })
+
+  it('maps to active (a future start included) / ended, with paused and completed taking priority', () => {
+    const p = prog('a')
+    expect(getProgramStatus(p, c, undefined, {}, day(2026, 10, 20))).toBe('active')
+    expect(getProgramStatus(p, c, undefined, {}, day(2026, 11, 2))).toBe('active')
+    expect(getProgramStatus(p, c, undefined, {}, day(2027, 2, 1))).toBe('ended')
+    expect(getProgramStatus(p, c, { paused: true }, {}, day(2026, 10, 20))).toBe('paused')
+    const done = progressFor('a', {
+      w1: { d1: 'done', d2: 'done' }, w2: { d1: 'done', d2: 'done' }, w3: { d1: 'done', d2: 'done' },
+    })
+    expect(getProgramStatus(p, c, undefined, done, day(2027, 2, 1))).toBe('completed')
+  })
+
+  it('counts whole days to the start, 1 meaning tomorrow', () => {
+    expect(daysUntilStart('2026-10-26', day(2026, 10, 20))).toBe(6)
+    expect(daysUntilStart('2026-10-26', day(2026, 10, 25))).toBe(1)
+  })
+})
+
+describe('pickHomeProgram', () => {
+  // The reported case: Hybrid runs until 26/10, 12 Weeks was just set up to start 26/10
+  const hybrid = prog('hybrid')
+  const twelve = prog('twelve')
+  const configs = {
+    hybrid: cfg('2026-08-03', '2026-10-26'),
+    twelve: cfg('2026-10-26', '2027-01-18'),
+  }
+  // twelve was set up AFTER hybrid's last session — activity alone would pick it
+  const metas = { twelve: { activatedAt: Date.parse('2026-10-19T10:00:00') }, hybrid: { activatedAt: Date.parse('2026-08-01T10:00:00') } }
+  const all = [hybrid, twelve]
+
+  it('keeps the running program while the new one has not started', () => {
+    expect(pickHomeProgram(all, configs, metas, {}, [], day(2026, 10, 20)))
+      .toEqual({ kind: 'current', id: 'hybrid' })
+  })
+
+  it('switches on the start date, which is also the previous endDate', () => {
+    expect(pickHomeProgram(all, configs, metas, {}, [], day(2026, 10, 26)))
+      .toEqual({ kind: 'current', id: 'twelve' })
+  })
+
+  it('counts down to the nearest upcoming program when nothing is running', () => {
+    const only = { twelve: configs.twelve }
+    expect(pickHomeProgram([twelve], only, metas, {}, [], day(2026, 10, 20)))
+      .toEqual({ kind: 'upcoming', id: 'twelve', startDate: '2026-10-26', daysUntil: 6 })
+    const two = { a: cfg('2026-11-09', '2027-02-01'), b: cfg('2026-10-26', '2027-01-18') }
+    expect(pickHomeProgram([prog('a'), prog('b')], two, {}, {}, [], day(2026, 10, 20)))
+      .toMatchObject({ kind: 'upcoming', id: 'b' })
+  })
+
+  it('falls back to an unfinished program past its endDate, but prefers an upcoming one', () => {
+    const late = { hybrid: configs.hybrid }
+    expect(pickHomeProgram([hybrid], late, {}, {}, [], day(2026, 11, 20)))
+      .toEqual({ kind: 'current', id: 'hybrid' })
+    expect(pickHomeProgram(all, configs, metas, {}, [], day(2026, 10, 27)))
+      .toEqual({ kind: 'current', id: 'twelve' })
+    const upcomingOnly = { hybrid: configs.hybrid, twelve: cfg('2026-12-01', '2027-02-23') }
+    expect(pickHomeProgram(all, upcomingOnly, {}, {}, [], day(2026, 11, 20)))
+      .toMatchObject({ kind: 'upcoming', id: 'twelve' })
+  })
+
+  it('skips finished programs and returns null when nothing qualifies', () => {
+    const done = progressFor('hybrid', {
+      w1: { d1: 'done', d2: 'done' }, w2: { d1: 'done', d2: 'done' }, w3: { d1: 'done', d2: 'done' },
+    })
+    expect(pickHomeProgram([hybrid], { hybrid: configs.hybrid }, {}, done, [], day(2026, 10, 20))).toBeNull()
+    expect(pickHomeProgram(all, {}, {}, {}, [], day(2026, 10, 20))).toBeNull()
+  })
+
+  it('lets the most recently activated win when dates overlap, then the later start', () => {
+    const a = cfg('2026-10-01', '2027-01-01')
+    const b = cfg('2026-10-10', '2027-01-10')
+    const x = [prog('a'), prog('b')]
+    expect(pickHomeProgram(x, { a, b }, { a: { activatedAt: 200 }, b: { activatedAt: 100 } }, {}, [], day(2026, 10, 20)))
+      .toEqual({ kind: 'current', id: 'a' })
+    expect(pickHomeProgram(x, { a, b }, {}, {}, [], day(2026, 10, 20)))
+      .toEqual({ kind: 'current', id: 'b' })
+  })
+
+  it('keeps a paused running program rather than promoting another', () => {
+    const pausedMetas = { hybrid: { paused: true, activatedAt: 1 }, twelve: { activatedAt: 2 } }
+    expect(pickHomeProgram(all, configs, pausedMetas, {}, [], day(2026, 10, 20)))
+      .toEqual({ kind: 'current', id: 'hybrid' })
+  })
+})
+
+describe('groupProgramsByStatus', () => {
+  it('orders groups ACTIVE, PAUSED, ENDED, COMPLETED, NOT STARTED and drops empty ones', () => {
+    const ps = ['n', 'e', 'u2', 'u1', 'a', 'p'].map(prog)
+    const configs = {
+      e: cfg('2026-01-05', '2026-03-30'),
+      u2: cfg('2026-12-01', '2027-02-23'),
+      u1: cfg('2026-11-02', '2027-01-25'),
+      a: cfg('2026-10-05', '2026-12-28'),
+      p: cfg('2026-10-05', '2026-12-28'),
+    }
+    const groups = groupProgramsByStatus(ps, configs, { p: { paused: true } }, {}, [], day(2026, 10, 20))
+    expect(groups.map(g => g.key)).toEqual(['active', 'paused', 'ended', 'not_started'])
+    // there is no UPCOMING group: queued programs sit in ACTIVE, after the running one,
+    // soonest start first — even though they were set up (activated) more recently
+    expect(groups[0]!.items.map(i => i.program.id)).toEqual(['a', 'u1', 'u2'])
+    expect(groups[0]!.items.every(i => i.status === 'active')).toBe(true)
+    expect(groups[1]!.items.map(i => [i.program.id, i.status])).toEqual([['p', 'paused']])
+    expect(groups[3]!.items.map(i => i.program.id)).toEqual(['n'])
+  })
+
+  it('keeps a queued program below the running one regardless of activatedAt', () => {
+    const configs = { run: cfg('2026-10-05', '2026-12-28'), next: cfg('2026-10-26', '2027-01-18') }
+    const metas = { run: { activatedAt: 1 }, next: { activatedAt: 999 } }
+    const groups = groupProgramsByStatus([prog('next'), prog('run')], configs, metas, {}, [], day(2026, 10, 20))
+    expect(groups[0]!.items.map(i => i.program.id)).toEqual(['run', 'next'])
   })
 })

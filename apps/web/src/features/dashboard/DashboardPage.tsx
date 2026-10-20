@@ -8,11 +8,11 @@ import { respondCoachRequest } from '../../lib/coachApi.js'
 import { STRUCTURED_PROGRAMS, buildDayProgram } from '../../lib/twelveWeekProgram.js'
 import { structuredWeight, resolveCalcRMs } from '../../lib/rpeTable.js'
 import { resolveDayExercises } from '../../lib/dayLayout.js'
-import { weeklyVolume, getDayOfWeek, runTarget, formatNum2 } from '../../lib/utils.js'
+import { weeklyVolume, getDayOfWeek, runTarget, formatNum2, formatDMY } from '../../lib/utils.js'
 import { latestWeightKg, weeklyCalories } from '../../lib/calories.js'
 import { CalorieRing } from './CalorieRing.js'
 import { useStartWorkout } from '../../hooks/useStartWorkout.js'
-import { pickCurrentProgramId, pickActiveWeek, dayRef as buildDayRef } from '../../lib/programStatus.js'
+import { pickHomeProgram, pickActiveWeek, dayRef as buildDayRef } from '../../lib/programStatus.js'
 import { IconDumbbell, IconSearch, IconCheck, IconBell, IconRun, IconUsers, IconX, IconPlay, IconTrendingUp } from '../../components/icons/index.js'
 import { OneRMSparkline } from '../../components/charts/OneRMSparkline.js'
 import { buildLiftSeries } from '../../lib/oneRM.js'
@@ -130,17 +130,25 @@ export function DashboardPage() {
   // empty card for someone who logged one squat and one bench on the same day.
   const hasOneRMTrend = liftSeries.some(s => s.manual.length >= 2)
 
-  // The program the user is currently on: most recently set up / resumed, and
-  // NOT skipped when paused — pausing must never silently promote another
-  // program (the paused card below is shown instead).
-  const currentProgram = useMemo(() => {
+  // What Home shows is decided by the programs' dates first (see pickHomeProgram):
+  // the running one — NOT skipped when paused, pausing must never silently promote
+  // another program (the paused card below is shown instead) — else a countdown to
+  // the nearest upcoming one.
+  const homePick = useMemo(() => {
     const allPrograms = [...STRUCTURED_PROGRAMS, ...customPrograms]
-    const id = pickCurrentProgramId(allPrograms, configs, programMeta, progress, history)
-    if (!id) return null
-    const program = allPrograms.find(p => p.id === id)
-    if (!program) return null
-    return { program, paused: !!programMeta[id]?.paused }
+    const pick = pickHomeProgram(allPrograms, configs, programMeta, progress, history)
+    const program = pick && allPrograms.find(p => p.id === pick.id)
+    return pick && program ? { pick, program } : null
   }, [configs, customPrograms, programMeta, progress, history])
+
+  const currentProgram = useMemo(() => {
+    if (homePick?.pick.kind !== 'current') return null
+    return { program: homePick.program, paused: !!programMeta[homePick.program.id]?.paused }
+  }, [homePick, programMeta])
+
+  const upcomingProgram = homePick?.pick.kind === 'upcoming'
+    ? { program: homePick.program, startDate: homePick.pick.startDate, daysUntil: homePick.pick.daysUntil }
+    : null
 
   // The week Home shows (null while paused): the calendar week, clamped so it can
   // never run past a week the user has actually reached — a program set up 5 weeks
@@ -485,8 +493,39 @@ export function DashboardPage() {
         </div>
       )}
 
+      {/* Nothing running, but a program is queued — count down to it */}
+      {upcomingProgram && (
+        <div style={{ padding: '0 20px', marginBottom: 16 }}>
+          <div className="card" style={{ borderLeft: '3px solid #22d3ee', paddingLeft: 14 }}>
+            <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 3, color: '#22d3ee' }}>UPCOMING PROGRAM</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, lineHeight: 1.1, marginBottom: 10 }}>
+              {upcomingProgram.program.name}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
+              <span className="t-mono tnum" style={{ fontSize: 32, fontWeight: 700, lineHeight: 1 }}>
+                {upcomingProgram.daysUntil}
+              </span>
+              <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
+                {upcomingProgram.daysUntil === 1 ? 'วัน — เริ่มพรุ่งนี้' : 'วันก่อนเริ่ม'}
+              </span>
+            </div>
+            <div className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 16 }}>
+              เริ่ม {formatDMY(upcomingProgram.startDate)}
+            </div>
+            <button
+              className="btn btn-secondary"
+              style={{ width: '100%' }}
+              onClick={() => navigate(`/programs/${upcomingProgram.program.id}`)}
+            >
+              <IconDumbbell size={16} />
+              ดูโปรแกรม
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* No active program CTA */}
-      {!activeProgramInfo && !currentProgram?.paused && (
+      {!activeProgramInfo && !currentProgram?.paused && !upcomingProgram && (
         <div style={{ padding: '0 20px', marginBottom: 16 }}>
           <div className="card" style={{ textAlign: 'center', padding: '28px 20px' }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🏋️</div>
