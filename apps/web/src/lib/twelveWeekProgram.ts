@@ -272,27 +272,27 @@ const WEEKS: StructuredWeek[] = [
   // ── Week 12 — Taper / Test ───────────────────────────────────────────────────
   wk(12, 'Taper', [
     mon([
-      e('squat',    'Back Squat',          'main',      3, 2, 0.65,  6),
-      e('bench',    'Speed Bench',         'accessory', 4, 3, 0.625, 6),
-      e('deadlift', 'Deadlift – Attempt 1','main',      1, 1, 0.90,  8),
-      e('deadlift', 'Deadlift – Attempt 2','main',      1, 1, 0.97,  9),
-      e('deadlift', 'Deadlift – Attempt 3','main',      1, 1, 1.02,  9.5),
-    ], 'Taper + DL Test'),
+      e('squat',    'Back Squat',  'main', 3, 2, 0.65,  6, 'เบา/คม พักให้พอ'),
+      e('bench',    'Bench Press', 'main', 4, 3, 0.625, 6, 'เบา/เร็ว'),
+      e('deadlift', 'Deadlift',    'main', 2, 2, 0.65,  6, 'เบา/คม'),
+    ], 'Deload Squat'),
     tue([
-      e('bench', 'Bench Press', 'main', 3, 2, 0.70, 6.5),
-    ]),
+      e('bench', 'Bench Press', 'main', 3, 2, 0.70, 6.5, 'Pause 1 วิ'),
+    ], 'Deload Bench'),
     thu([
-      e('bench', 'Bench Volume', 'accessory', 2, 3, 0.60, 6),
+      e('bench', 'Bench Press', 'main', 2, 3, 0.60, 6, 'เบามาก'),
     ]),
     fri([
-      e('deadlift', 'Deadlift',                'main', 2, 2, 0.65,  6),
-      e('squat',    'Squat – Attempt 1',       'main', 1, 1, 0.90,  8),
-      e('squat',    'Squat – Attempt 2',       'main', 1, 1, 0.97,  9),
-      e('squat',    'Squat – Attempt 3',       'main', 1, 1, 1.02,  9.5),
-      e('bench',    'Bench Press – Attempt 1', 'main', 1, 1, 0.90,  8),
-      e('bench',    'Bench Press – Attempt 2', 'main', 1, 1, 0.97,  9),
-      e('bench',    'Bench Press – Attempt 3', 'main', 1, 1, 1.02,  9.5),
-    ], 'Competition Day'),
+      e('squat',    'Squat – Attempt 1',       'main', 1, 1, 0.90, 8,   '1st attempt (ควรชัวร์)'),
+      e('squat',    'Squat – Attempt 2',       'main', 1, 1, 0.97, 9,   '2nd attempt'),
+      e('squat',    'Squat – Attempt 3',       'main', 1, 1, 1.02, 9.5, '3rd attempt (ตามความรู้สึก)'),
+      e('bench',    'Bench Press – Attempt 1', 'main', 1, 1, 0.90, 8,   '1st attempt (Pause 1 วิ)'),
+      e('bench',    'Bench Press – Attempt 2', 'main', 1, 1, 0.97, 9,   '2nd attempt'),
+      e('bench',    'Bench Press – Attempt 3', 'main', 1, 1, 1.02, 9.5, '3rd attempt'),
+      e('deadlift', 'Deadlift – Attempt 1',    'main', 1, 1, 0.90, 8,   '1st attempt'),
+      e('deadlift', 'Deadlift – Attempt 2',    'main', 1, 1, 0.97, 9,   '2nd attempt'),
+      e('deadlift', 'Deadlift – Attempt 3',    'main', 1, 1, 1.02, 9.5, '3rd attempt'),
+    ], 'Test PR'),
   ]),
 ]
 
