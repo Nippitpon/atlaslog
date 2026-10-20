@@ -5,6 +5,7 @@ import { useAppStore } from '../../store/useAppStore.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
 import { programVolume } from '../../lib/utils.js'
+import { canEditProgram } from '../../lib/programPermissions.js'
 import { PROGRAMS } from '../../lib/data.js'
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { ImportProgramSheet } from './ImportProgramSheet.js'
@@ -318,7 +319,7 @@ export function ProgramsPage() {
                           <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
                             <FavoriteButton programId={sp.id} on={!!programMeta[sp.id]?.favorite} onToggle={toggleFavorite} />
                             <PauseButton programId={sp.id} status={status} onSetPaused={setProgramPaused} />
-                            {sp.source !== 'coach' && (
+                            {sp.source !== 'coach' && canEditProgram(true, { isAdmin, isCoach }) && (
                               <button
                                 onClick={e => { e.stopPropagation(); navigate(`/programs/${sp.id}/edit`) }}
                                 style={CARD_BTN}

@@ -4,6 +4,8 @@ import type { DayStatus, RunEntry, StructuredDay, StructuredExercise, Structured
 import { buildDayProgram } from '../../lib/twelveWeekProgram.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAppStore } from '../../store/useAppStore.js'
+import { useAuthStore } from '../../store/useAuthStore.js'
+import { canEditProgram } from '../../lib/programPermissions.js'
 import { structuredWeight, resolveCalcRMs } from '../../lib/rpeTable.js'
 import { resolveDayExercises } from '../../lib/dayLayout.js'
 import { dayRef as buildDayRef, isDayPast, DAY_STATUS_EDGE } from '../../lib/programStatus.js'
@@ -19,7 +21,7 @@ const DAY_FULL: Record<string, string> = {
 }
 
 function DayCard({
-  day, status, exercises, oneRMs, loggedRun, canSkip, onStart, onEditDay, onOpenRun, onToggleDone, onToggleSkip,
+  day, status, exercises, oneRMs, loggedRun, canSkip, canEdit, onStart, onEditDay, onOpenRun, onToggleDone, onToggleSkip,
 }: {
   day: StructuredDay
   status: DayStatus
@@ -30,6 +32,7 @@ function DayCard({
   loggedRun: RunEntry | undefined
   // Only a day that has already gone by can be skipped
   canSkip: boolean
+  canEdit: boolean
   onStart: () => void
   onEditDay: () => void
   onOpenRun: () => void
@@ -166,17 +169,19 @@ function DayCard({
             {exercises.length} exercises
             {runs.length > 0 && ` · ${runs.length} run`}
           </span>
-          <button
-            onClick={e => { e.stopPropagation(); onEditDay() }}
-            style={{
-              background: 'transparent', border: '1px solid var(--border)',
-              borderRadius: 6, padding: '2px 8px', cursor: 'pointer',
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              color: 'var(--text-2)', fontFamily: 'var(--font-mono)', fontSize: 10,
-            }}
-          >
-            <IconEdit size={11} /> Edit
-          </button>
+          {canEdit && (
+            <button
+              onClick={e => { e.stopPropagation(); onEditDay() }}
+              style={{
+                background: 'transparent', border: '1px solid var(--border)',
+                borderRadius: 6, padding: '2px 8px', cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                color: 'var(--text-2)', fontFamily: 'var(--font-mono)', fontSize: 10,
+              }}
+            >
+              <IconEdit size={11} /> Edit
+            </button>
+          )}
           {/* A day that has gone by unlogged keeps its week — and the whole
               program — unfinished. Skip says "this one didn't happen" so the
               plan can close, without inflating what was trained. */}
@@ -252,8 +257,10 @@ function DayCard({
 // profile's Personal 1RM (no setup needed); general programs show no weights.
 export function WeekDays({ program, week }: { program: StructuredProgram; week: StructuredWeek }) {
   const navigate = useNavigate()
-  const { getDayStatus, setDayStatus, getConfig, getDayLayout, setDayLayout } = useProgramStore()
+  const { getDayStatus, setDayStatus, getConfig, getDayLayout, setDayLayout, customPrograms } = useProgramStore()
   const { personalOneRMs, runs } = useAppStore()
+  const { isAdmin, isCoach } = useAuthStore()
+  const canEdit = canEditProgram(customPrograms.some(p => p.id === program.id), { isAdmin, isCoach })
   const startWorkout = useStartWorkout()
   const [editingDayId, setEditingDayId] = useState<string | null>(null)
 
@@ -294,12 +301,13 @@ export function WeekDays({ program, week }: { program: StructuredProgram; week: 
               onToggleDone={() => setDayStatus(program.id, week.id, day.id, status === 'done' ? 'not_started' : 'done')}
               onToggleSkip={() => setDayStatus(program.id, week.id, day.id, status === 'skipped' ? 'not_started' : 'skipped')}
               canSkip={canSkip}
+              canEdit={canEdit}
             />
           )
         })}
       </div>
 
-      {editingDay && (
+      {canEdit && editingDay && (
         <DayEditSheet
           exercises={resolveDayExercises(editingDay, getDayLayout(program.id, week.id, editingDay.id))}
           onSave={(exercises) => setDayLayout(program.id, week.id, editingDay.id, exercises)}
