@@ -1,8 +1,36 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-20 (รอบ 62 — ✅ SHIPPED: โปรแกรม 12 Weeks SBD Peaking เพิ่ม phase Deload (W4/W8) + ปรับ Week 12)
+> อัปเดตล่าสุด: 2026-10-20 (รอบ 63 — ✅ SHIPPED: จำกัดสิทธิ์ปุ่ม Edit โปรแกรมตาม role)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-10-20 — รอบ 63 (✅ SHIPPED, deploy main): จำกัดสิทธิ์ Edit โปรแกรมตาม role
+
+เดิมทุก role กดปุ่ม Edit รายวัน (`WeekDays`) ได้หมด รวมถึงโปรแกรม built-in · ตอนนี้ built-in (12 Weeks SBD Peaking) แก้ได้เฉพาะ admin, custom แก้ได้ admin/coach, athlete ไม่เห็นปุ่ม · commit `9289f0f`
+
+### ทำอะไร
+
+- `lib/programPermissions.ts` ใหม่ — `canEditProgram(isCustom, { isAdmin, isCoach })` เก็บกฎไว้จุดเดียว · เทสต์ `programPermissions.test.ts` 2 เคส (239 เทสต์รวม)
+- `WeekDays.tsx` — ซ่อนปุ่ม Edit ใน `DayCard` + ไม่ render `DayEditSheet` เมื่อไม่มีสิทธิ์ (prop `canEdit`, ตัดสิน built-in/custom จาก `customPrograms.some(id)`)
+- `ProgramsPage.tsx` — ปุ่มแก้โปรแกรมบนการ์ด MY PROGRAMS ต้องผ่าน `canEditProgram(true, …)` ด้วย
+- ไม่ต้องแก้ `ProgramOverviewPage` (เช็ก `isCoach || isAdmin` อยู่แล้ว) และ `CreateProgramPage` (เด้งออกถ้าไม่ใช่ coach/admin อยู่แล้ว)
+
+### ผลกระทบ (จัดการแล้ว)
+
+override รายวันที่ผู้ใช้เคยแก้ไว้ (`customAccessories`) ยังถูกใช้แสดงผลต่อ — แค่แก้เพิ่มไม่ได้
+
+### verify
+
+`pnpm build` ผ่าน · ESLint ผ่าน · `pnpm test` 239 ผ่าน · e2e 390px (Playwright, ฉีด role ผ่าน `useAuthStore.setState` ไม่เรียก action ที่ sync): Week 4 ของ 12 Weeks → athlete 0 / coach 0 / admin 4 ปุ่ม · Week ของ custom → athlete 0 / coach 1 / admin 1 · การ์ด MY PROGRAMS → athlete 0 / coach 1 · revert `main.tsx` แล้ว ·
+⚠️ ยังไม่ได้ทดสอบ: กด Edit แล้วเปิด `DayEditSheet` จริง · พิมพ์ `/programs/<id>/edit` ตรงด้วย athlete (อ่านโค้ดว่าเด้งออก) · การ์ดของ admin ในหน้า Programs
+
+### ไม่ทำรอบนี้
+
+- **เป็น UI gate เท่านั้น** — override รายวันเก็บใน program state ของผู้ใช้เอง (`custom_accessories`) ไม่มีตารางกลาง/RLS ให้กัน
+- admin แก้ built-in ยังมีผลกับบัญชี admin เอง ไม่ใช่ทุกคน — ถ้าอยากให้การแก้ของ admin เปลี่ยนให้ทุกคนต้องเก็บ override กลางใน Supabase (ตาราง + RLS) เป็นงานแยก
+- ตัวช่วย e2e: Supabase ถูก config → `init()` รีเซ็ต user ปลอม; แก้โดย `__auth.setState({ init: () => {} , ... })` ก่อน navigate (เสริม memory `e2e-auth-gated-pages`)
 
 ---
 
