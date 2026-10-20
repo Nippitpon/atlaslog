@@ -1,8 +1,36 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-15 (รอบ 61 — ✅ SHIPPED: ระยะวิ่งใน Dashboard WEEKLY TRAINING + สรุปเดือน History)
+> อัปเดตล่าสุด: 2026-10-20 (รอบ 62 — ✅ SHIPPED: โปรแกรม 12 Weeks SBD Peaking เพิ่ม phase Deload (W4/W8) + ปรับ Week 12)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-10-20 — รอบ 62 (✅ SHIPPED, deploy main): 12 Weeks SBD Peaking — Deload W4/W8 + ปรับ Week 12
+
+แก้โปรแกรม built-in `sbd-12w` สองก้อน: `5acfed2` (phase Deload) · `de9997c` (Week 12 ตามตารางที่เจ้าของส่งมา)
+
+### ทำอะไร
+
+- **phase `Deload` ใหม่** — `ProgramPhase` (`packages/shared/src/types.ts`) เพิ่ม `'Deload'` · `twelveWeekProgram.ts` W4 (เดิม Accumulation) + W8 (เดิม Intensification) → `Deload` ·
+  `PHASE_COLOR` เพิ่ม `Deload: '#94a3b8'` ใน `DashboardPage` / `ProgramsPage` / `ProgramOverviewPage` / `WeekDetailPage` ·
+  `excelImport.ts` `mapPhase` ตรวจ `deload` ก่อน (เดิมตกไป Accumulation) · น้ำหนัก/เซ็ตของ W4/W8 ไม่แตะ (เป็นสัปดาห์เบาอยู่แล้ว)
+- **Week 12** — จันทร์ `Deload Squat` (Squat 3×2 @65% · Bench 4×3 @62.5% · Deadlift 2×2 @65%) · อังคาร `Deload Bench` (Bench 3×2 @70% Pause 1 วิ) ·
+  พฤหัส Bench 2×3 @60% · ศุกร์ `Test PR` (Squat/Bench/Deadlift อย่างละ 3 attempts @90/97/102%, RPE 8/9/9.5) ·
+  Deadlift attempts ย้ายจากจันทร์ → ศุกร์ · ทุกแถว `type: 'main'` + `note` ตามตาราง · ชื่อท่า Bench จันทร์/พฤหัสเป็น "Bench Press" (เดิม Speed Bench / Bench Volume)
+
+### ผลกระทบ (จัดการแล้ว)
+
+phase ของ Week 12 ยังเป็น `Taper` (ไม่ได้ใช้ `Taper/Test`) · ชื่อวันจันทร์ "Deload Squat" แต่มี Bench + Deadlift ด้วย — เจ้าของเลือกชื่อเอง
+
+### verify
+
+`pnpm build` ผ่าน · `pnpm test` 237 ผ่าน · ESLint ผ่าน · ⚠️ ยังไม่ได้ click-through e2e (ควรเช็ค ProgramOverview ว่า W4/W8 เป็นป้ายเทา Deload และ W12 ศุกร์มี 9 attempts ใน Logger)
+
+### ไม่ทำรอบนี้
+
+- ไม่ได้ migrate โปรแกรมที่ผู้ใช้บันทึกไว้ใน localStorage/Supabase ไปแล้ว → ใครเริ่ม `sbd-12w` ก่อนหน้านี้อาจยังเห็น phase/Week 12 เดิมจนกว่าจะ `restartProgram` (ยังไม่ได้ตรวจ)
+- `description` ของโปรแกรมยังเขียน "Accumulation → Intensification → Peaking → Taper/Test" ไม่ได้ใส่ Deload
 
 ---
 
