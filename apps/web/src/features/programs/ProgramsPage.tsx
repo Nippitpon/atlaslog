@@ -10,6 +10,7 @@ import { PROGRAMS } from '../../lib/data.js'
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
 import { ImportProgramSheet } from './ImportProgramSheet.js'
 import { useStartWorkout } from '../../hooks/useStartWorkout.js'
+import { PublicProgramSheet } from './PublicProgramSheet.js'
 import { createShare, importShare, listPublicPrograms, type PublicProgram } from '../../lib/shareApi.js'
 import {
   programProgress, reachedWeekNum, hasStarted as programHasStarted, groupProgramsByStatus, daysUntilStart,
@@ -112,6 +113,7 @@ export function ProgramsPage() {
 
   const [publicPrograms, setPublicPrograms] = useState<PublicProgram[]>([])
   const [importingCode, setImportingCode] = useState<string | null>(null)
+  const [previewPublic, setPreviewPublic] = useState<PublicProgram | null>(null)
 
   const loadPublic = useCallback(async () => {
     try { setPublicPrograms(await listPublicPrograms()) } catch { /* ignore */ }
@@ -124,6 +126,7 @@ export function ProgramsPage() {
     try {
       const program = await importShare(p.code)
       addCustomProgram(program)
+      setPreviewPublic(null)
       navigate(`/programs/${program.id}`)
     } catch { /* ignore */ } finally {
       setImportingCode(null)
@@ -407,7 +410,7 @@ export function ProgramsPage() {
           <div className="t-eyebrow" style={{ marginBottom: 12 }}>PUBLIC PROGRAMS</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {publicPrograms.map(p => (
-              <button key={p.code} onClick={() => void handleImportPublic(p)} disabled={importingCode === p.code}
+              <button key={p.code} onClick={() => setPreviewPublic(p)}
                 style={{ all: 'unset', cursor: 'pointer', display: 'block' }}>
                 <div className="card card-tight" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{
@@ -424,13 +427,22 @@ export function ProgramsPage() {
                     </div>
                   </div>
                   <span className="t-mono" style={{ fontSize: 10, color: 'var(--accent)', flexShrink: 0 }}>
-                    {importingCode === p.code ? '...' : 'GET →'}
+                    VIEW →
                   </span>
                 </div>
               </button>
             ))}
           </div>
         </div>
+      )}
+
+      {previewPublic && (
+        <PublicProgramSheet
+          item={previewPublic}
+          busy={importingCode === previewPublic.code}
+          onGet={() => void handleImportPublic(previewPublic)}
+          onClose={() => setPreviewPublic(null)}
+        />
       )}
 
       {/* ── Quick Templates ─────────────────────────────────── */}
