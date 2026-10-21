@@ -1,8 +1,28 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-20 (รอบ 64 — ✅ SHIPPED: Home เลือกโปรแกรมตามช่วงวัน + หน้า Programs จัดกลุ่มตาม status + ล้าง START DATE ได้)
+> อัปเดตล่าสุด: 2026-10-21 (รอบ 65 — ✅ SHIPPED: Public Programs กดดู preview ก่อน แล้วค่อยกด GET)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-10-21 — รอบ 65 (✅ SHIPPED, deploy main): Public Programs ดู preview ก่อน GET
+
+บั๊ก/UX: กดการ์ดใน PUBLIC PROGRAMS (หน้า Programs) แล้ว `importShare` + `addCustomProgram` ทันที — ยังไม่ได้ดูโปรแกรมก่อน ·
+commit `5227738` (หลัก) · `eb4434a` (ปุ่ม Close เป็นอังกฤษ)
+
+### ทำอะไร
+
+- **`PublicProgramSheet.tsx`** (ใหม่) — bottom sheet "Preview Program": ชื่อ/คำอธิบาย/pill (weeks · days/wk · focus) · ทุกสัปดาห์กดขยายดูวัน + ท่า (`sets×reps @%/RPE`, วิ่งแสดง km/min, label) · สัปดาห์แรกเปิดไว้ · ปุ่ม `CLOSE` + `GET PROGRAM`
+- **`ProgramsPage.tsx`** — การ์ดเปลี่ยน `GET →` เป็น `VIEW →` กดแล้วเปิด sheet (`previewPublic` state) · เพิ่มโปรแกรมเฉพาะตอนกด `GET PROGRAM` (`handleImportPublic` เดิม) แล้วปิด sheet + นำทางไป `/programs/:id`
+
+### verify
+
+`pnpm build` ผ่าน · ESLint ผ่าน · **ยังไม่ได้ click-through e2e** — ควรเช็คที่ 390px: กดการ์ด → sheet เปิดโดยไม่เพิ่มโปรแกรม · ขยาย/ยุบสัปดาห์ · GET PROGRAM เพิ่มและไปหน้าโปรแกรม
+
+### ไม่ทำรอบนี้
+
+- ไม่ใส่ตั้งค่า start date/1RM ใน sheet — GET แล้วไปตั้งที่หน้าโปรแกรมเหมือนเดิม
 
 ---
 
