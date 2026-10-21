@@ -1,8 +1,33 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-21 (รอบ 65 — ✅ SHIPPED: Public Programs กดดู preview ก่อน แล้วค่อยกด GET)
+> อัปเดตล่าสุด: 2026-10-21 (รอบ 66 — ✅ SHIPPED: Quick Templates เพิ่ม Squat/Bench/Deadlift/SBD Day)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-10-21 — รอบ 66 (✅ SHIPPED, deploy main): Quick Templates เพิ่ม Squat / Bench / Deadlift / SBD Day
+
+เพิ่ม 4 template แนว powerlifting ต่อท้าย QUICK TEMPLATES (หน้า Programs) · commit `f120481`
+
+### ทำอะไร
+
+- `lib/data.ts` (`PROGRAMS`) — `pl-squat` Squat Day · `pl-bench` Bench Press Day · `pl-deadlift` Deadlift Day · `pl-sbd` SBD Day (ครบ 3 ท่า)
+- ทุกท่าแยก 2 แถว `<ท่า> — Top set` / `<ท่า> — Back-off` ผ่านฟิลด์ `name` (วิธีเดียวกับ `CreateProgramPage`) · ใช้ exerciseId เดิม `squat`/`bench`/`deadlift` + `isMain: true`
+- แต่ละแถวมี 1 เซ็ต `w:0, r:0` → ช่องน้ำหนัก/reps ใน Logger ว่าง (`s.w || ''`) ให้กรอกเอง · เพิ่มเซ็ตเองใน Logger
+- id ไม่มี `/` (LoggerPage ใช้ `a/b/c` แยกวันของโปรแกรมจริง)
+
+### ผลกระทบ (จัดการแล้ว)
+
+Quick Template ไม่เข้า `customPrograms` และไม่ mark ความคืบหน้าโปรแกรม แต่จบแล้วเข้า History ตามปกติ · Top set/Back-off ของท่าเดียวกันรวมเป็นแถวเดียวในสถิติ session (`sessionStats`)
+
+### verify
+
+`pnpm build` ผ่าน · ESLint ผ่าน · `pnpm test` 252 tests ผ่าน · **ยังไม่ได้ click-through e2e** — ควรเช็คที่ 390px: การ์ดใหม่ 4 ใบขึ้น · กดแล้ว Logger เปิดพร้อมแถวถูกต้อง · ช่องว่าง · จบแล้วเข้า History
+
+### ไม่ทำรอบนี้
+
+- ไม่ใส่น้ำหนัก/reps ตั้งต้น (ตามที่ผู้ใช้ขอ) · Back-off เริ่มแค่ 1 เซ็ต
 
 ---
 
