@@ -108,6 +108,38 @@ export const PROGRAMS: Program[] = [
       { exerciseId: 'tricep-pd', sets: [{w:25,r:12},{w:30,r:10}] },
     ],
   },
+  {
+    id: 'pl-squat', name: 'Squat Day', focus: 'Powerlifting · Squat', duration: 60,
+    exercises: [
+      { exerciseId: 'squat', name: 'Back Squat — Top set', isMain: true, sets: [{w:0,r:0}] },
+      { exerciseId: 'squat', name: 'Back Squat — Back-off', isMain: true, sets: [{w:0,r:0}] },
+    ],
+  },
+  {
+    id: 'pl-bench', name: 'Bench Press Day', focus: 'Powerlifting · Bench', duration: 50,
+    exercises: [
+      { exerciseId: 'bench', name: 'Bench Press — Top set', isMain: true, sets: [{w:0,r:0}] },
+      { exerciseId: 'bench', name: 'Bench Press — Back-off', isMain: true, sets: [{w:0,r:0}] },
+    ],
+  },
+  {
+    id: 'pl-deadlift', name: 'Deadlift Day', focus: 'Powerlifting · Deadlift', duration: 50,
+    exercises: [
+      { exerciseId: 'deadlift', name: 'Deadlift — Top set', isMain: true, sets: [{w:0,r:0}] },
+      { exerciseId: 'deadlift', name: 'Deadlift — Back-off', isMain: true, sets: [{w:0,r:0}] },
+    ],
+  },
+  {
+    id: 'pl-sbd', name: 'SBD Day', focus: 'Powerlifting · Squat · Bench · Deadlift', duration: 75,
+    exercises: [
+      { exerciseId: 'squat', name: 'Back Squat — Top set', isMain: true, sets: [{w:0,r:0}] },
+      { exerciseId: 'squat', name: 'Back Squat — Back-off', isMain: true, sets: [{w:0,r:0}] },
+      { exerciseId: 'bench', name: 'Bench Press — Top set', isMain: true, sets: [{w:0,r:0}] },
+      { exerciseId: 'bench', name: 'Bench Press — Back-off', isMain: true, sets: [{w:0,r:0}] },
+      { exerciseId: 'deadlift', name: 'Deadlift — Top set', isMain: true, sets: [{w:0,r:0}] },
+      { exerciseId: 'deadlift', name: 'Deadlift — Back-off', isMain: true, sets: [{w:0,r:0}] },
+    ],
+  },
 ]
 
 export function makeSeedHistory(): Session[] {
