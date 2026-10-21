@@ -94,7 +94,7 @@ export function PublicProgramSheet({ item, busy, onGet, onClose }: Props) {
         </div>
 
         <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn btn-secondary" style={{ flex: 1 }} onClick={onClose}>ปิด</button>
+          <button className="btn btn-secondary" style={{ flex: 1 }} onClick={onClose}>CLOSE</button>
           <button className="btn btn-primary" style={{ flex: 2 }} onClick={onGet} disabled={busy}>
             {busy ? '...' : 'GET PROGRAM'}
           </button>
