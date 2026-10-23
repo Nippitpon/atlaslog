@@ -36,8 +36,8 @@ const WEEKS: StructuredWeek[] = [
     mon([
       e('squat',    'Back Squat',           'main',      1, 5, 0.75,  7),
       e('squat',    'Back Squat Back-off',  'main',      4, 5, 0.70,  6),
-      e('bench',    'Speed Bench',          'accessory', 8, 3, 0.70,  6),
-      e('deadlift', 'Deadlift Volume',      'accessory', 3, 6, 0.70,  7),
+      e('bench',    'Speed Bench',          'accessory', 3, 3, 0.70,  6),
+      e('deadlift', 'Deadlift Volume',      'accessory', 2, 6, 0.70,  7),
     ]),
     tue([
       e('bench', 'Bench Press',          'main', 1, 5, 0.75, 7),
@@ -58,8 +58,8 @@ const WEEKS: StructuredWeek[] = [
     mon([
       e('squat',    'Back Squat',           'main',      1, 5, 0.775, 7.5),
       e('squat',    'Back Squat Back-off',  'main',      4, 5, 0.725, 6.5),
-      e('bench',    'Speed Bench',          'accessory', 8, 3, 0.725, 6.5),
-      e('deadlift', 'Deadlift Volume',      'accessory', 4, 6, 0.70,  7.5),
+      e('bench',    'Speed Bench',          'accessory', 3, 3, 0.725, 6.5),
+      e('deadlift', 'Deadlift Volume',      'accessory', 2, 6, 0.70,  7.5),
     ]),
     tue([
       e('bench', 'Bench Press',          'main', 1, 5, 0.775, 7.5),
@@ -80,8 +80,8 @@ const WEEKS: StructuredWeek[] = [
     mon([
       e('squat',    'Back Squat',           'main',      1,  4, 0.80, 8),
       e('squat',    'Back Squat Back-off',  'main',      4,  4, 0.75, 7),
-      e('bench',    'Speed Bench',          'accessory', 10, 2, 0.75, 7),
-      e('deadlift', 'Deadlift Volume',      'accessory', 4,  5, 0.75, 8),
+      e('bench',    'Speed Bench',          'accessory', 3, 2, 0.75, 7),
+      e('deadlift', 'Deadlift Volume',      'accessory', 2,  5, 0.75, 8),
     ]),
     tue([
       e('bench', 'Bench Press',          'main', 1, 4, 0.80, 8),
@@ -102,7 +102,7 @@ const WEEKS: StructuredWeek[] = [
     mon([
       e('squat',    'Back Squat',           'main',      1, 5, 0.725, 6.5),
       e('squat',    'Back Squat Back-off',  'main',      2, 5, 0.65,  5.5),
-      e('bench',    'Speed Bench',          'accessory', 6, 3, 0.65,  6),
+      e('bench',    'Speed Bench',          'accessory', 3, 3, 0.65,  6),
       e('deadlift', 'Deadlift Volume',      'accessory', 2, 6, 0.65,  6),
     ]),
     tue([
@@ -124,8 +124,8 @@ const WEEKS: StructuredWeek[] = [
     mon([
       e('squat',    'Back Squat',           'main',      1, 3, 0.85, 8),
       e('squat',    'Back Squat Back-off',  'main',      3, 3, 0.80, 7.5),
-      e('bench',    'Speed Bench',          'accessory', 8, 3, 0.75, 6.5),
-      e('deadlift', 'Deadlift Volume',      'accessory', 3, 4, 0.80, 8),
+      e('bench',    'Speed Bench',          'accessory', 3, 3, 0.75, 6.5),
+      e('deadlift', 'Deadlift Volume',      'accessory', 2, 4, 0.80, 8),
     ]),
     tue([
       e('bench', 'Bench Press',          'main', 1, 3, 0.85, 8),
@@ -146,8 +146,8 @@ const WEEKS: StructuredWeek[] = [
     mon([
       e('squat',    'Back Squat',           'main',      1, 2, 0.88,  8.5),
       e('squat',    'Back Squat Back-off',  'main',      3, 2, 0.83,  8),
-      e('bench',    'Speed Bench',          'accessory', 8, 2, 0.775, 7),
-      e('deadlift', 'Deadlift Volume',      'accessory', 3, 3, 0.825, 8.5),
+      e('bench',    'Speed Bench',          'accessory', 3, 2, 0.775, 7),
+      e('deadlift', 'Deadlift Volume',      'accessory', 2, 3, 0.825, 8.5),
     ]),
     tue([
       e('bench', 'Bench Press',          'main', 1, 2, 0.88, 8.5),
@@ -168,8 +168,8 @@ const WEEKS: StructuredWeek[] = [
     mon([
       e('squat',    'Back Squat',           'main',      1, 1, 0.90,  9),
       e('squat',    'Back Squat Back-off',  'main',      3, 2, 0.85,  8),
-      e('bench',    'Speed Bench',          'accessory', 6, 2, 0.80,  7.5),
-      e('deadlift', 'Deadlift Volume',      'accessory', 3, 3, 0.825, 8),
+      e('bench',    'Speed Bench',          'accessory', 3, 2, 0.80,  7.5),
+      e('deadlift', 'Deadlift Volume',      'accessory', 2, 3, 0.825, 8),
     ]),
     tue([
       e('bench', 'Bench Press',          'main', 1, 1, 0.90, 9),
@@ -189,7 +189,7 @@ const WEEKS: StructuredWeek[] = [
   wk(8, 'Deload', [
     mon([
       e('squat',    'Back Squat',       'main',      3, 3, 0.80, 7.5),
-      e('bench',    'Speed Bench',      'accessory', 6, 3, 0.70, 6),
+      e('bench',    'Speed Bench',      'accessory', 3, 3, 0.70, 6),
       e('deadlift', 'Deadlift Volume',  'accessory', 2, 4, 0.75, 7),
     ]),
     tue([
@@ -209,7 +209,7 @@ const WEEKS: StructuredWeek[] = [
     mon([
       e('squat',    'Back Squat',           'main',      1, 1, 0.88, 8.5),
       e('squat',    'Back Squat Back-off',  'main',      2, 2, 0.85, 8),
-      e('bench',    'Speed Bench',          'accessory', 6, 2, 0.75, 6.5),
+      e('bench',    'Speed Bench',          'accessory', 3, 2, 0.75, 6.5),
       e('deadlift', 'Deadlift Volume',      'accessory', 2, 2, 0.85, 8.5),
     ]),
     tue([
@@ -231,7 +231,7 @@ const WEEKS: StructuredWeek[] = [
     mon([
       e('squat',    'Back Squat',           'main',      1, 1, 0.92,  9.3),
       e('squat',    'Back Squat Back-off',  'main',      2, 1, 0.88,  8.5),
-      e('bench',    'Speed Bench',          'accessory', 5, 2, 0.75,  6.5),
+      e('bench',    'Speed Bench',          'accessory', 3, 2, 0.75,  6.5),
       e('deadlift', 'Deadlift Volume',      'accessory', 2, 2, 0.825, 8),
     ]),
     tue([
@@ -253,7 +253,7 @@ const WEEKS: StructuredWeek[] = [
     mon([
       e('squat',    'Back Squat (Optional)', 'main',      1, 1, 0.92, 9.2),
       e('squat',    'Squat Opener',          'main',      2, 1, 0.90, 8.8),
-      e('bench',    'Speed Bench',           'accessory', 4, 2, 0.70, 6),
+      e('bench',    'Speed Bench',           'accessory', 3, 2, 0.70, 6),
       e('deadlift', 'Deadlift Volume',       'accessory', 2, 2, 0.75, 7),
     ]),
     tue([
