@@ -28,7 +28,7 @@ function wk(n: number, phase: ProgramPhase, days: StructuredDay[]): StructuredWe
 }
 
 // ─── 12-Week Program Data (from Excel Template) ───────────────────────────────
-// Structure: Mon=Squat+SpeedBench+DLVol, Tue=Bench, Thu=BenchVol, Fri=DL+SquatVol
+// Structure: Mon=Squat+SpeedBench+DLVol, Tue=Bench, Thu=BenchVol, Fri=DL
 
 const WEEKS: StructuredWeek[] = [
   // ── Week 1 — Accumulation ────────────────────────────────────────────────────
@@ -49,7 +49,6 @@ const WEEKS: StructuredWeek[] = [
     fri([
       e('deadlift', 'Deadlift',           'main',      1, 5, 0.75, 7),
       e('deadlift', 'Deadlift Back-off',  'main',      3, 5, 0.70, 6),
-      e('squat',    'Squat Volume',       'accessory', 4, 6, 0.70, 7),
     ]),
   ]),
 
@@ -71,7 +70,6 @@ const WEEKS: StructuredWeek[] = [
     fri([
       e('deadlift', 'Deadlift',          'main',      1, 5, 0.775, 7.5),
       e('deadlift', 'Deadlift Back-off', 'main',      3, 5, 0.725, 6.5),
-      e('squat',    'Squat Volume',      'accessory', 5, 6, 0.725, 7.5),
     ]),
   ]),
 
@@ -93,7 +91,6 @@ const WEEKS: StructuredWeek[] = [
     fri([
       e('deadlift', 'Deadlift',          'main',      1, 4, 0.80, 8),
       e('deadlift', 'Deadlift Back-off', 'main',      3, 4, 0.75, 7),
-      e('squat',    'Squat Volume',      'accessory', 5, 5, 0.75, 8),
     ]),
   ]),
 
@@ -115,7 +112,6 @@ const WEEKS: StructuredWeek[] = [
     fri([
       e('deadlift', 'Deadlift',          'main',      1, 4, 0.725, 6.5),
       e('deadlift', 'Deadlift Back-off', 'main',      2, 4, 0.65,  5.5),
-      e('squat',    'Squat Volume',      'accessory', 3, 6, 0.65,  6),
     ]),
   ]),
 
@@ -137,7 +133,6 @@ const WEEKS: StructuredWeek[] = [
     fri([
       e('deadlift', 'Deadlift',          'main',      1, 3, 0.85, 8),
       e('deadlift', 'Deadlift Back-off', 'main',      3, 3, 0.80, 7.5),
-      e('squat',    'Squat Volume',      'accessory', 4, 4, 0.80, 8),
     ]),
   ]),
 
@@ -159,7 +154,6 @@ const WEEKS: StructuredWeek[] = [
     fri([
       e('deadlift', 'Deadlift',          'main',      1, 2, 0.88,  8.5),
       e('deadlift', 'Deadlift Back-off', 'main',      3, 2, 0.83,  8),
-      e('squat',    'Squat Volume',      'accessory', 4, 3, 0.825, 8.5),
     ]),
   ]),
 
@@ -181,7 +175,6 @@ const WEEKS: StructuredWeek[] = [
     fri([
       e('deadlift', 'Deadlift',          'main',      1, 1, 0.90,  9),
       e('deadlift', 'Deadlift Back-off', 'main',      3, 2, 0.85,  8),
-      e('squat',    'Squat Volume',      'accessory', 3, 3, 0.825, 8),
     ]),
   ]),
 
@@ -200,7 +193,6 @@ const WEEKS: StructuredWeek[] = [
     ]),
     fri([
       e('deadlift', 'Deadlift',     'main',      2, 3, 0.80, 7.5),
-      e('squat',    'Squat Volume', 'accessory', 3, 4, 0.75, 7),
     ]),
   ]),
 
@@ -222,7 +214,6 @@ const WEEKS: StructuredWeek[] = [
     fri([
       e('deadlift', 'Deadlift',          'main',      1, 1, 0.88, 8.5),
       e('deadlift', 'Deadlift Back-off', 'main',      2, 2, 0.85, 8),
-      e('squat',    'Squat Volume',      'accessory', 3, 2, 0.85, 8.5),
     ]),
   ]),
 
@@ -244,7 +235,6 @@ const WEEKS: StructuredWeek[] = [
     fri([
       e('deadlift', 'Deadlift',          'main',      1, 1, 0.91, 9),
       e('deadlift', 'Deadlift Back-off', 'main',      2, 1, 0.87, 8.5),
-      e('squat',    'Squat Volume',      'accessory', 2, 2, 0.85, 8.5),
     ]),
   ]),
 
@@ -265,7 +255,6 @@ const WEEKS: StructuredWeek[] = [
     ]),
     fri([
       e('deadlift', 'Deadlift Opener', 'main',      2, 1, 0.88, 8.8),
-      e('squat',    'Squat Volume',    'accessory', 2, 2, 0.75, 7),
     ]),
   ]),
 
