@@ -1,8 +1,31 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-21 (รอบ 66 — ✅ SHIPPED: Quick Templates เพิ่ม Squat/Bench/Deadlift/SBD Day)
+> อัปเดตล่าสุด: 2026-10-23 (รอบ 67 — ✅ SHIPPED: ลด Speed Bench / Deadlift Volume วันจันทร์ ใน 12-week SBD)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-10-23 — รอบ 67 (✅ SHIPPED, deploy main): ลด Speed Bench / Deadlift Volume วัน Mon ใน 12-week SBD
+
+ปรับโปรแกรม built-in `sbd-12w` ตามที่ผู้ใช้ขอ · commit `376593b`
+
+### ทำอะไร
+
+- `lib/twelveWeekProgram.ts` — Speed Bench (`bench`, accessory) ของวัน Mon ทั้ง 12 สัปดาห์ → **3 sets** (เดิม 4–10) · Deadlift Volume ของวัน Mon ทั้ง 12 สัปดาห์ → **2 sets** (เดิม 2–4)
+- แก้เฉพาะ field `sets` · reps / pct / rpe ไม่เปลี่ยน
+
+### ผลกระทบ (จัดการแล้ว)
+
+เป็นการแก้ข้อมูลโปรแกรม built-in ในโค้ด · ยังไม่ได้เช็คว่าผู้ใช้ที่เริ่มโปรแกรมไปแล้ว (progress / weight override เดิมใน localStorage) เห็นจำนวน set ใหม่หรือไม่
+
+### verify
+
+`pnpm build` ผ่าน · ESLint ผ่าน · `pnpm test` 252 tests ผ่าน · **ยังไม่ได้ click-through e2e** — ควรเช็คที่ 390px: เปิดโปรแกรมวัน Mon ทุกสัปดาห์เห็น Speed Bench 3 sets / Deadlift Volume 2 sets
+
+### ไม่ทำรอบนี้
+
+- ไม่ได้ปรับ Deadlift Volume วันอื่น หรือ Speed Bench วันอื่น (โปรแกรมมีเฉพาะวัน Mon)
 
 ---
 
