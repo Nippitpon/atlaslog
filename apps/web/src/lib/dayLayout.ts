@@ -30,21 +30,33 @@ export function resolveDayExercises(
   stored: StructuredExercise[] | null,
 ): StructuredExercise[] {
   const mainsByKey = new Map<string, StructuredExercise>()
+  const liveByKey = new Map<string, StructuredExercise>()
   day.exercises.forEach((ex, i) => {
-    if (ex.type === 'main') mainsByKey.set(dayRowKey(ex, i), withKey(ex, i))
+    const keyed = withKey(ex, i)
+    liveByKey.set(keyed.id!, keyed)
+    if (ex.type === 'main') mainsByKey.set(dayRowKey(ex, i), keyed)
   })
 
   if (!stored) {
     return day.exercises.filter(e => e.type !== 'running').map(withKey)
   }
 
+  // A stored accessory that is still the program's own row is re-read live, so
+  // later edits to the program's sets/reps/pct/rpe reach users who saved a layout.
+  // One carrying a built-in row key (`exerciseId|name|i`) the program no longer has was
+  // removed upstream — drop it. Rows the user added or swapped stay as stored.
   const accessories = stored
     .filter(e => e.type !== 'main' && e.type !== 'running')
     .map((ex, i) => ex.id ? ex : { ...ex, id: `acc-${i}-${ex.exerciseId}` })
+    .map(ex => {
+      const live = liveByKey.get(ex.id!)
+      if (live) return sameRow(live, ex) ? live : ex
+      return ex.id!.includes('|') ? null : ex
+    })
 
   // Legacy payload: no main rows → keep the old "mains first, then accessories".
   if (!stored.some(e => e.type === 'main')) {
-    return [...mainsByKey.values(), ...accessories]
+    return [...mainsByKey.values(), ...accessories.filter(a => a !== null)]
   }
 
   const used = new Set<string>()
@@ -52,7 +64,11 @@ export function resolveDayExercises(
   let accIdx = 0
   stored.forEach(row => {
     if (row.type === 'running') return
-    if (row.type !== 'main') { ordered.push(accessories[accIdx++]); return }
+    if (row.type !== 'main') {
+      const acc = accessories[accIdx++]
+      if (acc) ordered.push(acc)
+      return
+    }
     const live = row.id ? mainsByKey.get(row.id) : undefined
     if (live && sameRow(live, row) && !used.has(row.id!)) {
       used.add(row.id!)
