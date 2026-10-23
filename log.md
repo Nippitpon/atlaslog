@@ -1,31 +1,39 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-23 (รอบ 67 — ✅ SHIPPED: ลด Speed Bench / Deadlift Volume วันจันทร์ ใน 12-week SBD)
+> อัปเดตล่าสุด: 2026-10-24 (รอบ 67 — ✅ SHIPPED: ปรับ 12-week SBD Mon/Fri + accessory อ่านค่าสดจากโปรแกรม)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
 
 ---
 
-## 2026-10-23 — รอบ 67 (✅ SHIPPED, deploy main): ลด Speed Bench / Deadlift Volume วัน Mon ใน 12-week SBD
+## 2026-10-23 — รอบ 67 (✅ SHIPPED, deploy main): ปรับโปรแกรม 12-week SBD (Mon/Fri) + accessory อ่านค่าสดจากโปรแกรม
 
-ปรับโปรแกรม built-in `sbd-12w` ตามที่ผู้ใช้ขอ · commit `376593b`
+ปรับโปรแกรม built-in `sbd-12w` ตามที่ผู้ใช้ขอ · พบว่าแก้แล้วไม่ขึ้นในแอปเพราะ layout ที่บันทึกไว้ใน localStorage → แก้ที่ต้นเหตุ · commit `376593b` (sets Mon) · `e00ad3c` (dayLayout) · `827b9b6` (ลบ Squat Volume Fri) · `b4528b1` (trigger redeploy)
 
 ### ทำอะไร
 
-- `lib/twelveWeekProgram.ts` — Speed Bench (`bench`, accessory) ของวัน Mon ทั้ง 12 สัปดาห์ → **3 sets** (เดิม 4–10) · Deadlift Volume ของวัน Mon ทั้ง 12 สัปดาห์ → **2 sets** (เดิม 2–4)
-- แก้เฉพาะ field `sets` · reps / pct / rpe ไม่เปลี่ยน
+- `lib/twelveWeekProgram.ts` — Speed Bench วัน Mon ทั้ง 12 สัปดาห์ → **3 sets** (เดิม 4–10) · Deadlift Volume วัน Mon ทั้ง 12 สัปดาห์ → **2 sets** (เดิม 2–4) · ลบ **Squat Volume วัน Fri** ทั้ง 12 สัปดาห์ · แก้เฉพาะ `sets` ของ 2 ท่าแรก reps/pct/rpe ไม่เปลี่ยน
+- `lib/dayLayout.ts` (`resolveDayExercises`) — accessory ที่มาจากโปรแกรม (id ตรงกับแถวสดและ `sameRow`) อ่านค่าจากโปรแกรมสดทุกครั้ง · เดิมมีแค่ main ที่อ่านสด ส่วน accessory ใช้สำเนาที่ `setDayLayout` เก็บไว้ทั้งแถว (รวม sets เดิม) → ผู้ใช้ที่เคยแก้วันนั้นไม่เห็นการเปลี่ยน
+- `lib/dayLayout.test.ts` (ใหม่) — 3 เคส: อ่านสด · ทิ้งแถวที่โปรแกรมลบแล้ว · เก็บท่าที่ผู้ใช้เพิ่มพร้อมลำดับเดิม
 
 ### ผลกระทบ (จัดการแล้ว)
 
-เป็นการแก้ข้อมูลโปรแกรม built-in ในโค้ด · ยังไม่ได้เช็คว่าผู้ใช้ที่เริ่มโปรแกรมไปแล้ว (progress / weight override เดิมใน localStorage) เห็นจำนวน set ใหม่หรือไม่
+- แถว accessory ที่ id เป็น built-in key (`exerciseId|name|i`) แต่โปรแกรมไม่มีแล้ว → ถูกทิ้งจาก layout (กัน Squat Volume ค้าง) · แถวที่ผู้ใช้เพิ่ม/สลับท่าเองคงตามที่บันทึก · ลำดับที่จัดไว้คงเดิม (`accIdx` ข้ามแถวที่ถูกทิ้ง)
+- ⚠️ ผู้ใช้ที่เคยแก้ sets ของ accessory ของโปรแกรมด้วยมือ (ท่าเดิม) จะถูกแทนด้วยค่าจากโปรแกรม
+
+### Deploy (สาเหตุที่ล่าช้า)
+
+push แล้ว production ไม่เปลี่ยน — Vercel บล็อก: (1) "not a member of the team" (Hobby + repo private) · (2) "commit email `TRUAI-ITD@thairung.co.th` could not be matched to a GitHub account" · แก้โดยตั้ง repo เป็น **public** + push commit ว่าง `b4528b1` → deploy ผ่าน (ผู้ใช้ยืนยัน)
+- ❗ ถ้า deploy ติดอีก: เพิ่มอีเมลนี้ใน GitHub Settings → Emails (verify) แล้ว Redeploy
+- ❗ repo เป็น public แล้ว — **ยังไม่ได้ตรวจ** ว่า history มีไฟล์ลับหลุด (`TEST_ACCOUNTS.md`, `*.local`, `.env*`) หรือไม่ (`git log --all -- <file>`)
 
 ### verify
 
-`pnpm build` ผ่าน · ESLint ผ่าน · `pnpm test` 252 tests ผ่าน · **ยังไม่ได้ click-through e2e** — ควรเช็คที่ 390px: เปิดโปรแกรมวัน Mon ทุกสัปดาห์เห็น Speed Bench 3 sets / Deadlift Volume 2 sets
+`pnpm build` ผ่าน · ESLint ผ่าน · `pnpm test` 255 tests ผ่าน · ผู้ใช้ยืนยันบน production ว่าเปลี่ยนแล้ว · ยังไม่ได้ click-through e2e 390px
 
 ### ไม่ทำรอบนี้
 
-- ไม่ได้ปรับ Deadlift Volume วันอื่น หรือ Speed Bench วันอื่น (โปรแกรมมีเฉพาะวัน Mon)
+- ไม่ได้ปรับ Speed Bench / Deadlift Volume วันอื่น (โปรแกรมมีเฉพาะวัน Mon) · ไม่ได้ตรวจประวัติ git หาของลับ (ดูด้านบน)
 
 ---
 
