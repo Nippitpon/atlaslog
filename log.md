@@ -1,8 +1,33 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-24 (รอบ 67 — ✅ SHIPPED: ปรับ 12-week SBD Mon/Fri + accessory อ่านค่าสดจากโปรแกรม)
+> อัปเดตล่าสุด: 2026-10-25 (รอบ 68 — ✅ SHIPPED: เคลียร์ Start Date แล้ว Save → โปรแกรมกลับเป็น NOT STARTED)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-10-25 — รอบ 68 (✅ SHIPPED, deploy main): เคลียร์ Start Date แล้ว Save → โปรแกรมกลับเป็น NOT STARTED
+
+เดิม ProgramSetupSheet เคลียร์วันที่ได้แต่ปุ่ม Save กดไม่ได้ (`isValid` ต้องมี startDate) · รอบนี้ให้ Save ได้และถอนการตั้งค่าโปรแกรม · commit `c741fe5`
+
+### ทำอะไร
+
+- `store/useProgramStore.ts` — action ใหม่ `clearConfig(programId)`: ลบ `configs[programId]` + `paused: false` + `queueStateSync` · `getProgramStatus` อ่าน "ไม่มี config" เป็น `not_setup` (กลุ่ม NOT STARTED) อยู่แล้ว
+- `features/programs/ProgramSetupSheet.tsx` — `isUnstart` = โหมด setup + startDate ว่าง + มี config เดิม → ปุ่มเป็น "Save" กดได้ (ไม่ต้องกรอก 1RM) แล้วเรียก `clearConfig` · โปรแกรมที่ยังไม่เคยตั้งค่า + วันที่ว่าง ยังกดไม่ได้เหมือนเดิม · โหมด restart ไม่เปลี่ยน
+- `store/clearConfig.test.ts` (ใหม่) — 2 เคส: กลับเป็น `not_setup` + unpause · progress รายวันไม่หาย
+
+### ผลกระทบ (จัดการแล้ว)
+
+- progress รายวัน / day layout / History ไม่ถูกลบ (ต่างจาก Restart) · ตั้งค่าใหม่ภายหลังแล้วความคืบหน้าเดิมกลับมา · `activatedAt` ไม่ถูกแตะ
+- sheet ยังเปิดมาพร้อมวันที่ = วันนี้ (ไม่ดึง startDate เดิม) — ไม่ได้เปลี่ยน
+
+### verify
+
+`pnpm build` ผ่าน · ESLint ผ่าน · `pnpm test` 257 tests ผ่าน · ยังไม่ได้ click-through e2e (Playwright MCP เชื่อมต่อไม่ได้) — ควรลอง: เปิดโปรแกรมที่ ACTIVE → Setup → เคลียร์วันที่ → Save → ต้องไปอยู่กลุ่ม NOT STARTED
+
+### ไม่ทำรอบนี้
+
+- ไม่ล้าง progress ตอน un-start (ใช้ Restart แทน) · ไม่ prefill startDate เดิมใน sheet
 
 ---
 
