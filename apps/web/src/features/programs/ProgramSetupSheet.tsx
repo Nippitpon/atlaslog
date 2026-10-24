@@ -51,7 +51,7 @@ function NumInput({ label, value, onChange, placeholder }: {
 }
 
 export function ProgramSetupSheet({ program, onClose, mode = 'setup' }: Props) {
-  const { setConfig, restartProgram, getConfig } = useProgramStore()
+  const { setConfig, restartProgram, clearConfig, getConfig } = useProgramStore()
   const { personalOneRMs, workout } = useAppStore()
 
   const isRestart = mode === 'restart'
@@ -83,9 +83,16 @@ export function ProgramSetupSheet({ program, onClose, mode = 'setup' }: Props) {
 
   const isGeneral = program.programType === 'general'
   const has1RMs = !!(squatRM && benchRM && deadliftRM && Number(squatRM) > 0 && Number(benchRM) > 0 && Number(deadliftRM) > 0)
-  const isValid = !!startDate && (isGeneral || has1RMs)
+  // An empty date on an already-started program means "un-start it".
+  const isUnstart = !isRestart && !startDate && !!existingConfig
+  const isValid = isUnstart || (!!startDate && (isGeneral || has1RMs))
 
   const handleConfirm = () => {
+    if (isUnstart) {
+      clearConfig(program.id)
+      onClose()
+      return
+    }
     const config: ProgramConfig = {
       startDate,
       endDate,
@@ -180,7 +187,7 @@ export function ProgramSetupSheet({ program, onClose, mode = 'setup' }: Props) {
           onClick={handleConfirm}
           disabled={!isValid}
         >
-          {isRestart ? 'Restart from Week 1' : 'Start Program'}
+          {isRestart ? 'Restart from Week 1' : isUnstart ? 'Save' : 'Start Program'}
         </button>
       </div>
     </div>

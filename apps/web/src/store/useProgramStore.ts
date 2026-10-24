@@ -34,6 +34,7 @@ interface ProgramStore {
   restartProgram: (programId: string, config: ProgramConfig) => void
 
   setConfig: (programId: string, config: ProgramConfig) => void
+  clearConfig: (programId: string) => void
   getConfig: (programId: string) => ProgramConfig | null
 
   setDayLayout: (programId: string, weekId: string, dayId: string, exercises: StructuredExercise[]) => void
@@ -170,6 +171,20 @@ export const useProgramStore = create<ProgramStore>()(
           configs: { ...state.configs, [programId]: config },
           programMeta: mergeMeta(state.programMeta, programId, { activatedAt: Date.now(), paused: false }),
         }))
+        queueStateSync(get)
+      },
+
+      // Back to NOT STARTED: getProgramStatus reads "no config" as not_setup. Progress
+      // and sessions stay — only the schedule is withdrawn.
+      clearConfig: (programId) => {
+        set(state => {
+          const configs = { ...state.configs }
+          delete configs[programId]
+          return {
+            configs,
+            programMeta: mergeMeta(state.programMeta, programId, { paused: false }),
+          }
+        })
         queueStateSync(get)
       },
 
