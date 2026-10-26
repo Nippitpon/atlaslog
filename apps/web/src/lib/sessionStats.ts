@@ -1,7 +1,7 @@
 import type { OneRMLift, Session, WorkoutSet } from '@atlaslog/shared'
 import { setE1RM } from './oneRM.js'
 import { SBD_IDS } from './rpeTable.js'
-import { ymdOfISO } from './utils.js'
+import { getExercise, ymdOfISO } from './utils.js'
 
 export interface ExerciseStats {
   exerciseId: string
@@ -38,7 +38,7 @@ export function sessionExerciseStats(session: Session): ExerciseStats[] {
     if (!row) {
       row = {
         exerciseId: ex.exerciseId,
-        name: ex.name ?? ex.exerciseId,
+        name: ex.name || getExercise(ex.exerciseId).name,
         label: ex.label,
         sets: [],
         topSet: null,

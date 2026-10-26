@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { Session, WorkoutExercise } from '@atlaslog/shared'
 import { compareSession, prDaysByLift, sessionExerciseStats } from './sessionStats.js'
+import { getExercise } from './utils.js'
 
 // Local noon, so the ISO stamp lands on the intended calendar day in any timezone.
 const isoAt = (y: number, m: number, d: number, h = 12) => new Date(y, m - 1, d, h).toISOString()
@@ -50,6 +51,14 @@ describe('sessionExerciseStats', () => {
       ex('squat', [[120, 3], [120, 6]]),
     ]))
     expect(rows[0]!.topSet?.r).toBe(6)
+  })
+
+  // Swapped / added exercises are saved with no name; it must resolve from the library, not show the id.
+  it('resolves a missing name from the exercise registry', () => {
+    const nameless = { ...ex('bench', [[80, 5]]), name: undefined }
+    const rows = sessionExerciseStats(session('a', isoAt(2026, 9, 7), [nameless]))
+    expect(rows[0]!.name).toBe(getExercise('bench').name)
+    expect(rows[0]!.name).not.toBe('bench')
   })
 
   it('drops an exercise with nothing completed', () => {
