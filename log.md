@@ -1,8 +1,33 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-25 (รอบ 68 — ✅ SHIPPED: เคลียร์ Start Date แล้ว Save → โปรแกรมกลับเป็น NOT STARTED)
+> อัปเดตล่าสุด: 2026-10-26 (รอบ 69 — ✅ SHIPPED: หน้ารายละเอียด session แสดงชื่อท่าแทนรหัส `db-xxxx`)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-10-26 — รอบ 69 (✅ SHIPPED, deploy main): หน้ารายละเอียด session แสดงชื่อท่าแทนรหัส `db-xxxx`
+
+หน้า `/history/:sessionId` แสดง `db-0597` / `db-0857` ขณะที่การ์ด History แสดง "lever seated hip abduction" / "wheel rollerout" · commit `062ff43`
+
+### ทำอะไร
+
+- สาเหตุ: ท่าที่ **สลับ** (`LoggerPage.tsx` ตั้ง `name: undefined` ตั้งใจ) และท่าที่ **เพิ่มระหว่างเล่น** (`addExerciseToWorkout` เก็บแค่ `exerciseId`) ถูกบันทึกลง session โดยไม่มี `name` · `sessionExerciseStats` ใส่ `exerciseId` เป็นชื่อแทน → เป็น string ไม่ว่าง → `current.name || meta.name` ใน `SessionDetailPage` ไม่ตกไปใช้ registry · การ์ดไม่เป็นเพราะเรียก `getExercise(id).name` ตรง
+- `lib/sessionStats.ts` — `name: ex.name || getExercise(ex.exerciseId).name` (เดิม `ex.name ?? ex.exerciseId`)
+- `lib/sessionStats.test.ts` — เคสใหม่: ไม่มี `name` → ได้ชื่อจาก registry ไม่ใช่ id
+
+### ผลกระทบ (จัดการแล้ว)
+
+- แก้ที่ตอนแสดงผล ไม่ migrate ข้อมูล → ประวัติเก่าที่มีแต่รหัสถูกต้องย้อนหลังทันที · `sessionExerciseStats` ถูกใช้เฉพาะใน `sessionStats.ts` (compareSession / prDaysByLift) กับหน้ารายละเอียด ไม่กระทบหน้าอื่น
+- id ที่ไม่อยู่ใน registry เลย (เช่น registry ยังไม่โหลด) จะแสดง "Exercise" แทนรหัส
+
+### verify
+
+`pnpm build` ผ่าน · ESLint ผ่าน · `pnpm test` 258 tests ผ่าน · e2e 390px (Playwright, ปลอม auth + seed session ด้วย `setState` ไม่ผ่าน action → ไม่แตะ Supabase; revert `main.tsx` แล้ว): ท่า `db-0597`/`db-0857` ไม่มีชื่อ → แสดงชื่อจาก registry ถูกต้อง · registry ใส่ 2 ท่าเองเพราะไลบรารีโหลดจาก Supabase ซึ่งไม่ได้ล็อกอินจริง · ยังไม่ได้เปิด session จริงบน production
+
+### ไม่ทำรอบนี้
+
+- ไม่เก็บ `name` ลง session ตอนสลับ/เพิ่มท่า (ตั้งใจให้ชื่อตามไลบรารีเสมอ ตามคอมเมนต์ใน `LoggerPage`)
 
 ---
 
