@@ -1,8 +1,28 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-26 (รอบ 70 — ✅ SHIPPED: Import Excel หา exercise_id จากชื่อท่าในไลบรารี)
+> อัปเดตล่าสุด: 2026-10-26 (รอบ 71 — ✅ SHIPPED: Preview ตอน Import กดขยายดูรายละเอียดแต่ละ Week ได้)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-10-26 — รอบ 71 (✅ SHIPPED, deploy main): Preview ตอน Import กดขยายดูรายละเอียดแต่ละ Week ได้
+
+ขั้น "Preview Program" ของ Import from Excel เดิมโชว์แค่สรุป 6 สัปดาห์แรก + ตัวอย่างวันแรกของ Week 1 · รอบนี้กดแถว Week เพื่อขยายดูทุกวัน/ทุกท่าได้ · commit `8e4c931`
+
+### ทำอะไร
+
+- `features/programs/ImportProgramSheet.tsx` — แถว Week เป็นปุ่ม (`aria-expanded`, ลูกศร `IconChevronRight` หมุนตามสถานะ) · ขยายแล้วแสดงทุกวัน (`MON · focus`) + ท่า (ชื่อ · label Variant/Prescription · `sets×reps @pct/@RPE` หรือ km/min สำหรับ running) · เปิดทีละ Week (state `openWeek`) · Week แรกเปิดไว้ให้ตอนเข้า preview
+- แสดงครบทุกสัปดาห์ (เดิม `slice(0, 6)` + "+N more weeks") · กล่อง "ตัวอย่าง" เดิมถูกแทนด้วย Week 1 ที่เปิดอยู่
+
+### verify
+
+`pnpm build` ผ่าน · ESLint ผ่าน · `pnpm test` 265 tests ผ่าน · e2e 390px (Playwright, ปลอม auth ผ่าน `setState`, 0 console errors): fixture `hybrid-program.xlsx` + ไฟล์จริง `12 Weeks SBD PR Test.xlsx` → 12 Week ครบ · ยุบ/เปิดสลับถูกต้อง · Week 12 แสดง attempt @90/97/102% · ไปขั้น Setup ได้ปกติ · **ไม่ได้กด "เริ่มโปรแกรม"** (จะเขียนลงบัญชีจริง) → ขั้นบันทึกไม่ได้เทส (รอบนี้ไม่ได้แตะ)
+- ⚠️ ไฟล์จริงผ่าน import ได้เพราะใน browser ทดสอบมี custom exercise 23 ท่า (3 ท่า map ได้) + ผมใส่อีก 4 ท่าลง registry จำลองเอง (assisted hanging knee raise with throw down · barbell bent over row · cable preacher curl · dumbbell hammer curl) — **ยังไม่ได้เช็กกับ 1,324 ท่าบน Supabase** (ต่อจากรอบ 70) · ถ้าบนแอปจริงยังขึ้น error ท่าไหน → ให้ admin สร้างใน Library หรือแก้ชื่อในไฟล์ให้ตรง
+
+### ไม่ทำรอบนี้
+
+- ไม่ทำหน้า preview ของโปรแกรมที่บันทึกแล้ว (ProgramOverviewPage มี WeekDays อยู่แล้ว) · ไม่ทำให้แก้ท่า/น้ำหนักใน preview
 
 ---
 
