@@ -1,8 +1,35 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-26 (รอบ 69 — ✅ SHIPPED: หน้ารายละเอียด session แสดงชื่อท่าแทนรหัส `db-xxxx`)
+> อัปเดตล่าสุด: 2026-10-26 (รอบ 70 — ✅ SHIPPED: Import Excel หา exercise_id จากชื่อท่าในไลบรารี)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-10-26 — รอบ 70 (✅ SHIPPED, deploy main): Import Excel หา exercise_id จากชื่อท่าในไลบรารี
+
+ไฟล์ `12 Weeks SBD PR Test.xlsx` (รูปแบบเดิม sheet `Program`) import ไม่ผ่าน 180 แถว: `Row N: ต้องมี "Lift" หรือ "exercise_id" + "exercise_name"` · สาเหตุ: ท่าเสริมมี `exercise_name` แต่ `exercise_id` ว่าง และ parser บังคับให้มีทั้งคู่ · commit `214cc45`
+
+### ทำอะไร
+
+- `lib/excelImport.ts` — แถว `exercise_id`/`exercise_name` ต้อง resolve กับไลบรารี (`allExercises()` = ท่าในโค้ด + `DB_EXERCISES` + custom): มีแต่ชื่อ → หาด้วยชื่อ (ไม่สนตัวพิมพ์/ช่องว่าง/ขีด) แล้วใช้ id ของไลบรารี · มีทั้ง id + ชื่อ → ต้องตรงกัน (ยอมชื่อใน `LIFT_DICTIONARY` เช่น "Squat" คู่ `squat`) · ไม่พบ/ไม่ตรง → error
+- error รวมเป็นรายการละท่า (`flag()` + `grouped`) เช่น `ไม่พบท่า "X" ในไลบรารี (Row 5, 29, … และอีก N แถว) — ให้ admin สร้างท่านี้ใน Library ก่อน แล้วนำเข้าใหม่` แทน 180 บรรทัด · ถ้า `DB_EXERCISES` ว่างจะต่อท้ายหมายเหตุให้รีเฟรช
+- ข้อยกเว้น: คอลัมน์ `Lift` (เดิม) และแถว `type = running` ไม่ถูกเช็กกับไลบรารี
+- `lib/excelImport.test.ts` — describe ใหม่ 7 เคส · `docs/excel-import-guide.md` + `CLAUDE.md` อัปเดตกติกา
+- ฝั่ง admin สร้างท่า: ใช้ปุ่มสร้างใน `LibraryPage` ที่มีอยู่ (coach/admin) ไม่ได้เพิ่มฟีเจอร์
+
+### ผลกระทบ (จัดการแล้ว)
+
+- ไฟล์รูปแบบเดิมที่ใช้ id ของตัวเองซึ่งไม่อยู่ในไลบรารี จะไม่ผ่านอีกต่อไป (ตั้งใจ ตามที่ผู้ใช้สั่งให้เข้มงวด) · ชื่อใน program ที่ import ใช้ชื่อจากไลบรารีแทนชื่อในไฟล์
+- parser ไม่โหลดไลบรารีเอง ต้องรอ registry จาก Supabase ตอน init → ถ้า import เร็วเกินไปท่าจาก server จะถูกมองว่าไม่พบ (มีหมายเหตุในข้อความ error)
+
+### verify
+
+`pnpm build` ผ่าน · ESLint ผ่าน · `pnpm test` 265 tests ผ่าน · รัน parser กับไฟล์จริง (เทสต์ชั่วคราว ลบแล้ว) โดยมีแค่ท่าในโค้ด: 8 จาก 15 ชื่อ map ได้ · อีก 7 ท่าไม่พบ: Bulgarian Split Squat · assisted hanging knee raise with throw down · barbell bent over row · cable preacher curl · one arm dumbbell row · back-extension · dumbbell hammer curl — **ยังไม่ได้เช็กกับ 1,324 ท่าบน Supabase และยังไม่ได้ click-through import บนแอปที่ล็อกอิน** · ควรลอง: import ไฟล์นี้หลัง deploy → ท่าไหนที่ขึ้น error ให้ admin สร้างใน Library หรือแก้ชื่อในไฟล์ให้ตรง
+
+### ไม่ทำรอบนี้
+
+- ไม่ทำ fuzzy match / แนะนำชื่อใกล้เคียง · ไม่เพิ่มปุ่มสร้างท่าจากหน้า import (ต้องไปสร้างใน Library เอง)
 
 ---
 
