@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import * as XLSX from 'xlsx'
 import { parseExcelFile } from './excelImport.js'
+import { setDbExercisesRegistry } from './data.js'
 
 // parseExcelFile only ever takes a File, so every case has to travel through a
 // real workbook. The binary fixture covers the shape a coach actually sends;
@@ -261,6 +262,76 @@ describe('parseExcelFile — what it will accept', () => {
       Program: [HEAD, row({ Lift: 'Deadlift' })],
     }))
     expect(program!.weeks[0].days[0].exercises[0].exerciseId).toBe('deadlift')
+  })
+})
+
+// ─── exercise_id / exercise_name must resolve against the library ─────────────
+
+describe('parseExcelFile — exercise library lookup', () => {
+  const LEGACY_HEAD = ['week', 'day_of_week', 'exercise_name', 'exercise_id', 'sets', 'reps']
+  const legacy = (...rows: unknown[][]) => makeXlsx({ Program: [LEGACY_HEAD, ...rows] })
+
+  afterEach(() => setDbExercisesRegistry([]))
+
+  it('fills the id from the library when only the name is given', async () => {
+    const { program, errors } = await parseExcelFile(legacy(
+      [1, 'Mon', 'Pull-Up', '', 3, 8],
+      [1, 'Mon', 'lat  pulldown', '', 3, 10],
+    ))
+    expect(errors).toEqual([])
+    const ex = program!.weeks[0].days[0].exercises
+    expect(ex.map(e => e.exerciseId)).toEqual(['pullup', 'lat-pd'])
+    expect(ex.map(e => e.name)).toEqual(['Pull-Up', 'Lat Pulldown'])
+  })
+
+  it('resolves names from the server library too', async () => {
+    setDbExercisesRegistry([{ id: 'db-0857', name: 'wheel rollerout', group: 'Core', equipment: 'Other' }])
+    const { program, errors } = await parseExcelFile(legacy([1, 'Mon', 'Wheel Rollerout', '', 3, 10]))
+    expect(errors).toEqual([])
+    expect(program!.weeks[0].days[0].exercises[0].exerciseId).toBe('db-0857')
+  })
+
+  it('reports an unknown name once, with its rows, and tells the admin to create it', async () => {
+    const rows = Array.from({ length: 7 }, (_, i) => [i + 1, 'Mon', 'Bulgarian Split Squat', '', 2, 6])
+    const { program, errors } = await parseExcelFile(legacy(...rows))
+    expect(program).toBeNull()
+    expect(errors).toHaveLength(2)
+    expect(errors[0]).toContain('"Bulgarian Split Squat"')
+    expect(errors[0]).toContain('Row 2, 3, 4, 5, 6 และอีก 2 แถว')
+    expect(errors[0]).toContain('admin')
+    expect(errors[1]).toContain('ยังไม่ได้โหลด')
+  })
+
+  it('rejects an id that is not in the library', async () => {
+    const { errors } = await parseExcelFile(legacy([1, 'Mon', 'Zercher Squat', 'zercher', 3, 5]))
+    expect(errors[0]).toContain('exercise_id "zercher"')
+  })
+
+  it('rejects a name that disagrees with its id', async () => {
+    const { program, errors } = await parseExcelFile(legacy([1, 'Mon', 'Lat Pulldown', 'pullup', 3, 8]))
+    expect(program).toBeNull()
+    expect(errors[0]).toContain('"pullup" คือ "Pull-Up"')
+    expect(errors[0]).toContain('"Lat Pulldown"')
+  })
+
+  it('accepts the main-lift spellings the 1RM calc already knows', async () => {
+    const { program, errors } = await parseExcelFile(legacy(
+      [1, 'Mon', 'Back Squat', 'squat', 5, 5],
+      [1, 'Mon', 'Squat', 'squat', 3, 5],
+      [1, 'Mon', 'Bench Press', 'bench', 3, 5],
+      [1, 'Mon', 'Deadlift', 'deadlift', 3, 5],
+    ))
+    expect(errors).toEqual([])
+    expect(program!.weeks[0].days[0].exercises.map(e => e.exerciseId))
+      .toEqual(['squat', 'squat', 'bench', 'deadlift'])
+  })
+
+  it('does not look running rows up in the library', async () => {
+    const { errors } = await parseExcelFile(makeXlsx({
+      Program: [['week', 'day_of_week', 'exercise_id', 'exercise_name', 'type', 'distance'],
+        [1, 'Mon', 'running', 'Easy Run', 'running', 5]],
+    }))
+    expect(errors).toEqual([])
   })
 })
 

@@ -3,6 +3,7 @@
 import type { WorkSheet } from 'xlsx'
 import type { StructuredProgram, StructuredWeek, StructuredDay, StructuredExercise, ProgramPhase } from '@atlaslog/shared'
 import { round2 } from './utils.js'
+import { allExercises, DB_EXERCISES } from './data.js'
 
 const VALID_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -92,6 +93,15 @@ function slug(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, '_')
 }
 
+function normName(s: string): string {
+  return s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+}
+
+function rowsLabel(rows: number[]): string {
+  const shown = rows.slice(0, 5).join(', ')
+  return rows.length > 5 ? `Row ${shown} และอีก ${rows.length - 5} แถว` : `Row ${shown}`
+}
+
 function prettifyName(fileName: string): string {
   return fileName.replace(/\.(xlsx|xls)$/i, '').replace(/[-_]+/g, ' ').trim()
 }
@@ -164,6 +174,22 @@ export async function parseExcelFile(file: File): Promise<ImportResult> {
     return v === undefined || v === null ? '' : String(v).trim()
   }
 
+  // Exercises written as exercise_id/exercise_name must exist in the library, so a
+  // row can never reference a lift the app can't resolve a name/GIF/muscle group for.
+  const library = allExercises()
+  const byId = new Map(library.map(e => [e.id, e]))
+  const byName = new Map<string, (typeof library)[number]>()
+  for (const e of library) if (!byName.has(normName(e.name))) byName.set(normName(e.name), e)
+  const nameMatches = (e: (typeof library)[number], name: string) =>
+    normName(e.name) === normName(name) || LIFT_DICTIONARY[slug(name)]?.id === e.id
+  // Same complaint on many rows (e.g. one missing accessory) is reported once.
+  const grouped = new Map<string, { rows: number[]; text: (rows: string) => string }>()
+  const flag = (key: string, rowNum: number, text: (rows: string) => string) => {
+    const g = grouped.get(key)
+    if (g) g.rows.push(rowNum)
+    else grouped.set(key, { rows: [rowNum], text })
+  }
+
   // Group rows by week → day-of-week
   const weekMap = new Map<number, Map<string, StructuredExercise[]>>()
   const weekPhase = new Map<number, ProgramPhase>()
@@ -202,8 +228,39 @@ export async function parseExcelFile(file: File): Promise<ImportResult> {
       if (mapped) { exerciseId = mapped.id; exerciseName = mapped.name }
       else { exerciseId = slug(liftRaw); exerciseName = liftRaw }
     } else {
-      exerciseId = slug(cellStr(row, 'exercise_id'))
-      exerciseName = cellStr(row, 'exercise_name') || liftRaw
+      const idRaw = cellStr(row, 'exercise_id')
+      const nameRaw = cellStr(row, 'exercise_name')
+      if (isRunning) {
+        exerciseId = slug(idRaw)
+        exerciseName = nameRaw
+      } else if (!idRaw && !nameRaw) {
+        errors.push(`Row ${rowNum}: ต้องมี "Lift" หรือ "exercise_name" (หรือ "exercise_id")`)
+        return
+      } else if (!idRaw) {
+        const hit = byName.get(normName(nameRaw)) ?? byId.get(LIFT_DICTIONARY[slug(nameRaw)]?.id ?? '')
+        if (!hit) {
+          flag(`name:${normName(nameRaw)}`, rowNum, rows =>
+            `ไม่พบท่า "${nameRaw}" ในไลบรารี (${rows}) — ให้ admin สร้างท่านี้ใน Library ก่อน แล้วนำเข้าใหม่`)
+          return
+        }
+        exerciseId = hit.id
+        exerciseName = hit.name
+      } else {
+        const id = idRaw.toLowerCase()
+        const hit = byId.get(id)
+        if (!hit) {
+          flag(`id:${id}`, rowNum, rows =>
+            `ไม่พบ exercise_id "${idRaw}" ในไลบรารี (${rows}) — ให้ admin สร้างท่านี้ใน Library ก่อน แล้วนำเข้าใหม่`)
+          return
+        }
+        if (nameRaw && !nameMatches(hit, nameRaw)) {
+          flag(`mismatch:${id}:${normName(nameRaw)}`, rowNum, rows =>
+            `exercise_id "${idRaw}" คือ "${hit.name}" ในไลบรารี แต่ไฟล์เขียนชื่อ "${nameRaw}" (${rows}) — แก้ชื่อหรือรหัสให้ตรงกัน`)
+          return
+        }
+        exerciseId = hit.id
+        exerciseName = hit.name
+      }
     }
     if (!exerciseId || !exerciseName) {
       errors.push(`Row ${rowNum}: ต้องมี "Lift" หรือ "exercise_id" + "exercise_name"`)
@@ -285,6 +342,10 @@ export async function parseExcelFile(file: File): Promise<ImportResult> {
     if (focusCol && !dayFocusMap.has(focusKey)) dayFocusMap.set(focusKey, focusCol)
   })
 
+  for (const g of grouped.values()) errors.push(g.text(rowsLabel(g.rows)))
+  if (grouped.size > 0 && DB_EXERCISES.length === 0) {
+    errors.push('หมายเหตุ: ไลบรารีท่าจากเซิร์ฟเวอร์ (1,324 ท่า) ยังไม่ได้โหลด — ลองรีเฟรชหน้าแล้วนำเข้าใหม่ก่อน')
+  }
   if (errors.length > 0) return { program: null, errors }
   if (weekMap.size === 0) return { program: null, errors: ['ไม่พบข้อมูลโปรแกรม (ตารางว่างเปล่า)'] }
 

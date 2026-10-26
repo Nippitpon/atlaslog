@@ -115,6 +115,9 @@ in one parser** — full details + coach guide in `docs/excel-import-guide.md`.
 
 **Legacy format** (still supported) — sheet `Program` + optional `Meta`: lowercase
 `week/phase/day_of_week/focus/exercise_name/exercise_id/type/sets/reps/pct/rpe/note`.
+`exercise_id` may be blank: the name is looked up in the library (`allExercises()`) and its id used;
+id + name given → must agree; unknown → grouped error telling an admin to create the exercise
+(`Lift` column and `running` rows are exempt).
 
 **Program name:** `Meta.name` if present, else derived from the **file name**, editable in Setup step.
 `Meta` sheet is optional; `program_type` `powerlifting` (default) / `general`.
