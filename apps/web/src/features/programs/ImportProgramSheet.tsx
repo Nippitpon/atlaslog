@@ -4,7 +4,7 @@ import type { StructuredProgram, ProgramConfig } from '@atlaslog/shared'
 import { parseExcelFile } from '../../lib/excelImport.js'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAppStore } from '../../store/useAppStore.js'
-import { IconX, IconUpload, IconCheck } from '../../components/icons/index.js'
+import { IconX, IconUpload, IconCheck, IconChevronRight } from '../../components/icons/index.js'
 import { formatDMY, programEndDate } from '../../lib/utils.js'
 import { DateField } from '../../components/DateField.js'
 
@@ -54,6 +54,7 @@ export function ImportProgramSheet({ onClose }: Props) {
   const [errors, setErrors] = useState<string[]>([])
   const [program, setProgram] = useState<StructuredProgram | null>(null)
   const [programName, setProgramName] = useState('')
+  const [openWeek, setOpenWeek] = useState<number | null>(null)
 
   // Setup step state
   const todayISO = new Date().toISOString().split('T')[0]
@@ -90,6 +91,7 @@ export function ImportProgramSheet({ onClose }: Props) {
       } else if (result.program) {
         setProgram(result.program)
         setProgramName(result.program.name)
+        setOpenWeek(result.program.weeks[0]?.weekNumber ?? null)
         setStep('preview')
       }
     } catch (err) {
@@ -241,59 +243,74 @@ export function ImportProgramSheet({ onClose }: Props) {
             </div>
 
             {/* Week breakdown */}
-            <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 8 }}>WEEK SUMMARY</div>
+            <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 8 }}>WEEK SUMMARY · แตะเพื่อดูรายละเอียด</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20 }}>
-              {program.weeks.slice(0, 6).map(w => (
-                <div key={w.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  background: 'var(--surface-2)', borderRadius: 10, padding: '8px 12px',
-                }}>
-                  <div className="t-mono" style={{ fontSize: 11, fontWeight: 700, minWidth: 60 }}>
-                    Week {w.weekNumber}
-                  </div>
-                  <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', flex: 1 }}>
-                    {w.phase} · {w.days.length} days
-                  </div>
-                  <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
-                    {w.days.reduce((s, d) => s + d.exercises.length, 0)} ex
-                  </div>
-                </div>
-              ))}
-              {program.weeks.length > 6 && (
-                <div className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', padding: '4px 12px' }}>
-                  +{program.weeks.length - 6} more weeks
-                </div>
-              )}
-            </div>
-
-            {/* Sample: first day of week 1 — confirms parsing + shows Variant/Prescription labels */}
-            {program.weeks[0]?.days[0] && (
-              <>
-                <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 8 }}>
-                  ตัวอย่าง — WEEK {program.weeks[0].weekNumber}, {program.weeks[0].days[0].dayOfWeek}
-                </div>
-                <div style={{
-                  background: 'var(--surface-2)', borderRadius: 10, padding: '10px 12px', marginBottom: 20,
-                  display: 'flex', flexDirection: 'column', gap: 6,
-                }}>
-                  {program.weeks[0].days[0].exercises.map((ex, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <span style={{ fontSize: 12, fontWeight: 600 }}>{ex.name}</span>
-                        {ex.label && (
-                          <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)' }}>{ex.label}</div>
-                        )}
+              {program.weeks.map(w => {
+                const open = openWeek === w.weekNumber
+                return (
+                  <div key={w.id} style={{ background: 'var(--surface-2)', borderRadius: 10, overflow: 'hidden' }}>
+                    <button
+                      type="button"
+                      aria-expanded={open}
+                      onClick={() => setOpenWeek(open ? null : w.weekNumber)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                        background: 'none', border: 'none', color: 'inherit', cursor: 'pointer',
+                        padding: '8px 12px', textAlign: 'left', font: 'inherit',
+                      }}
+                    >
+                      <div className="t-mono" style={{ fontSize: 11, fontWeight: 700, minWidth: 60 }}>
+                        Week {w.weekNumber}
                       </div>
-                      <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', flexShrink: 0 }}>
-                        {ex.type === 'running'
-                          ? [ex.distanceKm && `${ex.distanceKm}km`, ex.durationMin && `${ex.durationMin}min`].filter(Boolean).join(' · ')
-                          : `${ex.sets}×${ex.reps}${ex.pct ? ` @${Math.round(ex.pct * 100)}%` : ex.rpe !== undefined ? ` @RPE${ex.rpe}` : ''}`}
+                      <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', flex: 1 }}>
+                        {w.phase} · {w.days.length} days
+                      </div>
+                      <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
+                        {w.days.reduce((s, d) => s + d.exercises.length, 0)} ex
+                      </div>
+                      <span style={{
+                        display: 'flex', color: 'var(--muted)',
+                        transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s',
+                      }}>
+                        <IconChevronRight size={14} />
                       </span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
+                    </button>
+
+                    {open && (
+                      <div style={{
+                        borderTop: '1px solid var(--border)', padding: '10px 12px',
+                        display: 'flex', flexDirection: 'column', gap: 12,
+                      }}>
+                        {w.days.map(d => (
+                          <div key={d.id}>
+                            <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 6 }}>
+                              {d.dayOfWeek.toUpperCase()} · {d.focus}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {d.exercises.map((ex, i) => (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <div style={{ minWidth: 0, flex: 1 }}>
+                                    <span style={{ fontSize: 12, fontWeight: 600 }}>{ex.name}</span>
+                                    {ex.label && (
+                                      <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)' }}>{ex.label}</div>
+                                    )}
+                                  </div>
+                                  <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', flexShrink: 0 }}>
+                                    {ex.type === 'running'
+                                      ? [ex.distanceKm && `${ex.distanceKm}km`, ex.durationMin && `${ex.durationMin}min`].filter(Boolean).join(' · ')
+                                      : `${ex.sets}×${ex.reps}${ex.pct ? ` @${Math.round(ex.pct * 100)}%` : ex.rpe !== undefined ? ` @RPE${ex.rpe}` : ''}`}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
 
             <div style={{ display: 'flex', gap: 10 }}>
               <button className="btn btn-secondary" style={{ flex: 1 }}
