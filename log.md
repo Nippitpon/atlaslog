@@ -1,8 +1,35 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-26 (รอบ 71 — ✅ SHIPPED: Preview ตอน Import กดขยายดูรายละเอียดแต่ละ Week ได้)
+> อัปเดตล่าสุด: 2026-10-27 (รอบ 72 — ✅ SHIPPED: Weekly routine จบได้ — auto-complete + ปุ่ม Finish/Restart)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-10-27 — รอบ 72 (✅ SHIPPED, deploy main): Weekly routine จบได้ (Hybrid Powerbuilding V1 ค้าง Active)
+
+Weekly routine (ไม่มีวันเริ่ม/จบ) เล่นครบทุกวันแล้วยังอยู่ Active เพราะ `isProgramComplete` คืน `false` เสมอสำหรับ `weekly` · รอบนี้ให้จบได้ทั้งอัตโนมัติและกดเอง + มีทางกลับ (Restart) · commit `7666bda`
+
+### ทำอะไร
+
+- `lib/programStatus.ts` — `isProgramComplete` ตัด guard `weekly` ออก (weekly มี 1 week → ใช้ logic เดิม) · `getProgramStatus` คืน `completed` เมื่อ `program.weekly && meta.finishedAt` (จบมือแม้ยังมีวันเปิดอยู่ · completed ชนะ paused)
+- `packages/shared/src/types.ts` — `ProgramMeta.finishedAt?: number` (ไปกับ programMeta blob เดิม ไม่ต้อง migrate)
+- `store/useProgramStore.ts` — `finishProgram(id)` ใหม่ · `restartProgram(id, config?)` config เป็น optional (weekly ไม่มี config) และเคลียร์ `finishedAt`
+- `features/programs/ProgramOverviewPage.tsx` — branch weekly: ปุ่ม **Finish program** (เมื่อเริ่มแล้วและยังไม่จบ) + **Restart** (เมื่อเริ่มแล้ว/จบแล้ว) ทั้งคู่ `window.confirm`
+- เทสต์: `programStatus.test.ts` (แทนเทสต์ "never completes weekly" ด้วย 3 เคสใหม่) · `restartProgram.test.ts` (weekly restart)
+
+### ผลกระทบ (จัดการแล้ว)
+
+- ปุ่ม Pause หายเมื่อ Completed (เงื่อนไขเดิม `active/paused/ended`) → ทางกลับคือ Restart
+- ⚠️ routine ที่วนซ้ำทุกสัปดาห์จะกลายเป็น Completed ทุกครั้งที่ติ๊กครบ → ต้องกด Restart เพื่อเริ่มสัปดาห์ใหม่ (ตามที่ผู้ใช้เลือก)
+
+### verify
+
+`pnpm build` ผ่าน · ESLint ผ่าน · `pnpm test` 267 tests ผ่าน · ⚠️ **ยังไม่ได้ click-through e2e** — ควรเช็คที่ 390px: ติ๊กครบทุกวัน → pill COMPLETED + การ์ดย้ายไปกลุ่ม Completed ใน `/programs` · Restart → กลับ Active/ไม่มี progress · Finish ตอนมีวันค้าง → Completed
+
+### ไม่ทำรอบนี้
+
+- ไม่ทำ reset รายสัปดาห์อัตโนมัติสำหรับ routine ที่ใช้วนซ้ำ (ใช้ Restart มือแทน) · ไม่ใช้ confirm sheet ของแอป ใช้ `window.confirm` ไปก่อน
 
 ---
 
