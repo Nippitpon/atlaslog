@@ -1,8 +1,29 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-27 (รอบ 72 — ✅ SHIPPED: Weekly routine จบได้ — auto-complete + ปุ่ม Finish/Restart)
+> อัปเดตล่าสุด: 2026-10-27 (รอบ 73 — ✅ SHIPPED: หน้า Program เรียงวัน Mon→Sat เสมอ แม้ add วันทีหลัง)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-10-27 — รอบ 73 (✅ SHIPPED, deploy main): หน้า Program เรียงวัน Mon→Sat เสมอ
+
+ตอน edit program แล้ว add วันทีหลัง (เช่น Mon Tue Fri + Wed) วันถูกเก็บตามลำดับที่เพิ่ม → หน้า Program แสดง Mon Tue Fri Wed · รอบนี้เรียงตามปฏิทินทั้งตอนแสดงและตอนบันทึก · commit `2777616`
+
+### ทำอะไร
+
+- `lib/programStatus.ts` — `sortDaysByWeekday()` ใหม่ (ใช้ `DAY_INDEX` เดิม · ไม่ mutate · stable · weekday แปลก ๆ ไปท้าย)
+- `features/programs/WeekDays.tsx` · `features/dashboard/DashboardPage.tsx` (แถวสถานะวันของ current week) — เรียงตอนแสดง → โปรแกรมเก่าที่เคยเก็บลำดับผิดไว้เรียงถูกทันที ไม่ต้องแก้ข้อมูล
+- `features/programs/CreateProgramPage.tsx` — `handleCreate` เรียง `days` ก่อนสร้าง program → ข้อมูลที่เก็บเรียงถูกด้วย · day id ของวันเดิมคงเดิม (ผูกกับ `d.id` ไม่ใช่ตำแหน่ง) ความคืบหน้าไม่หาย
+- เทสต์ใหม่ 2 เคสใน `programStatus.test.ts`
+
+### verify
+
+`pnpm build` ผ่าน · ESLint ผ่าน · `pnpm test` 269 tests ผ่าน · ⚠️ ยังไม่ได้ click-through e2e (ควรเช็ค: edit program → add Wed ทีหลัง → หน้า Program เรียง Mon Tue Wed Fri)
+
+### ไม่ทำรอบนี้
+
+- ฟอร์ม create/edit ยังโชว์วันตามลำดับที่เพิ่มจนกว่าจะบันทึก (ไม่เรียง live เพราะ index `di` ของฟอร์มผูกกับ state/picker) · `ImportProgramSheet` / `PublicProgramSheet` ไม่แตะ (Excel import เรียงอยู่แล้วใน `excelImport.ts`)
 
 ---
 
