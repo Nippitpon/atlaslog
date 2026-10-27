@@ -250,6 +250,7 @@ export interface ProgramMeta {
   paused?: boolean
   updatedAt?: number    // epoch ms — last create/import/edit of the program
   activatedAt?: number  // epoch ms — last time the program was set up / resumed
+  finishedAt?: number   // epoch ms — weekly routine ended by hand; cleared on restart
 }
 
 export interface ProgramMetaState {

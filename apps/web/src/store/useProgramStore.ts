@@ -31,7 +31,8 @@ interface ProgramStore {
   setDayStatus: (programId: string, weekId: string, dayId: string, status: DayStatus) => void
   setRunDayStatus: (dayRef: string, logged: boolean) => void
   markDayStarted: (dayRef: string) => void
-  restartProgram: (programId: string, config: ProgramConfig) => void
+  restartProgram: (programId: string, config?: ProgramConfig) => void
+  finishProgram: (programId: string) => void
 
   setConfig: (programId: string, config: ProgramConfig) => void
   clearConfig: (programId: string) => void
@@ -150,10 +151,12 @@ export const useProgramStore = create<ProgramStore>()(
           return {
             progress,
             customAccessories,
-            configs: { ...state.configs, [programId]: config },
+            // Weekly routines have no config to write
+            configs: config ? { ...state.configs, [programId]: config } : state.configs,
             // Same stamp setConfig makes — a restart is the newest activation, and
             // a paused program must come back active rather than stay parked.
-            programMeta: mergeMeta(state.programMeta, programId, { activatedAt: Date.now(), paused: false }),
+            programMeta: mergeMeta(state.programMeta, programId,
+              { activatedAt: Date.now(), paused: false, finishedAt: undefined }),
           }
         })
         const app = useAppStore.getState()
@@ -161,6 +164,13 @@ export const useProgramStore = create<ProgramStore>()(
         // back into the progress we just cleared the moment it is finished.
         if (app.workout?.programId.split('/')[0] === programId) app.cancelWorkout()
         app.unlinkProgramRuns(programId)
+        queueStateSync(get)
+      },
+
+      finishProgram: (programId) => {
+        set(state => ({
+          programMeta: mergeMeta(state.programMeta, programId, { finishedAt: Date.now(), paused: false }),
+        }))
         queueStateSync(get)
       },
 

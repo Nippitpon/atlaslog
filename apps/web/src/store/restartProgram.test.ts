@@ -185,3 +185,17 @@ describe('restartProgram', () => {
     expect(as().workout).toEqual(elsewhere)
   })
 })
+
+describe('restartProgram on a weekly routine', () => {
+  it('clears progress and finishedAt without needing a config', () => {
+    ps().setDayStatus(MULTI_PROGRAM_ID, 'week-1', W1_MON, 'done')
+    ps().finishProgram(MULTI_PROGRAM_ID)
+    expect(ps().programMeta[MULTI_PROGRAM_ID]?.finishedAt).toBeTypeOf('number')
+
+    ps().restartProgram(MULTI_PROGRAM_ID)
+
+    expect(programProgress(multi, ps().progress).doneDays).toBe(0)
+    expect(ps().programMeta[MULTI_PROGRAM_ID]?.finishedAt).toBeUndefined()
+    expect(ps().configs[MULTI_PROGRAM_ID]).toBeDefined()
+  })
+})

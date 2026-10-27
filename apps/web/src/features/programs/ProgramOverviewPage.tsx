@@ -25,7 +25,7 @@ const PHASE_COLOR: Record<string, string> = {
 export function ProgramOverviewPage() {
   const { programId } = useParams<{ programId: string }>()
   const navigate = useNavigate()
-  const { getConfig, customPrograms, progress, programMeta, toggleFavorite, setProgramPaused } = useProgramStore()
+  const { getConfig, customPrograms, progress, programMeta, toggleFavorite, setProgramPaused, finishProgram, restartProgram } = useProgramStore()
   const { isCoach, isAdmin } = useAuthStore()
   const [sheetMode, setSheetMode] = useState<'setup' | 'restart' | null>(null)
 
@@ -120,6 +120,33 @@ export function ProgramOverviewPage() {
             <div className="t-eyebrow">TRAINING DAYS</div>
           </div>
           {program.weeks[0] && <WeekDays program={program} week={program.weeks[0]} />}
+          {(status === 'completed' || hasStarted(program, progress)) && (
+            <div style={{ padding: '16px 20px 24px', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              {status !== 'completed' && (
+                <button
+                  onClick={() => { if (window.confirm('Finish this program? You can restart it later.')) finishProgram(program.id) }}
+                  style={{
+                    all: 'unset', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 10,
+                    textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--muted)',
+                    border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px',
+                  }}
+                >
+                  Finish program
+                </button>
+              )}
+              <button
+                onClick={() => { if (window.confirm('Restart this program? Day progress will be cleared.')) restartProgram(program.id) }}
+                style={{
+                  all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                  fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase',
+                  letterSpacing: '0.08em', color: 'var(--muted)',
+                  border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px',
+                }}
+              >
+                <IconRefresh size={13} /> Restart
+              </button>
+            </div>
+          )}
         </>
       ) : (
       <>

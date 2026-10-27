@@ -257,15 +257,20 @@ describe('isProgramComplete', () => {
     }))).toBe(false)
   })
 
-  // A repeating routine has no end to reach. Completing it also took away its
-  // pause button on two screens, with no restart path to get back.
-  it('never completes a weekly routine', () => {
-    expect(isProgramComplete(weeklyRoutine(), routineSettled)).toBe(false)
-    expect(getProgramStatus(weeklyRoutine(), undefined, undefined, routineSettled)).toBe('active')
+  it('completes a weekly routine once every day is settled', () => {
+    expect(isProgramComplete(weeklyRoutine(), routineSettled)).toBe(true)
+    expect(getProgramStatus(weeklyRoutine(), undefined, undefined, routineSettled)).toBe('completed')
   })
 
-  it('leaves a paused weekly routine paused rather than completing it', () => {
-    expect(getProgramStatus(weeklyRoutine(), undefined, { paused: true }, routineSettled)).toBe('paused')
+  it('keeps a weekly routine active while a day is open', () => {
+    const open = progressOf({ w1: { d1: 'done' } })
+    expect(getProgramStatus(weeklyRoutine(), undefined, undefined, open)).toBe('active')
+  })
+
+  it('completes a weekly routine finished by hand, open days or not', () => {
+    const open = progressOf({ w1: { d1: 'done' } })
+    expect(getProgramStatus(weeklyRoutine(), undefined, { finishedAt: 1 }, open)).toBe('completed')
+    expect(getProgramStatus(weeklyRoutine(), undefined, { finishedAt: 1, paused: true }, open)).toBe('completed')
   })
 
   // totalWeeks is metadata nothing keeps in sync with the weeks array. Counting

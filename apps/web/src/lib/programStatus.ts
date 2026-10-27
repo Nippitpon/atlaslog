@@ -171,9 +171,10 @@ export function hasStarted(program: StructuredProgram, progress: ProgramProgress
   return Object.values(byWeek).some(week => Object.values(week).some(s => s !== 'not_started'))
 }
 
-// A plan the user has run out of. Three things this must not get wrong:
-// · a weekly routine repeats forever, so 'completed' is a category error for it —
-//   and it would cost the routine its pause button on two screens with no way back;
+// A plan the user has run out of. Two things this must not get wrong:
+// · a weekly routine has one week, so it completes when every day is settled; the
+//   Restart button on its overview is the way back, and meta.finishedAt covers
+//   ending it early (see getProgramStatus);
 // · the denominator is program.weeks, the same list countDoneWeeks iterates —
 //   program.totalWeeks is a separate metadata field that nothing keeps in sync, and
 //   a stale one reports completion early or never at all;
@@ -184,7 +185,6 @@ export function isProgramComplete(
   program: StructuredProgram,
   progress: ProgramProgressState,
 ): boolean {
-  if (program.weekly) return false
   const trackable = program.weeks.filter(w => w.days.length > 0).length
   return trackable > 0 && countDoneWeeks(program, progress) === trackable
 }
@@ -196,7 +196,7 @@ export function getProgramStatus(
   progress: ProgramProgressState,
   now: Date = new Date(),
 ): ProgramStatus {
-  if (isProgramComplete(program, progress)) return 'completed'
+  if (isProgramComplete(program, progress) || (program.weekly && meta?.finishedAt)) return 'completed'
   if (meta?.paused) return 'paused'
   if (config) {
     // A start date still ahead is not a status of its own: the plan is set up, so it
