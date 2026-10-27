@@ -12,7 +12,7 @@ import { weeklyVolume, getDayOfWeek, runTarget, formatNum2, formatDMY } from '..
 import { latestWeightKg, weeklyCalories } from '../../lib/calories.js'
 import { CalorieRing } from './CalorieRing.js'
 import { useStartWorkout } from '../../hooks/useStartWorkout.js'
-import { pickHomeProgram, pickActiveWeek, dayRef as buildDayRef } from '../../lib/programStatus.js'
+import { pickHomeProgram, pickActiveWeek, sortDaysByWeekday, dayRef as buildDayRef } from '../../lib/programStatus.js'
 import { IconDumbbell, IconSearch, IconCheck, IconBell, IconRun, IconUsers, IconX, IconPlay, IconTrendingUp } from '../../components/icons/index.js'
 import { OneRMSparkline } from '../../components/charts/OneRMSparkline.js'
 import { buildLiftSeries } from '../../lib/oneRM.js'
@@ -588,7 +588,7 @@ export function DashboardPage() {
 
                 {/* Day status row */}
                 <div style={{ display: 'flex', gap: 5, marginBottom: 12 }}>
-                  {currentWeek.days.map(day => {
+                  {sortDaysByWeekday(currentWeek.days).map(day => {
                     const status = getDayStatus(program.id, currentWeek.id, day.id)
                     const isActive = status === 'in_progress'
                     const isDone = status === 'done'

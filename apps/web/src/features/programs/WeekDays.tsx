@@ -8,7 +8,7 @@ import { useAuthStore } from '../../store/useAuthStore.js'
 import { canEditProgram } from '../../lib/programPermissions.js'
 import { structuredWeight, resolveCalcRMs } from '../../lib/rpeTable.js'
 import { resolveDayExercises } from '../../lib/dayLayout.js'
-import { dayRef as buildDayRef, isDayPast, DAY_STATUS_EDGE } from '../../lib/programStatus.js'
+import { dayRef as buildDayRef, isDayPast, sortDaysByWeekday, DAY_STATUS_EDGE } from '../../lib/programStatus.js'
 import { DayStatusBadge } from '../../components/DayStatusBadge.js'
 import { useStartWorkout } from '../../hooks/useStartWorkout.js'
 import { runTarget, formatNum2 } from '../../lib/utils.js'
@@ -276,7 +276,7 @@ export function WeekDays({ program, week }: { program: StructuredProgram; week: 
   return (
     <>
       <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {week.days.map(day => {
+        {sortDaysByWeekday(week.days).map(day => {
           const exercises = resolveDayExercises(day, getDayLayout(program.id, week.id, day.id))
           const ref = buildDayRef(program.id, week.id, day.id)
           const status = getDayStatus(program.id, week.id, day.id)

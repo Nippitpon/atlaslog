@@ -7,6 +7,7 @@ import { createShare } from '../../lib/shareApi.js'
 import { allExercises } from '../../lib/data.js'
 import { getExercise, moveItem, muscleColor, runTarget, round2 } from '../../lib/utils.js'
 import { ReorderList } from '../../components/ReorderList.js'
+import { sortDaysByWeekday } from '../../lib/programStatus.js'
 import { IconChevronLeft, IconPlus, IconX, IconCheck, IconSearch, IconCopy, IconRun } from '../../components/icons/index.js'
 
 type Visibility = 'private' | 'code' | 'public'
@@ -114,7 +115,8 @@ export function CreateProgramPage() {
     // Assign stable day ids ONCE: keep existing (preserves progress), new days get
     // a fresh non-positional id so nothing collides / drifts on later edits.
     const stamp = Date.now()
-    const dayIds = days.map((d, di) => d.id ?? `day-${stamp}-${di}`)
+    const ordered = sortDaysByWeekday(days)
+    const dayIds = ordered.map((d, di) => d.id ?? `day-${stamp}-${di}`)
     const program: StructuredProgram = {
       id: editing ? editing.id : `custom-${stamp}`,
       name: name.trim(),
@@ -131,7 +133,7 @@ export function CreateProgramPage() {
         id: `week-${wi + 1}`,
         weekNumber: wi + 1,
         phase: 'Accumulation' as const,
-        days: days.map((d, di) => ({
+        days: ordered.map((d, di) => ({
           id: dayIds[di],
           dayOfWeek: d.dayOfWeek,
           focus: d.focus.trim() || `${d.dayOfWeek} Training`,

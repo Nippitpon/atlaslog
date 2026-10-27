@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type { DayStatus, ProgramProgressState, StructuredProgram } from '@atlaslog/shared'
 import {
   dayRef, resolveDayRef, doneDaysInWeek, settledDaysInWeek, remainingDays, programProgress,
-  reachedWeekNum, isWeekDone, weekStatus, getProgramStatus, isProgramComplete, dayDate, isDayPast,
+  reachedWeekNum, sortDaysByWeekday, isWeekDone, weekStatus, getProgramStatus, isProgramComplete, dayDate, isDayPast,
   programDateState, daysUntilStart, pickHomeProgram, groupProgramsByStatus,
 } from './programStatus.js'
 import { makeRunProgram, RUN_PROGRAM_ID, RUN_WEEK_ID, RUN_DAY_ID, MIXED_DAY_ID } from '../test/fixtures.js'
@@ -440,5 +440,18 @@ describe('groupProgramsByStatus', () => {
     const metas = { run: { activatedAt: 1 }, next: { activatedAt: 999 } }
     const groups = groupProgramsByStatus([prog('next'), prog('run')], configs, metas, {}, [], day(2026, 10, 20))
     expect(groups[0]!.items.map(i => i.program.id)).toEqual(['run', 'next'])
+  })
+})
+
+describe('sortDaysByWeekday', () => {
+  it('orders days Mon→Sat regardless of the order they were added', () => {
+    const days = ['Mon', 'Tue', 'Fri', 'Wed'].map(dayOfWeek => ({ dayOfWeek }))
+    expect(sortDaysByWeekday(days).map(d => d.dayOfWeek)).toEqual(['Mon', 'Tue', 'Wed', 'Fri'])
+  })
+
+  it('does not mutate the input', () => {
+    const days = [{ dayOfWeek: 'Fri' }, { dayOfWeek: 'Mon' }]
+    sortDaysByWeekday(days)
+    expect(days[0]!.dayOfWeek).toBe('Fri')
   })
 })

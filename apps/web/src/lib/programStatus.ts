@@ -508,6 +508,12 @@ export function resolveDayRef(
 
 const DAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
 
+// Calendar order for a week's days. Days are stored in the order they were added,
+// so a Wed added after Fri would otherwise list last. Stable, so same-weekday ties keep order.
+export function sortDaysByWeekday<T extends { dayOfWeek: string }>(days: T[]): T[] {
+  return [...days].sort((a, b) => (DAY_INDEX[a.dayOfWeek] ?? 7) - (DAY_INDEX[b.dayOfWeek] ?? 7))
+}
+
 // The calendar date a program day falls on. Weeks are 7-day blocks counted from
 // startDate (same arithmetic as scheduledWeekNum and the week ranges shown on the
 // overview page), and every weekday name appears exactly once inside a block —
