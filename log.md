@@ -1,8 +1,72 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-27 (รอบ 73 — ✅ SHIPPED: หน้า Program เรียงวัน Mon→Sat เสมอ แม้ add วันทีหลัง)
+> อัปเดตล่าสุด: 2026-10-28 (รอบ 75 — PLANNED: Gamification EXP/Level/Tier · รอบ 74 — รีสกิน Liquid Crimson Glass ขั้น 1–3 ยังไม่ commit)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-10-28 — รอบ 75 (PLANNED, ยังไม่ลงมือ): Gamification — EXP / Level / Tier
+
+`DESIGN.md` §6 ออกแบบระบบ Gamification ไว้ (Athlete Tier + EXP bar, 4 Core EXP Pillars, Tier Roadmap) แต่ยัง**ไม่มีในแอป** — ไม่ใช่การรีสกิน ต้องมีกฎคำนวณใหม่ จึงแยกเป็นรอบของตัวเอง ทำหลังรอบ 74 จบ
+
+### แนวทาง (ยังไม่ตัดสินใจเรื่องตัวเลข)
+
+- **EXP ไม่เก็บ** — คำนวณจาก `Session[]` on the fly แบบเดียวกับ e1RM (`buildLiftSeries`) → ไม่ต้องมี store/persist/sync ใหม่ และไม่เพี้ยนเมื่อแก้/ลบ session · ฟังก์ชัน pure ใน `lib/` (เช่น `lib/exp.ts`) + test
+- 4 Pillars → แหล่งที่มา:
+  - **Consistency** — streak (สัปดาห์/วันที่ฝึก) จาก `session.date`
+  - **Volume & Effort** — tonnage จาก volume ที่ `lib/utils.ts` คำนวณอยู่แล้ว
+  - **Mastery & PRs** — PR จาก e1RM series / `oneRMHistory` (ต้องนิยามว่า PR = e1RM ใหม่สูงสุด หรือ 1RM test)
+  - **Diversity** — ความหลากหลายท่า/กล้ามเนื้อ (ใช้กลุ่มจาก `lib/utils.ts`)
+- Level = f(EXP รวม) · Tier = ช่วงของ Level (Tier Roadmap: unlocked / current / locked)
+
+### ต้องตัดสินใจก่อนลงมือ
+
+- สูตร EXP ต่อ pillar + น้ำหนักรวม + เส้น Level/Tier (ตัวเลขจริง)
+- นับ session แบบไหน: เฉพาะ `done` sets? รวม run? รวมการ import ย้อนหลัง/backdating? (กัน farm EXP)
+- ⚠️ ห้ามให้ EXP ลดเมื่อลบ session ถ้าอยากให้ Level ไม่ถอย → ต้อง snapshot (ขัดกับ "ไม่เก็บ") — เลือกอย่างใดอย่างหนึ่ง
+- แสดงที่ไหน: Dashboard hero / Profile / หน้า `/level` ใหม่
+
+### Verify (ตอนทำจริง)
+
+- test: EXP deterministic · session ว่าง = 0 · streak ข้ามสัปดาห์/เดือน · backdate ไม่ให้ streak พัง
+- e2e 390px: EXP bar animate, Tier Roadmap 3 สถานะ, 0 console errors
+
+### ข้อควรระวัง
+
+- CLAUDE.md: types ใหม่ไปที่ `packages/shared/src/types.ts` · ไม่ใส่ backend call (Phase 1–2 logic) · Phase 3 sync ถ้ามี state ใหม่
+- ไม่ prefill `rpe` จาก `targetRpe` (กฎ e1RM เดิม) — PR ที่นับจาก RPE-prescribed row จะ flat by construction
+
+### ไฟล์
+
+`packages/shared/src/types.ts` · `lib/exp.ts` (ใหม่) · `lib/utils.ts` (volume, muscle group) · `components/charts/oneRMScale.ts`/`lib/oneRM.ts` (PR) · `features/dashboard/DashboardPage.tsx` · `features/profile/ProfilePage.tsx`
+
+---
+
+## 2026-10-28 — รอบ 74 (ยังไม่ commit): รีสกิน Liquid Crimson Glass ขั้น 1–3 (token + คลาสร่วม + index.html)
+
+เริ่มรีสกินตาม `DESIGN.md` — รอบนี้ทำเฉพาะชั้นที่แก้จุดเดียวแล้วกระทบทั้งแอป ยังไม่ไล่สีที่ฝังในโค้ด
+
+### ทำอะไร
+
+- `index.css` token — `--accent` lime `#d4ff3a` → crimson `#ff1744` · `--accent-ink` ดำ → ขาว · `--success` แยกจาก accent เป็น `#10b981` (ไม่มีโค้ดอ่าน `var(--success)` อยู่) · พื้น/surface/border/text ชุด obsidian · เพิ่ม `--accent-rgb` `--accent-grad` `--accent-glow` `--glass-bg` `--glass-highlight`
+- `index.css` คลาสร่วม — `.card` glass (blur + specular) · `.btn-primary` gradient + glow · `.sheet` highlight · `.bottom-nav` blur 24px · `.atlas-app` แสง crimson มุมขวาบน · แทนที่ lime ที่ฝังใน `.bar-fill.today` `.set-row.complete` `.fab` `pulse-bg` `.avatar` ด้วย var
+- `--font-display` Space Grotesk → Inter (โหลดน้ำหนัก 800/900) · `--font-mono` ยังเป็น JetBrains Mono · `index.html` `theme-color` `#0a0a0c`
+- ธีม light คงไว้ แค่เปลี่ยน accent เป็น `#d90429` (ยังไม่ออกแบบ light crimson เต็มรูปแบบ)
+
+### ผลกระทบ
+
+- ไม่แตะ logic (คำนวณน้ำหนัก, e1RM, program progress, import, persist) · `pnpm test` ไม่ต้องแก้
+
+### verify
+
+`pnpm build` ผ่าน · ESLint ผ่าน · `pnpm test` 269 tests ผ่าน · ⚠️ ยังไม่ได้ดูหน้าจริง/click-through e2e 390px
+
+### ไม่ทำรอบนี้ / งานค้างรีสกิน
+
+- **ขั้น 4 — สีที่ฝังใน `lib/*.ts`** ต้องตัดสินใจเชิงดีไซน์: `programStatus.ts` (in_progress ใช้ `rgba(212,255,58,…)` ยังเป็น lime) · `historyCalendar.ts` (`run`=`var(--accent)` ชนกับ `missed`=`var(--danger)` `#ff5b3a` ที่ใกล้แดง) · `utils.ts` สีกลุ่มกล้ามเนื้อ (Chest `#ff6b6b` ใกล้ accent) · `oneRMScale.ts`/`bodyMetrics.ts` (คอมเมนต์ "ห้ามใช้ accent" ต้องทบทวนความหมาย you/now/active)
+- สีฝังใน `.tsx` ~99 จุด/27 ไฟล์ (มากสุด `DashboardPage`) · กราฟ `OneRMChart`/`MetricChart` · `--danger` · `--font-mono` ตาม DESIGN.md (Inter ล้วน?) · ธีม light ตัดหรือเก็บ · กรอบมือถือ 402×874
+- `DESIGN.md` มีจุดไม่สอดคล้อง: ลิงก์ Stitch บรรทัด 1 · `glass-border-active` `235,14,57` ≠ primary · ใช้คลาส Tailwind ทั้งที่แอปไม่ใช้ Tailwind
 
 ---
 
