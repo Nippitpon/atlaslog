@@ -1,6 +1,6 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-28 (รอบ 75 — PLANNED: Gamification EXP/Level/Tier · รอบ 74 — รีสกิน Liquid Crimson Glass ขั้น 1–3 ยังไม่ commit)
+> อัปเดตล่าสุด: 2026-10-28 (รอบ 75 — PLANNED: Gamification EXP/Level/Tier · รอบ 74 — ✅ SHIPPED: รีสกิน Liquid Crimson Glass ขั้น 1–4)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
 
@@ -43,7 +43,7 @@
 
 ---
 
-## 2026-10-28 — รอบ 74 (ยังไม่ commit): รีสกิน Liquid Crimson Glass ขั้น 1–3 (token + คลาสร่วม + index.html)
+## 2026-10-28 — รอบ 74 (✅ SHIPPED, deploy main `1b6569e` `b9c768d`): รีสกิน Liquid Crimson Glass ขั้น 1–3 (token + คลาสร่วม + index.html)
 
 เริ่มรีสกินตาม `DESIGN.md` — รอบนี้ทำเฉพาะชั้นที่แก้จุดเดียวแล้วกระทบทั้งแอป ยังไม่ไล่สีที่ฝังในโค้ด
 
@@ -62,7 +62,7 @@
 
 `pnpm build` ผ่าน · ESLint ผ่าน · `pnpm test` 269 tests ผ่าน · ⚠️ ยังไม่ได้ดูหน้าจริง/click-through e2e 390px
 
-### ขั้น 4 — สีสถานะ (ทำแล้ว, ยังไม่ commit)
+### ขั้น 4 — สีสถานะ (✅ SHIPPED `b9c768d`)
 
 - แทน `rgba(212,255,58,…)` (lime) ทุกจุดใน `.ts`/`.tsx` ด้วย `rgba(var(--accent-rgb),…)` — `programStatus.ts` (`in_progress`) + ~20 จุดใน `DashboardPage` `CreateProgramPage` `ProgramOverviewPage` `DayEditSheet` `ImportProgramSheet` `PublicProgramSheet` `ProfilePage` `AthleteDetailPage` `DayDetailSheet` `SessionDetailPage` · grep lime เหลือ 0
 - สี "พลาด" (`CALENDAR_DOT.missed`) เปลี่ยนจาก `var(--danger)` เป็นเทา `var(--muted)` + จุดวงกลมขีดทับ (`struck` flag ใหม่ ใช้ใน `HistoryCalendar.tsx` `Dot`) → ไม่ชนแดงของ accent (run/now)
