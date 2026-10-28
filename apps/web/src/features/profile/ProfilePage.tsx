@@ -582,7 +582,7 @@ export function ProfilePage() {
                         onClick={() => setBioDraft(d => ({ ...d, activityLevel: lvl }))}
                         style={{ textAlign: 'left', padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
                           border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-                          background: active ? 'rgba(212,255,58,0.10)' : 'var(--surface-2)' }}
+                          background: active ? 'rgba(var(--accent-rgb),0.10)' : 'var(--surface-2)' }}
                       >
                         <div style={{ fontSize: 12, fontWeight: 600, color: active ? 'var(--accent)' : 'var(--text)' }}>
                           {ACTIVITY[lvl].label}

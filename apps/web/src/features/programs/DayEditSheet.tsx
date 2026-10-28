@@ -184,7 +184,7 @@ export function DayEditSheet({ exercises, onSave, onClose }: Props) {
                     all: 'unset', display: 'flex', alignItems: 'center', gap: 12,
                     width: '100%', padding: '10px 4px', cursor: 'pointer',
                     borderBottom: '1px solid var(--border)',
-                    background: pickedId === ex.id ? 'rgba(212,255,58,0.08)' : 'transparent',
+                    background: pickedId === ex.id ? 'rgba(var(--accent-rgb),0.08)' : 'transparent',
                     boxSizing: 'border-box',
                   }}
                 >

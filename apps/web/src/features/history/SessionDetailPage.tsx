@@ -149,7 +149,7 @@ export function SessionDetailPage() {
       <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         {prs.length > 0 && (
           <div className="card card-tight" style={{
-            background: 'rgba(212,255,58,0.08)', border: '1px solid rgba(212,255,58,0.35)',
+            background: 'rgba(var(--accent-rgb),0.08)', border: '1px solid rgba(var(--accent-rgb),0.35)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <IconBolt size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />

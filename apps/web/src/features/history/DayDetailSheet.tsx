@@ -180,7 +180,7 @@ export function DayDetailSheet({
           {prs.length > 0 && (
             <div className="t-mono" style={{
               fontSize: 11, color: 'var(--accent)', padding: '8px 12px', borderRadius: 10,
-              background: 'rgba(212,255,58,0.08)', border: '1px solid rgba(212,255,58,0.3)',
+              background: 'rgba(var(--accent-rgb),0.08)', border: '1px solid rgba(var(--accent-rgb),0.3)',
             }}>
               ⚡ PR · {prs.map(p => `${LIFT_LABEL[p.lift]} ${Math.round(p.e1rm)}kg`).join(' · ')}
               <span style={{ color: 'var(--muted)' }}> (e1RM)</span>

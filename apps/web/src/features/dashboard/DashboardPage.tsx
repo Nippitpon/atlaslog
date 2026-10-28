@@ -597,10 +597,10 @@ export function DashboardPage() {
                       <div key={day.id} style={{
                         flex: 1, textAlign: 'center', padding: '6px 4px',
                         background: isActive
-                          ? 'rgba(212,255,58,0.12)'
+                          ? 'rgba(var(--accent-rgb),0.12)'
                           : isDone ? 'rgba(74,222,128,0.08)' : 'var(--surface-2)',
                         border: `1px solid ${isActive
-                          ? 'rgba(212,255,58,0.4)'
+                          ? 'rgba(var(--accent-rgb),0.4)'
                           : isDone ? 'rgba(74,222,128,0.25)' : 'var(--border)'}`,
                         borderRadius: 8,
                         transition: 'background .2s',

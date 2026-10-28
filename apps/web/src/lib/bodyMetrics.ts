@@ -17,7 +17,7 @@ export interface MeasureDef {
 }
 
 // Three hexes already in LIFT_COLOR / PHASE_COLOR rather than a new palette.
-// Never var(--accent) — for the same reason oneRMScale gives: lime means
+// Never var(--accent) — for the same reason oneRMScale gives: crimson means
 // "you / now / active" everywhere else, so a series wearing it reads as special.
 export const BODY_MEASURES: MeasureDef[] = [
   { key: 'weight', label: 'Weight', pill: 'WEIGHT', unit: 'kg', color: '#60a5fa', get: e => e.weightKg },

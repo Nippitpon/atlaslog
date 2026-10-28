@@ -3,7 +3,7 @@ import type { OneRMLift } from '@atlaslog/shared'
 export { LIFT_ORDER } from '../../lib/oneRM.js'
 
 // Reuses three hexes already in PHASE_COLOR (DashboardPage) rather than growing
-// the palette. Never var(--accent): lime is the app's "you / now / active" colour
+// the palette. Never var(--accent): crimson is the app's "you / now / active" colour
 // everywhere else, so handing it to one of three lifts would read as privileged.
 export const LIFT_COLOR: Record<OneRMLift, string> = {
   squat: '#60a5fa',

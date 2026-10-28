@@ -14,11 +14,13 @@ const WEEKDAY_HEADS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 const LEGEND: CalendarDot[] = ['trained', 'run', 'today', 'planned', 'missed', 'settled']
 
 function Dot({ dot, size = 7 }: { dot: CalendarDot; size?: number }) {
-  const { color, hollow } = CALENDAR_DOT[dot]
+  const { color, hollow, struck } = CALENDAR_DOT[dot]
   return (
     <span style={{
       display: 'block', width: size, height: size, borderRadius: '50%',
-      background: hollow ? 'transparent' : color,
+      background: struck
+        ? `linear-gradient(135deg, transparent 42%, ${color} 42%, ${color} 58%, transparent 58%)`
+        : hollow ? 'transparent' : color,
       boxShadow: hollow ? `inset 0 0 0 1.5px ${color}` : 'none',
     }} />
   )

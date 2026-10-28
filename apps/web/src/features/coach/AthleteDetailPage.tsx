@@ -398,7 +398,7 @@ function AssignProgramSheet({ onAssign, onClose, assignedError }: {
               all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
               padding: 12, borderRadius: 12, boxSizing: 'border-box',
               border: `1px solid ${pickedId === p.id ? 'var(--accent)' : 'var(--border)'}`,
-              background: pickedId === p.id ? 'rgba(212,255,58,0.08)' : 'var(--surface-1)',
+              background: pickedId === p.id ? 'rgba(var(--accent-rgb),0.08)' : 'var(--surface-1)',
             }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 15 }}>{p.name}</div>

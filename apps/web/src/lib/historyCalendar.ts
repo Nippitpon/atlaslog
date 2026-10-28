@@ -12,13 +12,14 @@ export type CalendarDot = 'trained' | 'run' | 'today' | 'planned' | 'missed' | '
 
 // Dot styling in one place, the same way DAY_STATUS_STYLE owns the day badge —
 // 'done' green is taken from there rather than re-typing the hex. `hollow` draws
-// a ring instead of a fill.
-export const CALENDAR_DOT: Record<CalendarDot, { color: string; hollow: boolean; label: string }> = {
+// a ring instead of a fill; `struck` draws a ring with a slash through it — missed
+// is grey, not red, so it can't be mistaken for the crimson accent (run / now).
+export const CALENDAR_DOT: Record<CalendarDot, { color: string; hollow: boolean; struck?: boolean; label: string }> = {
   trained: { color: DAY_STATUS_STYLE.done.color, hollow: false, label: 'ยกเหล็ก' },
   run:     { color: 'var(--accent)',             hollow: false, label: 'วิ่ง' },
   today:   { color: '#3aaaff',                   hollow: false, label: 'วันนี้' },
   planned: { color: 'var(--border-strong)',      hollow: false, label: 'ตามแผน' },
-  missed:  { color: 'var(--danger)',             hollow: false, label: 'พลาด' },
+  missed:  { color: 'var(--muted)',              hollow: true,  struck: true, label: 'พลาด' },
   settled: { color: 'var(--border-strong)',      hollow: true,  label: 'ปิดแล้ว' },
 }
 

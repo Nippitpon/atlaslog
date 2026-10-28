@@ -267,7 +267,7 @@ export function CreateProgramPage() {
                 all: 'unset', cursor: 'pointer', flex: 1, boxSizing: 'border-box',
                 padding: '12px', borderRadius: 12, textAlign: 'center',
                 border: `1px solid ${programType === v ? 'var(--accent)' : 'var(--border)'}`,
-                background: programType === v ? 'rgba(212,255,58,0.10)' : 'var(--surface-2)',
+                background: programType === v ? 'rgba(var(--accent-rgb),0.10)' : 'var(--surface-2)',
               }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14, color: programType === v ? 'var(--accent)' : 'var(--text)' }}>{label}</div>
               <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', marginTop: 2 }}>{desc}</div>
@@ -375,7 +375,7 @@ export function CreateProgramPage() {
                 all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12,
                 padding: '10px 12px', borderRadius: 10,
                 border: `1px solid ${visibility === v ? 'var(--accent)' : 'var(--border)'}`,
-                background: visibility === v ? 'rgba(212,255,58,0.10)' : 'var(--surface-2)',
+                background: visibility === v ? 'rgba(var(--accent-rgb),0.10)' : 'var(--surface-2)',
               }}>
               <div style={{
                 width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
@@ -662,7 +662,7 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
                   style={{
                     all: 'unset', display: 'flex', alignItems: 'center', gap: 10, width: '100%',
                     padding: '10px 4px', cursor: 'pointer', borderBottom: '1px solid var(--border)',
-                    background: pickedId === ex.id ? 'rgba(212,255,58,0.08)' : 'transparent', boxSizing: 'border-box',
+                    background: pickedId === ex.id ? 'rgba(var(--accent-rgb),0.08)' : 'transparent', boxSizing: 'border-box',
                   }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 14 }}>{ex.name}</div>
@@ -697,7 +697,7 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
                   style={{
                     flex: 1, height: 36, borderRadius: 8, cursor: 'pointer',
                     border: `1px solid ${type === t ? 'var(--accent)' : 'var(--border)'}`,
-                    background: type === t ? 'rgba(212,255,58,0.12)' : 'var(--surface-2)',
+                    background: type === t ? 'rgba(var(--accent-rgb),0.12)' : 'var(--surface-2)',
                     color: type === t ? 'var(--accent)' : 'var(--text-2)',
                     fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
                   }}>
@@ -713,7 +713,7 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
                     style={{
                       flex: 1, height: 32, borderRadius: 8, cursor: 'pointer',
                       border: `1px solid ${role === r ? 'var(--accent)' : 'var(--border)'}`,
-                      background: role === r ? 'rgba(212,255,58,0.12)' : 'var(--surface-2)',
+                      background: role === r ? 'rgba(var(--accent-rgb),0.12)' : 'var(--surface-2)',
                       color: role === r ? 'var(--accent)' : 'var(--text-2)',
                       fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
                     }}>

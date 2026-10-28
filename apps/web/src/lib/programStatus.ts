@@ -549,7 +549,7 @@ export const DAY_STATUS_STYLE: Record<
   { label: string; bg: string; border: string; color: string }
 > = {
   not_started: { label: 'Not started', bg: 'var(--surface-2)',       border: 'var(--border)',           color: 'var(--muted)' },
-  in_progress: { label: 'In progress', bg: 'rgba(212,255,58,0.12)',  border: 'rgba(212,255,58,0.35)',   color: 'var(--accent)' },
+  in_progress: { label: 'In progress', bg: 'rgba(var(--accent-rgb),0.12)',  border: 'rgba(var(--accent-rgb),0.35)',   color: 'var(--accent)' },
   done:        { label: 'Done',        bg: 'rgba(74,222,128,0.1)',   border: 'rgba(74,222,128,0.3)',    color: '#4ade80' },
   skipped:     { label: 'Skipped',     bg: 'var(--surface-2)',       border: 'var(--border-strong)',    color: 'var(--text-2)' },
 }

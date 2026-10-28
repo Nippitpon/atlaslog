@@ -97,7 +97,7 @@ export function BodyPage() {
                 {(['all', ...BODY_MEASURES.map(m => m.key)] as BodySelection[]).map(k => {
                   const active = measure === k
                   // ALL wears the accent on its border only. A drawn line never
-                  // gets it: lime means "you / now / active" everywhere else, so
+                  // gets it: crimson means "you / now / active" everywhere else, so
                   // a series in it would read as the privileged one.
                   const color = k === 'all' ? 'var(--accent)' : measureDef(k).color
                   return (

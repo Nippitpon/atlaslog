@@ -153,7 +153,7 @@ export function ProgramOverviewPage() {
       {/* Config banner or setup CTA */}
       {config ? (
         <div style={{ padding: '0 20px', marginBottom: 16 }}>
-          <div className="card card-tight" style={{ background: 'rgba(212,255,58,0.06)', borderColor: 'rgba(212,255,58,0.2)' }}>
+          <div className="card card-tight" style={{ background: 'rgba(var(--accent-rgb),0.06)', borderColor: 'rgba(var(--accent-rgb),0.2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
               {/* Dates column */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

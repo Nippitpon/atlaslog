@@ -228,7 +228,7 @@ export function ImportProgramSheet({ onClose }: Props) {
         {step === 'preview' && program && (
           <>
             <div style={{
-              background: 'rgba(212,255,58,0.06)', border: '1px solid rgba(212,255,58,0.2)',
+              background: 'rgba(var(--accent-rgb),0.06)', border: '1px solid rgba(var(--accent-rgb),0.2)',
               borderRadius: 12, padding: 14, marginBottom: 16,
             }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 20, marginBottom: 4 }}>

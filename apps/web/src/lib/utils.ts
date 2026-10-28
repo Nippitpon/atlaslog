@@ -126,7 +126,7 @@ export function programVolume(prog: { exercises: { sets: { w: number; r: number 
 
 export function muscleColor(group: string) {
   const map: Record<string, string> = {
-    Chest: '#ff6b6b', Back: '#4ecdc4', Legs: '#ffd93d',
+    Chest: '#f472b6', Back: '#4ecdc4', Legs: '#ffd93d',
     Shoulders: '#a78bfa', Arms: '#3aaaff', Core: '#ff9b3a', Other: '#7a8a99',
   }
   return map[group] ?? '#888'
