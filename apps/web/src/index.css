@@ -1,38 +1,48 @@
-/* Atlaslog — Bold athletic, lime accent on near-black (+ light variant) */
+/* Atlaslog — Liquid Crimson Glass (see DESIGN.md): crimson accent on obsidian (+ light variant) */
 
 :root {
-  --accent: #d4ff3a;
-  --accent-ink: #0a0a0a;
+  --accent: #ff1744;
+  --accent-rgb: 255, 23, 68;
+  --accent-ink: #ffffff;
+  --accent-grad: linear-gradient(135deg, #ff2d55 0%, #d90429 100%);
+  --accent-glow: rgba(255, 23, 68, 0.35);
   --danger: #ff5b3a;
-  --success: #d4ff3a;
+  --success: #10b981;
 
-  --font-display: "Space Grotesk", -apple-system, system-ui, sans-serif;
+  --font-display: "Inter", -apple-system, system-ui, sans-serif;
   --font-body: "Inter", -apple-system, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 .theme-dark {
-  --bg: #0a0a0a;
-  --surface-1: #141414;
-  --surface-2: #1c1c1c;
-  --surface-3: #242424;
-  --border: #262626;
-  --border-strong: #333333;
-  --text: #fafafa;
-  --text-2: #b5b5b5;
-  --muted: #6e6e6e;
-  --muted-2: #4a4a4a;
-  --nav-bg: rgba(20, 20, 20, 0.88);
-  --shadow: 0 8px 24px rgba(0,0,0,0.5);
+  --bg: #0a0a0c;
+  --surface-1: #131318;
+  --surface-2: #1c1b22;
+  --surface-3: #25242c;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --text: #f8fafc;
+  --text-2: #94a3b8;
+  --muted: #64748b;
+  --muted-2: #475569;
+  --nav-bg: rgba(15, 14, 20, 0.85);
+  --glass-bg: rgba(20, 18, 24, 0.6);
+  --glass-highlight: inset 0 1px 1px 0 rgba(255, 255, 255, 0.12);
+  --shadow: 0 8px 32px rgba(0,0,0,0.5);
   /* Program status + the trained share of a progress bar. Theme-aware because the
      bright variants sit at ~1.5:1 on a white card, and on the two-tone bar that
      let the grey skipped segment out-shout the trained one. */
   --status-active: #3aaaff;
   --status-done: #4ade80;
-  --bar-trained: #d4ff3a;
+  --bar-trained: #ff3b5c;
 }
 
 .theme-light {
+  --accent: #d90429;
+  --accent-rgb: 217, 4, 41;
+  --accent-glow: rgba(217, 4, 41, 0.25);
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-highlight: inset 0 1px 1px 0 rgba(255, 255, 255, 0.8);
   --bg: #f4f4ef;
   --surface-1: #ffffff;
   --surface-2: #faf9f5;
@@ -47,7 +57,7 @@
   --shadow: 0 4px 16px rgba(0,0,0,0.06);
   --status-active: #0369a1;
   --status-done: #166534;
-  --bar-trained: #6b9213;
+  --bar-trained: #d90429;
 }
 
 * { box-sizing: border-box; }
@@ -81,6 +91,7 @@ body {
   width: 402px;
   height: 874px;
   background: var(--bg);
+  background-image: radial-gradient(circle at 85% -5%, rgba(var(--accent-rgb), 0.14) 0%, transparent 55%);
   color: var(--text);
   font-family: var(--font-body);
   display: flex;
@@ -152,11 +163,14 @@ body {
 }
 
 .card {
-  background: var(--surface-1);
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid var(--border);
   border-radius: 18px;
   padding: 20px;
   color: var(--text);
+  box-shadow: var(--shadow), var(--glass-highlight);
 }
 .card-tight { padding: 16px; border-radius: 14px; }
 
@@ -178,7 +192,7 @@ body {
 .btn:active { transform: scale(0.97); }
 
 .btn-primary {
-  background: var(--accent);
+  background: var(--accent-grad);
   color: var(--accent-ink);
   height: 60px;
   padding: 0 24px;
@@ -187,8 +201,9 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-weight: 700;
+  box-shadow: 0 8px 25px -4px var(--accent-glow), inset 0 1px 1px rgba(255, 255, 255, 0.35);
 }
-.btn-primary:hover { background: #c8f328; }
+.btn-primary:hover { filter: brightness(1.08); }
 
 .btn-secondary {
   background: var(--surface-2);
@@ -314,8 +329,8 @@ body {
   height: 88px;
   padding-bottom: 24px;
   background: var(--nav-bg);
-  backdrop-filter: blur(18px) saturate(180%);
-  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
   border-top: 1px solid var(--border);
   display: flex;
   align-items: stretch;
@@ -378,7 +393,7 @@ body {
 }
 .bar-fill.active { background: var(--accent); }
 .bar-fill.run { background: #60a5fa; }
-.bar-fill.today { background: var(--accent); box-shadow: 0 0 0 2px var(--accent), 0 0 14px rgba(212,255,58,0.4); }
+.bar-fill.today { background: var(--accent); box-shadow: 0 0 0 2px var(--accent), 0 0 14px var(--accent-glow); }
 .bar-label {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -408,8 +423,8 @@ body {
 }
 .set-row.complete .set-num { color: var(--accent); }
 .set-row.complete .input-num {
-  background: rgba(212, 255, 58, 0.08);
-  border-color: rgba(212, 255, 58, 0.3);
+  background: rgba(var(--accent-rgb), 0.1);
+  border-color: rgba(var(--accent-rgb), 0.35);
   color: var(--text);
 }
 
@@ -457,7 +472,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 24px rgba(212, 255, 58, 0.35), 0 2px 8px rgba(0,0,0,0.2);
+  box-shadow: 0 8px 24px var(--accent-glow), 0 2px 8px rgba(0,0,0,0.2);
   z-index: 30;
   -webkit-tap-highlight-color: transparent;
 }
@@ -499,8 +514,8 @@ body {
 .pop-check { animation: popcheck .25s cubic-bezier(.2,.7,.3,1) both; }
 
 @keyframes pulse-bg {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 255, 58, 0.4); }
-  50% { box-shadow: 0 0 0 10px rgba(212, 255, 58, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.4); }
+  50% { box-shadow: 0 0 0 10px rgba(var(--accent-rgb), 0); }
 }
 .pulse-now { animation: pulse-bg 1.6s ease-in-out infinite; }
 
@@ -518,6 +533,7 @@ body {
 .sheet {
   width: 100%;
   background: var(--surface-1);
+  box-shadow: var(--glass-highlight);
   border-radius: 28px 28px 0 0;
   padding: 16px 20px 36px;
   border-top: 1px solid var(--border);
@@ -565,7 +581,7 @@ body {
   width: 56px;
   height: 56px;
   border-radius: 28px;
-  background: linear-gradient(135deg, var(--accent), #8fbf18);
+  background: var(--accent-grad);
   color: var(--accent-ink);
   display: flex;
   align-items: center;
