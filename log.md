@@ -62,10 +62,17 @@
 
 `pnpm build` ผ่าน · ESLint ผ่าน · `pnpm test` 269 tests ผ่าน · ⚠️ ยังไม่ได้ดูหน้าจริง/click-through e2e 390px
 
+### ขั้น 4 — สีสถานะ (ทำแล้ว, ยังไม่ commit)
+
+- แทน `rgba(212,255,58,…)` (lime) ทุกจุดใน `.ts`/`.tsx` ด้วย `rgba(var(--accent-rgb),…)` — `programStatus.ts` (`in_progress`) + ~20 จุดใน `DashboardPage` `CreateProgramPage` `ProgramOverviewPage` `DayEditSheet` `ImportProgramSheet` `PublicProgramSheet` `ProfilePage` `AthleteDetailPage` `DayDetailSheet` `SessionDetailPage` · grep lime เหลือ 0
+- สี "พลาด" (`CALENDAR_DOT.missed`) เปลี่ยนจาก `var(--danger)` เป็นเทา `var(--muted)` + จุดวงกลมขีดทับ (`struck` flag ใหม่ ใช้ใน `HistoryCalendar.tsx` `Dot`) → ไม่ชนแดงของ accent (run/now)
+- Chest `#ff6b6b` → `#f472b6` (`utils.ts` `muscleColor`) · คอมเมนต์ lime → crimson ใน `oneRMScale.ts` `bodyMetrics.ts` `BodyPage.tsx`
+- verify: `pnpm build` · ESLint · `pnpm test` 269 ผ่าน · ⚠️ ยังไม่ได้ดูหน้าจริง (ปฏิทิน History จุด missed, ป้าย In progress)
+
 ### ไม่ทำรอบนี้ / งานค้างรีสกิน
 
-- **ขั้น 4 — สีที่ฝังใน `lib/*.ts`** ต้องตัดสินใจเชิงดีไซน์: `programStatus.ts` (in_progress ใช้ `rgba(212,255,58,…)` ยังเป็น lime) · `historyCalendar.ts` (`run`=`var(--accent)` ชนกับ `missed`=`var(--danger)` `#ff5b3a` ที่ใกล้แดง) · `utils.ts` สีกลุ่มกล้ามเนื้อ (Chest `#ff6b6b` ใกล้ accent) · `oneRMScale.ts`/`bodyMetrics.ts` (คอมเมนต์ "ห้ามใช้ accent" ต้องทบทวนความหมาย you/now/active)
-- สีฝังใน `.tsx` ~99 จุด/27 ไฟล์ (มากสุด `DashboardPage`) · กราฟ `OneRMChart`/`MetricChart` · `--danger` · `--font-mono` ตาม DESIGN.md (Inter ล้วน?) · ธีม light ตัดหรือเก็บ · กรอบมือถือ 402×874
+- `HistoryPage.tsx:91` ข้อความ "พลาด N วัน" ยังใช้ `var(--danger)` (ส้มแดง) ไม่ตรงกับจุดเทาในปฏิทิน · `--danger` ที่เหลือใช้กับ error/ปุ่ม/badge ตามเดิม
+- สี hex อื่นที่ฝังใน `.tsx` (~99 จุด/27 ไฟล์ มากสุด `DashboardPage`) ยังไม่ไล่ · กราฟ `OneRMChart`/`MetricChart` · `--font-mono` ตาม DESIGN.md (Inter ล้วน?) · ธีม light ตัดหรือเก็บ · กรอบมือถือ 402×874
 - `DESIGN.md` มีจุดไม่สอดคล้อง: ลิงก์ Stitch บรรทัด 1 · `glass-border-active` `235,14,57` ≠ primary · ใช้คลาส Tailwind ทั้งที่แอปไม่ใช้ Tailwind
 
 ---
