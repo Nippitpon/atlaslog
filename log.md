@@ -1,8 +1,43 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-28 (รอบ 75 — PLANNED: Gamification EXP/Level/Tier · รอบ 74 — ✅ SHIPPED: รีสกิน Liquid Crimson Glass ขั้น 1–4)
+> อัปเดตล่าสุด: 2026-10-29 (รอบ 76 — ✅ SHIPPED: Responsive มือถือ/แท็บเล็ต/เดสก์ท็อป · รอบ 75 — PLANNED: Gamification EXP/Level/Tier)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-10-29 — รอบ 76 (✅ SHIPPED, deploy main `5d9d203` `2a339ff` `0d82711`): Responsive — มือถือ / แท็บเล็ต / เดสก์ท็อป
+
+เดิมจอ >440px ถูกล็อกเป็นกรอบมือถือจำลอง 402×874 (`.atlas-app` ใน `index.css`) → เปิดบนคอมเห็นมือถือกลางจอ · รอบนี้ทำ Full responsive 4 phase: A shell เต็มจอ (`5d9d203`) · B sidebar + C หลายคอลัมน์ + D polish (`2a339ff`) · CLAUDE.md (`0d82711`)
+
+Breakpoints: **<768** มือถือเหมือนเดิม · **768–1023** แท็บเล็ต (bottom nav, เนื้อหา 720px กลางจอ, card grid 2 คอลัมน์) · **≥1024** เดสก์ท็อป (sidebar ซ้าย 220px, หน้า `.screen-wide` กว้าง 1080px)
+
+### ทำอะไร
+- **A — Shell:** `.atlas-app` = `100%` × `100dvh` ทุกขนาด (ลบกรอบ/radius/เงา + `@media 440px`) · safe-area: ตัวแปร `--nav-h` = `64px + max(24px, env(safe-area-inset-bottom))` ใช้ร่วมกันใน bottom nav / resume bar / FAB / padding ล่างของ screen (เครื่องไม่มี home indicator ได้ 88/108/148px เท่าเดิมเป๊ะ) · padding-top `max(56px, inset+12px)` · ≥768 `.atlas-screen` จำกัดเนื้อหาด้วย `padding-inline` (ไม่ต้องแก้ JSX, scrollbar อยู่ขอบจอ) · `.sheet` ≥768 → modal กลางจอ max 560px ซ่อน handle · `FinishReview` maxWidth 560 · ลบ boilerplate Vite (`App.tsx`, `App.css`, `src/assets/*`)
+- **B — Sidebar:** `<nav class="bottom-nav">` ตัวเดิมเปลี่ยนเป็น sidebar ด้วย CSS ล้วน (≥1024) + `.nav-brand` "ATLASLOG" (ซ่อนบนมือถือ) · `AppShell` ใส่ `.has-nav` เมื่อไม่ใช่ logger → `/workout` ไม่มี sidebar (focus mode) · resume bar ย้ายไป `bottom:0; left:220px`, FAB `bottom:32px`
+- **C — หลายคอลัมน์:** helper ใน `index.css`: `.screen-wide` · `.r-cols` (2 คอลัมน์ ≥1024, ต่ำกว่านั้น stack ตามลำดับ source) · `.r-grid` (2 คอลัมน์ ≥768) · `.r-grid-3` · `.r-sticky`
+  - 2 คอลัมน์: Dashboard (stats/1RM ซ้าย · program/shortcuts ขวา) · Profile (avatar/role/stats/1RM ซ้าย · body/energy/theme ขวา) · 1RM + Body (กราฟซ้าย sticky · ตารางขวา)
+  - card grid: Programs · History (เฉพาะ list view, ปฏิทินคง 720) · Library (3 คอลัมน์) · ProgramOverview weeks · WeekDays · Coach · AthleteDetail · Admin
+- **D — Polish:** hover เฉพาะ `@media (hover: hover)` · `:focus-visible` outline สำหรับปุ่ม/ลิงก์ · scrollbar บางคืนให้ `.atlas-screen` ใน `@media (pointer: fine)`
+- **บั๊กเดิมที่แก้ไปด้วย:** nav ไฮไลต์ Home ตอนอยู่ `/one-rm` `/body` → ตอนนี้ Profile · ปุ่ม "เปิดปฏิทิน" (History list ว่าง) ไม่มี padding/height
+- CLAUDE.md: เทสที่ 390 + 768 + 1280 · อธิบาย helper class · ค่าที่เปลี่ยนตาม breakpoint ห้ามเป็น inline style (inline ชนะ media query)
+
+### ผลกระทบ (จัดการแล้ว)
+- overlay ทุกตัว (`.sheet-backdrop`, nav, resume bar, FAB) เป็น `position:absolute` ใน `.atlas-app` → ขยายตามเองไม่ต้องแก้รายหน้า · absolute อ้าง padding box จึงต้อง offset 220px เองสำหรับ resume bar
+- inline `style={{ display:'flex', flexDirection:'column', gap }}` override class ไม่ได้ → แทนด้วย `className="r-grid" style={{ gap }}`
+- การห่อ div ใช้สคริปต์ re-indent → `git diff -w` จริงแค่ +157/−34 (ที่เหลือคือ whitespace) ไม่แตะ logic
+
+### verify
+- `pnpm build` ผ่าน · ESLint ผ่าน · `pnpm test` **269/269 (15 ไฟล์)**
+- Playwright (inject auth ตาม memory `e2e-auth-gated-pages`, revert `main.tsx` แล้ว, ไม่เขียนอะไรลง Supabase): `/` `/programs` `/library` `/profile` `/one-rm` `/body` `/programs/sbd-12w` × 390 / 768 / 1280 → ไม่มี horizontal scroll ทุกจุด · sheet เป็น modal บนจอใหญ่ / bottom sheet บน 390 · sidebar ที่ 1024 / bottom nav ที่ 900 · light theme ผ่าน
+- ⚠️ **ยังไม่ได้เทส:** logger + resume bar บนเดสก์ท็อป (ต้องมี workout ค้าง — ไม่ seed เพราะจะ sync ขึ้นบัญชีจริง) · History/Coach/Admin ที่มีข้อมูลจริง · iPhone จริงโหมด PWA (safe-area) · เปิดดูการไฮไลต์ nav `/one-rm` หลังแก้ (มีแค่ build/test ยืนยัน)
+- tip: screenshot ผ่าน `browser_run_code_unsafe` ถ่ายติดหน้าว่างถ้าจับระหว่าง animation → ใส่ `animations: 'disabled'`
+
+### ไม่ทำรอบนี้
+- จำกัดความสูงกราฟ (`max-height`) — ใน 2 คอลัมน์กราฟ 320×168 สูง ~260px พอดีแล้ว
+- ปฏิทิน History แบบปฏิทินซ้าย/รายการขวา — ต้องเปลี่ยน state calendar/list ไม่ใช่แค่ CSS · ตอนนี้ calendar view คงความกว้าง 720
+- การ์ดสูงไม่เท่ากันใน grid ที่การ์ดซ้อนลึก (Programs custom card) — `.r-grid > * > .card:only-child` ครอบได้แค่โครงตื้น
+- `public/favicon.svg` / `icons.svg` ยังเป็นของ Vite (ม่วง) — sidebar ใช้ wordmark ตัวอักษรแทน
 
 ---
 
