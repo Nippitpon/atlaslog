@@ -184,7 +184,9 @@ pnpm lint         # ESLint
 
 - No comments unless the WHY is non-obvious
 - All new types go in `packages/shared/src/types.ts`
-- Mobile-first: design and test at 390px viewport width
+- Mobile-first: design and test at 390px viewport width, then check 768px (tablet) and 1280px (desktop sidebar)
+- Responsive helpers live in `index.css`: `.screen-wide` (wider desktop column), `.r-cols` (2 columns ≥1024px),
+  `.r-grid` / `.r-grid-3` (card grid), `.r-sticky`. A breakpoint-dependent value can't be an inline style — use a class
 - No backend calls in Phase 1–2 — all state lives in Zustand + localStorage
 - New exercises must be added to `apps/web/src/lib/data.ts` EXERCISES array
 - Program `id` must be unique: built-ins use `sbd-12w`, custom imports use `custom-<timestamp>`
