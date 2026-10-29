@@ -34,7 +34,7 @@ export function FinishReview({ workout, now, onConfirm, onCancel }: FinishReview
     <div className="sheet-backdrop" style={{ alignItems: 'flex-end', padding: 0 }}>
       <div style={{
         background: 'var(--surface-1)', border: '1px solid var(--border)',
-        borderRadius: '24px 24px 0 0', padding: '24px 24px 32px', width: '100%',
+        borderRadius: '24px 24px 0 0', padding: '24px 24px 32px', width: '100%', maxWidth: 560,
         animation: 'slidein .3s cubic-bezier(.2,.7,.3,1) both',
         maxHeight: '90vh', overflowY: 'auto',
       }}>
