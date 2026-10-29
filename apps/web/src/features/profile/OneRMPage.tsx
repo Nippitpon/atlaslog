@@ -56,7 +56,7 @@ export function OneRMPage() {
   }
 
   return (
-    <div className="atlas-screen screen-enter">
+    <div className="atlas-screen screen-enter screen-wide">
       {/* .scr-header defaults to space-between, which would shove the title to the
           right edge away from the back button (see /runs) — group them at the left. */}
       <div className="scr-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 12 }}>
@@ -86,8 +86,8 @@ export function OneRMPage() {
           </div>
         </div>
       ) : (
-        <>
-          <div style={{ padding: '0 20px 20px' }}>
+        <div className="r-cols">
+          <div className="r-sticky" style={{ padding: '0 20px 20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <IconTrendingUp size={14} style={{ color: 'var(--muted)' }} />
               <div className="t-eyebrow">PROGRESSION</div>
@@ -180,7 +180,7 @@ export function OneRMPage() {
               ))}
             </div>
           )}
-        </>
+        </div>
       )}
 
       {showLog && (

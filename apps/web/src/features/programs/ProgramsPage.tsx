@@ -47,7 +47,7 @@ function StatusPill({ status }: { status: ProgramStatus }) {
   )
 }
 
-const GROUP_EYEBROW: CSSProperties = { fontSize: 9, color: 'var(--muted)', margin: '2px 0 -2px' }
+const GROUP_EYEBROW: CSSProperties = { fontSize: 9, color: 'var(--muted)', margin: '2px 0 -2px', gridColumn: '1 / -1' }
 
 function statusStripe(status: ProgramStatus): string {
   return status === 'not_setup' ? 'var(--border-strong)' : PROGRAM_STATUS_STYLE[status].color
@@ -366,7 +366,7 @@ export function ProgramsPage() {
   }
 
   return (
-    <div className="atlas-screen screen-enter">
+    <div className="atlas-screen screen-enter screen-wide">
       <div className="scr-header">
         <div>
           <div className="sub">TRAINING</div>
@@ -392,7 +392,7 @@ export function ProgramsPage() {
 
       {/* ── Programs, grouped by status (ACTIVE first) ───────── */}
       <div style={{ padding: '0 20px', marginBottom: 28 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="r-grid" style={{ gap: 10 }}>
           {groups.map(group => (
             <Fragment key={group.key}>
               <div className="t-eyebrow" style={GROUP_EYEBROW}>{group.label}</div>
@@ -408,7 +408,7 @@ export function ProgramsPage() {
       {publicPrograms.length > 0 && (
         <div style={{ padding: '0 20px', marginBottom: 28 }}>
           <div className="t-eyebrow" style={{ marginBottom: 12 }}>PUBLIC PROGRAMS</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="r-grid" style={{ gap: 10 }}>
             {publicPrograms.map(p => (
               <button key={p.code} onClick={() => setPreviewPublic(p)}
                 style={{ all: 'unset', cursor: 'pointer', display: 'block' }}>
@@ -448,7 +448,7 @@ export function ProgramsPage() {
       {/* ── Quick Templates ─────────────────────────────────── */}
       <div style={{ padding: '0 20px', paddingBottom: 24 }}>
         <div className="t-eyebrow" style={{ marginBottom: 12 }}>QUICK TEMPLATES</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="r-grid" style={{ gap: 10 }}>
           {PROGRAMS.map(p => {
             const vol = programVolume(p)
             return (

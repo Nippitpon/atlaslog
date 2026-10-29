@@ -153,7 +153,7 @@ export function HistoryPage() {
   const selectedDot = selected ? dotFor(selected, schedule, trained, todayYmd) : null
 
   return (
-    <div className="atlas-screen screen-enter">
+    <div className={`atlas-screen screen-enter${view === 'list' ? ' screen-wide' : ''}`}>
       <div className="scr-header">
         <div>
           <div className="sub">ALL SESSIONS</div>
@@ -220,7 +220,7 @@ export function HistoryPage() {
             ดูวันที่ต้องเล่นได้ในมุมมองปฏิทิน
           </div>
           <button className="btn" onClick={() => setView('calendar')} style={{
-            background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)',
+            background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)', height: 44, padding: '0 20px', borderRadius: 12,
           }}>
             เปิดปฏิทิน
           </button>
@@ -230,7 +230,7 @@ export function HistoryPage() {
           <div style={{ padding: '0 20px 12px' }}>
             <div className="t-eyebrow">{month}</div>
           </div>
-          <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="r-grid" style={{ padding: '0 20px' }}>
             {items.map(it => {
               if (it.kind === 'session') {
                 return <SessionCard key={it.data.id} h={it.data} onOpen={() => navigate(`/history/${it.data.id}`)} />

@@ -72,7 +72,7 @@ export function AppShell() {
   }
 
   return (
-    <div className={`atlas-app theme-${theme}${showResumeBar ? ' has-resume-bar' : ''}`}>
+    <div className={`atlas-app theme-${theme}${isLogger ? '' : ' has-nav'}${showResumeBar ? ' has-resume-bar' : ''}`}>
       <Outlet />
 
       {showResumeBar && <ResumeBar workout={workout} onOpen={() => navigate('/workout')} />}

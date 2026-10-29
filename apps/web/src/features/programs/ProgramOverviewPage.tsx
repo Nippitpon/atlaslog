@@ -46,7 +46,7 @@ export function ProgramOverviewPage() {
   const formatDate = formatDMY
 
   return (
-    <div className="atlas-screen screen-enter">
+    <div className="atlas-screen screen-enter screen-wide">
       {/* Header */}
       <div style={{ padding: '12px 20px 0', marginBottom: 20 }}>
         <button onClick={() => navigate('/programs')}
@@ -238,7 +238,7 @@ export function ProgramOverviewPage() {
       {/* Weeks list */}
       <div style={{ padding: '0 20px 24px' }}>
         <div className="t-eyebrow" style={{ marginBottom: 12 }}>WEEKS</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="r-grid" style={{ gap: 8 }}>
           {program.weeks.map(week => {
             const status = weekStatus(program.id, week, progress)
             const phaseColor = PHASE_COLOR[week.phase] ?? 'var(--muted)'

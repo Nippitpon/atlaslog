@@ -110,7 +110,7 @@ export function AthleteDetailPage() {
   const sbdTotal = oneRMs ? oneRMs.squat + oneRMs.bench + oneRMs.deadlift : 0
 
   return (
-    <div className="atlas-screen screen-enter">
+    <div className="atlas-screen screen-enter screen-wide">
       <div className="scr-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button className="btn-icon" onClick={() => navigate('/coach')} aria-label="Back to athletes">
@@ -298,7 +298,7 @@ export function AthleteDetailPage() {
               </button>
             </div>
             {programs.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div className="r-grid" style={{ gap: 8 }}>
                 {programs.map(p => (
                   <div key={p.id} className="card card-tight">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -322,7 +322,7 @@ export function AthleteDetailPage() {
             {sessions.length === 0 ? (
               <div className="t-mono" style={{ fontSize: 12, color: 'var(--muted)' }}>No workouts logged yet</div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div className="r-grid" style={{ gap: 8 }}>
                 {sessions.slice(0, 30).map(s => (
                   <div key={s.id} className="card card-tight" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>

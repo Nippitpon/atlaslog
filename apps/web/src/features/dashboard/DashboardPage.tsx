@@ -202,7 +202,7 @@ export function DashboardPage() {
 
 
   return (
-    <div className="atlas-screen screen-enter">
+    <div className="atlas-screen screen-enter screen-wide">
       <div className="scr-header">
         <div>
           <div className="sub">{getDayOfWeek()}</div>
@@ -229,465 +229,471 @@ export function DashboardPage() {
       </div>
 
 
-      {/* Today's training reminder */}
-      {todayReminder && (() => {
-        const { day, exercises, program, currentWeek } = todayReminder
-        // resolveDayExercises drops running rows, so those still come off the raw
-        // program day — same split DayCard uses on the Week page.
-        const runs = day.exercises.filter(e => e.type === 'running')
-        const hasLifts = exercises.length > 0
-        const calcRMs = resolveCalcRMs(program, configs[program.id], personalOneRMs)
-        const weekHref = `/programs/${program.id}/week/${currentWeek.id}`
+      <div className="r-cols">
+        <div>
+          {/* Today's training reminder */}
+          {todayReminder && (() => {
+            const { day, exercises, program, currentWeek } = todayReminder
+            // resolveDayExercises drops running rows, so those still come off the raw
+            // program day — same split DayCard uses on the Week page.
+            const runs = day.exercises.filter(e => e.type === 'running')
+            const hasLifts = exercises.length > 0
+            const calcRMs = resolveCalcRMs(program, configs[program.id], personalOneRMs)
+            const weekHref = `/programs/${program.id}/week/${currentWeek.id}`
 
-        // Running-only day → the whole card opens the /runs logger
-        if (!hasLifts && runs.length > 0) {
-          const target = runTarget(runs[0])
-          return (
-            <div style={{ padding: '0 20px', marginBottom: 16 }}>
-              <button
-                style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box' }}
-                onClick={() => navigate(todayRunHref)}
-              >
-                <div className="card card-tight" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ fontSize: 22 }}>🏃</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>TODAY'S SESSION</div>
-                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>
-                      {day.focus}
+            // Running-only day → the whole card opens the /runs logger
+            if (!hasLifts && runs.length > 0) {
+              const target = runTarget(runs[0])
+              return (
+                <div style={{ padding: '0 20px', marginBottom: 16 }}>
+                  <button
+                    style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box' }}
+                    onClick={() => navigate(todayRunHref)}
+                  >
+                    <div className="card card-tight" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ fontSize: 22 }}>🏃</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>TODAY'S SESSION</div>
+                        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>
+                          {day.focus}
+                        </div>
+                        {target && (
+                          <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{target}</div>
+                        )}
+                      </div>
+                      <span className="t-mono" style={{ fontSize: 11, color: 'var(--accent)' }}>RUN →</span>
                     </div>
-                    {target && (
-                      <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{target}</div>
-                    )}
-                  </div>
-                  <span className="t-mono" style={{ fontSize: 11, color: 'var(--accent)' }}>RUN →</span>
+                  </button>
                 </div>
-              </button>
-            </div>
-          )
-        }
+              )
+            }
 
-        return (
-          <div style={{ padding: '0 20px', marginBottom: 16 }}>
-            <div className="card card-tight">
-              {/* Two tap targets: the body opens the week, START begins the workout */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', boxSizing: 'border-box' }}>
-                <button
-                  style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}
-                  onClick={() => navigate(weekHref)}
-                >
-                  <div style={{ fontSize: 22 }}>🗓️</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>TODAY'S SESSION</div>
-                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>
-                      {day.focus}
-                    </div>
+            return (
+              <div style={{ padding: '0 20px', marginBottom: 16 }}>
+                <div className="card card-tight">
+                  {/* Two tap targets: the body opens the week, START begins the workout */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', boxSizing: 'border-box' }}>
+                    <button
+                      style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}
+                      onClick={() => navigate(weekHref)}
+                    >
+                      <div style={{ fontSize: 22 }}>🗓️</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>TODAY'S SESSION</div>
+                        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15 }}>
+                          {day.focus}
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      className="t-mono"
+                      style={{
+                        background: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0,
+                        fontSize: 11, color: 'var(--accent)', padding: '6px 2px 6px 10px',
+                      }}
+                      onClick={handleStartToday}
+                    >
+                      START →
+                    </button>
                   </div>
-                </button>
-                <button
-                  className="t-mono"
-                  style={{
-                    background: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0,
-                    fontSize: 11, color: 'var(--accent)', padding: '6px 2px 6px 10px',
-                  }}
-                  onClick={handleStartToday}
-                >
-                  START →
-                </button>
+
+                  {/* The day's lifts in the user's own order — capped like the Week
+                      page's DayCard so a long day can't take over the dashboard. */}
+                  {exercises.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 10, paddingLeft: 34 }}>
+                      {exercises.slice(0, PREVIEW_ROWS).map((ex, i) => {
+                        const wt = structuredWeight(ex, calcRMs)
+                        return (
+                          <div key={ex.id ?? i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 12, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {ex.name}
+                              {/* Without the label a top set and its back-off read as the same row */}
+                              {ex.label && (
+                                <span style={{ color: 'var(--muted)', fontSize: 10 }}> · {ex.label}</span>
+                              )}
+                            </span>
+                            <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 'auto', flexShrink: 0 }}>
+                              {ex.sets != null && `${ex.sets}×${ex.reps}`}
+                              {ex.rpe !== undefined && ` @${ex.rpe}`}
+                              {wt ? <span style={{ color: 'var(--accent)', marginLeft: 6 }}>{wt}kg</span> : null}
+                            </span>
+                          </div>
+                        )
+                      })}
+                      {exercises.length > PREVIEW_ROWS && (
+                        <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
+                          +{exercises.length - PREVIEW_ROWS} more
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Running on a lifting day → separate tap target to /runs */}
+                  {runs.length > 0 && (
+                    <button
+                      onClick={() => navigate(todayRunHref)}
+                      style={{
+                        all: 'unset', cursor: 'pointer', boxSizing: 'border-box', width: '100%',
+                        display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, padding: '8px 10px',
+                        borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)',
+                      }}
+                    >
+                      <IconRun size={15} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{runs[0].name}</span>
+                      {runTarget(runs[0]) && (
+                        <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>{runTarget(runs[0])}</span>
+                      )}
+                      <span className="t-mono" style={{ fontSize: 10, color: 'var(--accent)', marginLeft: 'auto' }}>LOG →</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Stats card */}
+          <div style={{ padding: '0 20px', marginBottom: 16 }}>
+            <div className="card">
+              {/* Calories burned ring */}
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+                <CalorieRing
+                  calories={caloriesToday}
+                  peak={caloriesPeak}
+                  subtitle={weightKg
+                    ? (caloriesPeak > 0 ? `PEAK ${caloriesPeak.toLocaleString()} kcal · สัปดาห์นี้` : 'ยังไม่มีการซ้อมสัปดาห์นี้')
+                    : 'ใส่น้ำหนักตัวใน Profile เพื่อคำนวณ'}
+                  onClick={weightKg ? undefined : () => navigate('/profile')}
+                />
               </div>
 
-              {/* The day's lifts in the user's own order — capped like the Week
-                  page's DayCard so a long day can't take over the dashboard. */}
-              {exercises.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 10, paddingLeft: 34 }}>
-                  {exercises.slice(0, PREVIEW_ROWS).map((ex, i) => {
-                    const wt = structuredWeight(ex, calcRMs)
+              {/* SBD Total row */}
+              {sbdTotal.total > 0 && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  background: 'var(--surface-2)', borderRadius: 10, padding: '8px 12px', marginBottom: 16,
+                }}>
+                  <div>
+                    <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>SBD TOTAL (WEEK)</div>
+                    <div className="t-mono tnum" style={{ fontSize: 20, fontWeight: 700, color: 'var(--accent)' }}>
+                      {sbdTotal.total}<span style={{ fontSize: 11, color: 'var(--muted)', marginLeft: 2 }}>kg</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    {[
+                      { label: 'S', val: sbdTotal.bestSquat },
+                      { label: 'B', val: sbdTotal.bestBench },
+                      { label: 'D', val: sbdTotal.bestDeadlift },
+                    ].map(({ label, val }) => (
+                      <div key={label} style={{ textAlign: 'center' }}>
+                        <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>{label}</div>
+                        <div className="t-mono tnum" style={{ fontSize: 13, fontWeight: 600 }}>{val}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <div className="t-eyebrow">{hasRuns ? 'WEEKLY TRAINING' : 'WEEKLY VOLUME'}</div>
+                  <div className="t-mono" style={{ fontSize: 11, color: 'var(--muted)' }}>
+                    {hasRuns
+                      ? `${Math.round(weekKg).toLocaleString()} kg · ${formatNum2(weekKm)} km`
+                      : `PEAK ${Math.round(maxVol).toLocaleString()} kg`}
+                  </div>
+                </div>
+                {hasRuns && (
+                  <div className="t-mono" style={{ display: 'flex', gap: 12, fontSize: 9, color: 'var(--muted)' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--accent)' }} />LIFT kg
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: 2, background: '#60a5fa' }} />RUN km
+                    </span>
+                  </div>
+                )}
+                <div className="bar-chart">
+                  {week.map((d, i) => {
+                    const h = d.volume > 0 ? Math.max(4, (d.volume / maxVol) * 100) : 4
+                    const hr = d.runKm > 0 ? Math.max(4, (d.runKm / maxKm) * 100) : 4
                     return (
-                      <div key={ex.id ?? i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 12, color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {ex.name}
-                          {/* Without the label a top set and its back-off read as the same row */}
-                          {ex.label && (
-                            <span style={{ color: 'var(--muted)', fontSize: 10 }}> · {ex.label}</span>
+                      <div key={i} className="bar-col">
+                        <div style={{ height: 100, width: '100%', display: 'flex', alignItems: 'flex-end', gap: 2 }}>
+                          <div
+                            className={`bar-fill ${d.isToday ? 'today' : d.volume > 0 ? 'active' : ''}`}
+                            style={{ height: `${h}%` }}
+                          />
+                          {hasRuns && (
+                            <div className={`bar-fill ${d.runKm > 0 ? 'run' : ''}`} style={{ height: `${hr}%` }} />
                           )}
-                        </span>
-                        <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 'auto', flexShrink: 0 }}>
-                          {ex.sets != null && `${ex.sets}×${ex.reps}`}
-                          {ex.rpe !== undefined && ` @${ex.rpe}`}
-                          {wt ? <span style={{ color: 'var(--accent)', marginLeft: 6 }}>{wt}kg</span> : null}
-                        </span>
+                        </div>
+                        <div className="bar-label" style={{
+                          color: d.isToday ? 'var(--accent)' : 'var(--muted)',
+                          fontWeight: d.isToday ? 700 : 400,
+                        }}>
+                          {d.label}
+                        </div>
                       </div>
                     )
                   })}
-                  {exercises.length > PREVIEW_ROWS && (
-                    <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
-                      +{exercises.length - PREVIEW_ROWS} more
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Running on a lifting day → separate tap target to /runs */}
-              {runs.length > 0 && (
-                <button
-                  onClick={() => navigate(todayRunHref)}
-                  style={{
-                    all: 'unset', cursor: 'pointer', boxSizing: 'border-box', width: '100%',
-                    display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, padding: '8px 10px',
-                    borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)',
-                  }}
-                >
-                  <IconRun size={15} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{runs[0].name}</span>
-                  {runTarget(runs[0]) && (
-                    <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>{runTarget(runs[0])}</span>
-                  )}
-                  <span className="t-mono" style={{ fontSize: 10, color: 'var(--accent)', marginLeft: 'auto' }}>LOG →</span>
-                </button>
-              )}
-            </div>
-          </div>
-        )
-      })()}
-
-      {/* Stats card */}
-      <div style={{ padding: '0 20px', marginBottom: 16 }}>
-        <div className="card">
-          {/* Calories burned ring */}
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-            <CalorieRing
-              calories={caloriesToday}
-              peak={caloriesPeak}
-              subtitle={weightKg
-                ? (caloriesPeak > 0 ? `PEAK ${caloriesPeak.toLocaleString()} kcal · สัปดาห์นี้` : 'ยังไม่มีการซ้อมสัปดาห์นี้')
-                : 'ใส่น้ำหนักตัวใน Profile เพื่อคำนวณ'}
-              onClick={weightKg ? undefined : () => navigate('/profile')}
-            />
-          </div>
-
-          {/* SBD Total row */}
-          {sbdTotal.total > 0 && (
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              background: 'var(--surface-2)', borderRadius: 10, padding: '8px 12px', marginBottom: 16,
-            }}>
-              <div>
-                <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>SBD TOTAL (WEEK)</div>
-                <div className="t-mono tnum" style={{ fontSize: 20, fontWeight: 700, color: 'var(--accent)' }}>
-                  {sbdTotal.total}<span style={{ fontSize: 11, color: 'var(--muted)', marginLeft: 2 }}>kg</span>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 12 }}>
-                {[
-                  { label: 'S', val: sbdTotal.bestSquat },
-                  { label: 'B', val: sbdTotal.bestBench },
-                  { label: 'D', val: sbdTotal.bestDeadlift },
-                ].map(({ label, val }) => (
-                  <div key={label} style={{ textAlign: 'center' }}>
-                    <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>{label}</div>
-                    <div className="t-mono tnum" style={{ fontSize: 13, fontWeight: 600 }}>{val}</div>
+            </div>
+          </div>
+
+          {/* 1RM progression — all-time, sits with the retrospective stats card above.
+              Renders nothing until there are 2+ logged tests. */}
+          {hasOneRMTrend && (
+            <div style={{ padding: '0 20px', marginBottom: 16 }}>
+              <button
+                onClick={() => navigate('/one-rm')}
+                style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box' }}
+              >
+                <div className="card card-tight" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                    background: 'var(--surface-2)', border: '1px solid var(--border)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'var(--accent)',
+                  }}><IconTrendingUp size={16} /></div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>1RM PROGRESSION</div>
+                    <OneRMSparkline series={liftSeries} />
                   </div>
-                ))}
+                  <span className="t-mono" style={{ fontSize: 11, color: 'var(--accent)', flexShrink: 0 }}>VIEW →</span>
+                </div>
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div>
+          {/* Paused program — deliberately does NOT fall through to another program */}
+          {currentProgram?.paused && (
+            <div style={{ padding: '0 20px', marginBottom: 16 }}>
+              <div className="card" style={{ borderLeft: '3px solid #f59e0b', paddingLeft: 14 }}>
+                <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 3, color: '#f59e0b' }}>PROGRAM PAUSED</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, lineHeight: 1.1, marginBottom: 6 }}>
+                  {currentProgram.program.name}
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 16, lineHeight: 1.5 }}>
+                  พักโปรแกรมนี้ไว้ — กดทำต่อเมื่อพร้อมกลับไปซ้อม หรือเลือกโปรแกรมใหม่
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    className="btn btn-primary"
+                    style={{ flex: 1 }}
+                    onClick={() => setProgramPaused(currentProgram.program.id, false)}
+                  >
+                    <IconPlay size={14} />
+                    ทำต่อ
+                  </button>
+                  <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => navigate('/programs')}>
+                    <IconDumbbell size={16} />
+                    Programs
+                  </button>
+                </div>
               </div>
             </div>
           )}
 
-          <div>
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 }}>
-              <div className="t-eyebrow">{hasRuns ? 'WEEKLY TRAINING' : 'WEEKLY VOLUME'}</div>
-              <div className="t-mono" style={{ fontSize: 11, color: 'var(--muted)' }}>
-                {hasRuns
-                  ? `${Math.round(weekKg).toLocaleString()} kg · ${formatNum2(weekKm)} km`
-                  : `PEAK ${Math.round(maxVol).toLocaleString()} kg`}
-              </div>
-            </div>
-            {hasRuns && (
-              <div className="t-mono" style={{ display: 'flex', gap: 12, fontSize: 9, color: 'var(--muted)' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--accent)' }} />LIFT kg
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: 2, background: '#60a5fa' }} />RUN km
-                </span>
-              </div>
-            )}
-            <div className="bar-chart">
-              {week.map((d, i) => {
-                const h = d.volume > 0 ? Math.max(4, (d.volume / maxVol) * 100) : 4
-                const hr = d.runKm > 0 ? Math.max(4, (d.runKm / maxKm) * 100) : 4
-                return (
-                  <div key={i} className="bar-col">
-                    <div style={{ height: 100, width: '100%', display: 'flex', alignItems: 'flex-end', gap: 2 }}>
-                      <div
-                        className={`bar-fill ${d.isToday ? 'today' : d.volume > 0 ? 'active' : ''}`}
-                        style={{ height: `${h}%` }}
-                      />
-                      {hasRuns && (
-                        <div className={`bar-fill ${d.runKm > 0 ? 'run' : ''}`} style={{ height: `${hr}%` }} />
-                      )}
-                    </div>
-                    <div className="bar-label" style={{
-                      color: d.isToday ? 'var(--accent)' : 'var(--muted)',
-                      fontWeight: d.isToday ? 700 : 400,
-                    }}>
-                      {d.label}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 1RM progression — all-time, sits with the retrospective stats card above.
-          Renders nothing until there are 2+ logged tests. */}
-      {hasOneRMTrend && (
-        <div style={{ padding: '0 20px', marginBottom: 16 }}>
-          <button
-            onClick={() => navigate('/one-rm')}
-            style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box' }}
-          >
-            <div className="card card-tight" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{
-                width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-                background: 'var(--surface-2)', border: '1px solid var(--border)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'var(--accent)',
-              }}><IconTrendingUp size={16} /></div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>1RM PROGRESSION</div>
-                <OneRMSparkline series={liftSeries} />
-              </div>
-              <span className="t-mono" style={{ fontSize: 11, color: 'var(--accent)', flexShrink: 0 }}>VIEW →</span>
-            </div>
-          </button>
-        </div>
-      )}
-
-      {/* Paused program — deliberately does NOT fall through to another program */}
-      {currentProgram?.paused && (
-        <div style={{ padding: '0 20px', marginBottom: 16 }}>
-          <div className="card" style={{ borderLeft: '3px solid #f59e0b', paddingLeft: 14 }}>
-            <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 3, color: '#f59e0b' }}>PROGRAM PAUSED</div>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, lineHeight: 1.1, marginBottom: 6 }}>
-              {currentProgram.program.name}
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 16, lineHeight: 1.5 }}>
-              พักโปรแกรมนี้ไว้ — กดทำต่อเมื่อพร้อมกลับไปซ้อม หรือเลือกโปรแกรมใหม่
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                className="btn btn-primary"
-                style={{ flex: 1 }}
-                onClick={() => setProgramPaused(currentProgram.program.id, false)}
-              >
-                <IconPlay size={14} />
-                ทำต่อ
-              </button>
-              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => navigate('/programs')}>
-                <IconDumbbell size={16} />
-                Programs
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Nothing running, but a program is queued — count down to it */}
-      {upcomingProgram && (
-        <div style={{ padding: '0 20px', marginBottom: 16 }}>
-          <div className="card" style={{ borderLeft: '3px solid #22d3ee', paddingLeft: 14 }}>
-            <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 3, color: '#22d3ee' }}>UPCOMING PROGRAM</div>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, lineHeight: 1.1, marginBottom: 10 }}>
-              {upcomingProgram.program.name}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
-              <span className="t-mono tnum" style={{ fontSize: 32, fontWeight: 700, lineHeight: 1 }}>
-                {upcomingProgram.daysUntil}
-              </span>
-              <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
-                {upcomingProgram.daysUntil === 1 ? 'วัน — เริ่มพรุ่งนี้' : 'วันก่อนเริ่ม'}
-              </span>
-            </div>
-            <div className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 16 }}>
-              เริ่ม {formatDMY(upcomingProgram.startDate)}
-            </div>
-            <button
-              className="btn btn-secondary"
-              style={{ width: '100%' }}
-              onClick={() => navigate(`/programs/${upcomingProgram.program.id}`)}
-            >
-              <IconDumbbell size={16} />
-              ดูโปรแกรม
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* No active program CTA */}
-      {!activeProgramInfo && !currentProgram?.paused && !upcomingProgram && (
-        <div style={{ padding: '0 20px', marginBottom: 16 }}>
-          <div className="card" style={{ textAlign: 'center', padding: '28px 20px' }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>🏋️</div>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18, marginBottom: 6 }}>
-              No active program
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 20, lineHeight: 1.5 }}>
-              เลือกโปรแกรมเพื่อเริ่มติดตามการซ้อม
-            </div>
-            <button className="btn btn-primary" onClick={() => navigate('/programs')} style={{ width: '100%' }}>
-              <IconDumbbell size={18} />
-              Browse Programs
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Active program current-week card */}
-      {activeProgramInfo && (() => {
-        const { program, week: currentWeek, weekNum: currentWeekNum, doneWeeks, weeksBehind, leftovers } = activeProgramInfo
-        const phaseColor = PHASE_COLOR[currentWeek.phase] ?? 'var(--accent)'
-        const pct = Math.round((doneWeeks / program.weeks.length) * 100)
-        const oldest = leftovers[0]
-        return (
-          <div style={{ padding: '0 20px', marginBottom: 16 }}>
-            <div className="card card-tight" style={{ borderLeft: `3px solid ${phaseColor}`, paddingLeft: 14 }}>
-              <button
-                style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box' }}
-                onClick={() => navigate(`/programs/${program.id}/week/${currentWeek.id}`)}
-              >
-                {/* Program header */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <div>
-                    <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 3 }}>ACTIVE PROGRAM</div>
-                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, lineHeight: 1.1 }}>
-                      {program.name}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 20, letterSpacing: '-0.02em' }}>
-                      W{currentWeekNum}
-                    </div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: phaseColor, textTransform: 'uppercase' }}>
-                      {currentWeek.phase}
-                    </div>
-                  </div>
+          {/* Nothing running, but a program is queued — count down to it */}
+          {upcomingProgram && (
+            <div style={{ padding: '0 20px', marginBottom: 16 }}>
+              <div className="card" style={{ borderLeft: '3px solid #22d3ee', paddingLeft: 14 }}>
+                <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 3, color: '#22d3ee' }}>UPCOMING PROGRAM</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, lineHeight: 1.1, marginBottom: 10 }}>
+                  {upcomingProgram.program.name}
                 </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
+                  <span className="t-mono tnum" style={{ fontSize: 32, fontWeight: 700, lineHeight: 1 }}>
+                    {upcomingProgram.daysUntil}
+                  </span>
+                  <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
+                    {upcomingProgram.daysUntil === 1 ? 'วัน — เริ่มพรุ่งนี้' : 'วันก่อนเริ่ม'}
+                  </span>
+                </div>
+                <div className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 16 }}>
+                  เริ่ม {formatDMY(upcomingProgram.startDate)}
+                </div>
+                <button
+                  className="btn btn-secondary"
+                  style={{ width: '100%' }}
+                  onClick={() => navigate(`/programs/${upcomingProgram.program.id}`)}
+                >
+                  <IconDumbbell size={16} />
+                  ดูโปรแกรม
+                </button>
+              </div>
+            </div>
+          )}
 
-                {/* Schedule drift — the plan's dates vs the week you're actually on */}
-                {weeksBehind !== 0 && (
-                  <div className="t-mono" style={{
-                    fontSize: 10, marginBottom: 10,
-                    color: weeksBehind > 0 ? '#f59e0b' : 'var(--muted)',
-                  }}>
-                    {weeksBehind > 0
-                      ? `⚠ ช้ากว่าแผน ${weeksBehind} สัปดาห์`
-                      : `เร็วกว่าแผน ${-weeksBehind} สัปดาห์`}
-                  </div>
-                )}
+          {/* No active program CTA */}
+          {!activeProgramInfo && !currentProgram?.paused && !upcomingProgram && (
+            <div style={{ padding: '0 20px', marginBottom: 16 }}>
+              <div className="card" style={{ textAlign: 'center', padding: '28px 20px' }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>🏋️</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18, marginBottom: 6 }}>
+                  No active program
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 20, lineHeight: 1.5 }}>
+                  เลือกโปรแกรมเพื่อเริ่มติดตามการซ้อม
+                </div>
+                <button className="btn btn-primary" onClick={() => navigate('/programs')} style={{ width: '100%' }}>
+                  <IconDumbbell size={18} />
+                  Browse Programs
+                </button>
+              </div>
+            </div>
+          )}
 
-                {/* Day status row */}
-                <div style={{ display: 'flex', gap: 5, marginBottom: 12 }}>
-                  {sortDaysByWeekday(currentWeek.days).map(day => {
-                    const status = getDayStatus(program.id, currentWeek.id, day.id)
-                    const isActive = status === 'in_progress'
-                    const isDone = status === 'done'
-                    const focusShort = day.focus.split(' ')[0]
-                    return (
-                      <div key={day.id} style={{
-                        flex: 1, textAlign: 'center', padding: '6px 4px',
-                        background: isActive
-                          ? 'rgba(var(--accent-rgb),0.12)'
-                          : isDone ? 'rgba(74,222,128,0.08)' : 'var(--surface-2)',
-                        border: `1px solid ${isActive
-                          ? 'rgba(var(--accent-rgb),0.4)'
-                          : isDone ? 'rgba(74,222,128,0.25)' : 'var(--border)'}`,
-                        borderRadius: 8,
-                        transition: 'background .2s',
-                      }}>
-                        <div style={{
-                          fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: isActive ? 700 : 400,
-                          color: isActive ? 'var(--accent)' : isDone ? '#4ade80' : 'var(--muted)',
-                          marginBottom: 3,
-                        }}>
-                          {day.dayOfWeek}
-                        </div>
-                        <div style={{ height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {isDone
-                            ? <IconCheck size={11} stroke={3} style={{ color: '#4ade80' }} />
-                            : isActive
-                            ? <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)' }} />
-                            : status === 'skipped'
-                            // A dash, not a dot: settled, but nothing was trained
-                            ? <div style={{ width: 8, height: 2, borderRadius: 1, background: 'var(--text-2)' }} />
-                            : <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--border-strong)' }} />
-                          }
-                        </div>
-                        <div style={{
-                          fontFamily: 'var(--font-mono)', fontSize: 8, marginTop: 3,
-                          color: isActive ? 'var(--accent)' : isDone ? '#4ade80' : 'var(--muted)',
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}>
-                          {focusShort}
+          {/* Active program current-week card */}
+          {activeProgramInfo && (() => {
+            const { program, week: currentWeek, weekNum: currentWeekNum, doneWeeks, weeksBehind, leftovers } = activeProgramInfo
+            const phaseColor = PHASE_COLOR[currentWeek.phase] ?? 'var(--accent)'
+            const pct = Math.round((doneWeeks / program.weeks.length) * 100)
+            const oldest = leftovers[0]
+            return (
+              <div style={{ padding: '0 20px', marginBottom: 16 }}>
+                <div className="card card-tight" style={{ borderLeft: `3px solid ${phaseColor}`, paddingLeft: 14 }}>
+                  <button
+                    style={{ all: 'unset', cursor: 'pointer', display: 'block', width: '100%', boxSizing: 'border-box' }}
+                    onClick={() => navigate(`/programs/${program.id}/week/${currentWeek.id}`)}
+                  >
+                    {/* Program header */}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <div>
+                        <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 3 }}>ACTIVE PROGRAM</div>
+                        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, lineHeight: 1.1 }}>
+                          {program.name}
                         </div>
                       </div>
-                    )
-                  })}
-                </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 20, letterSpacing: '-0.02em' }}>
+                          W{currentWeekNum}
+                        </div>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: phaseColor, textTransform: 'uppercase' }}>
+                          {currentWeek.phase}
+                        </div>
+                      </div>
+                    </div>
 
-                {/* Progress bar */}
-                <div style={{ height: 4, background: 'var(--surface-2)', borderRadius: 2, overflow: 'hidden', marginBottom: 4 }}>
-                  <div style={{ height: '100%', width: `${pct}%`, background: phaseColor, borderRadius: 2, transition: 'width .4s ease' }} />
-                </div>
-                <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase' }}>
-                  {doneWeeks}/{program.weeks.length} weeks · {pct}%
-                </div>
-              </button>
+                    {/* Schedule drift — the plan's dates vs the week you're actually on */}
+                    {weeksBehind !== 0 && (
+                      <div className="t-mono" style={{
+                        fontSize: 10, marginBottom: 10,
+                        color: weeksBehind > 0 ? '#f59e0b' : 'var(--muted)',
+                      }}>
+                        {weeksBehind > 0
+                          ? `⚠ ช้ากว่าแผน ${weeksBehind} สัปดาห์`
+                          : `เร็วกว่าแผน ${-weeksBehind} สัปดาห์`}
+                      </div>
+                    )}
 
-              {/* Unfinished days left behind — the card moved on, these didn't */}
-              {oldest && (
-                <button
-                  onClick={() => navigate(`/programs/${program.id}/week/${oldest.week.id}`)}
-                  style={{
-                    all: 'unset', cursor: 'pointer', boxSizing: 'border-box', width: '100%',
-                    display: 'flex', alignItems: 'center', gap: 6, minHeight: 28,
-                    marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)',
-                  }}
-                >
-                  <span className="t-mono" style={{ fontSize: 10, color: '#f59e0b' }}>
-                    ↩ W{oldest.weekNum} ยังค้าง {oldest.remaining} วัน
-                  </span>
-                  {leftovers.length > 1 && (
-                    <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
-                      · อีก {leftovers.length - 1} สัปดาห์
-                    </span>
+                    {/* Day status row */}
+                    <div style={{ display: 'flex', gap: 5, marginBottom: 12 }}>
+                      {sortDaysByWeekday(currentWeek.days).map(day => {
+                        const status = getDayStatus(program.id, currentWeek.id, day.id)
+                        const isActive = status === 'in_progress'
+                        const isDone = status === 'done'
+                        const focusShort = day.focus.split(' ')[0]
+                        return (
+                          <div key={day.id} style={{
+                            flex: 1, textAlign: 'center', padding: '6px 4px',
+                            background: isActive
+                              ? 'rgba(var(--accent-rgb),0.12)'
+                              : isDone ? 'rgba(74,222,128,0.08)' : 'var(--surface-2)',
+                            border: `1px solid ${isActive
+                              ? 'rgba(var(--accent-rgb),0.4)'
+                              : isDone ? 'rgba(74,222,128,0.25)' : 'var(--border)'}`,
+                            borderRadius: 8,
+                            transition: 'background .2s',
+                          }}>
+                            <div style={{
+                              fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: isActive ? 700 : 400,
+                              color: isActive ? 'var(--accent)' : isDone ? '#4ade80' : 'var(--muted)',
+                              marginBottom: 3,
+                            }}>
+                              {day.dayOfWeek}
+                            </div>
+                            <div style={{ height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {isDone
+                                ? <IconCheck size={11} stroke={3} style={{ color: '#4ade80' }} />
+                                : isActive
+                                ? <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)' }} />
+                                : status === 'skipped'
+                                // A dash, not a dot: settled, but nothing was trained
+                                ? <div style={{ width: 8, height: 2, borderRadius: 1, background: 'var(--text-2)' }} />
+                                : <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--border-strong)' }} />
+                              }
+                            </div>
+                            <div style={{
+                              fontFamily: 'var(--font-mono)', fontSize: 8, marginTop: 3,
+                              color: isActive ? 'var(--accent)' : isDone ? '#4ade80' : 'var(--muted)',
+                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            }}>
+                              {focusShort}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* Progress bar */}
+                    <div style={{ height: 4, background: 'var(--surface-2)', borderRadius: 2, overflow: 'hidden', marginBottom: 4 }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: phaseColor, borderRadius: 2, transition: 'width .4s ease' }} />
+                    </div>
+                    <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase' }}>
+                      {doneWeeks}/{program.weeks.length} weeks · {pct}%
+                    </div>
+                  </button>
+
+                  {/* Unfinished days left behind — the card moved on, these didn't */}
+                  {oldest && (
+                    <button
+                      onClick={() => navigate(`/programs/${program.id}/week/${oldest.week.id}`)}
+                      style={{
+                        all: 'unset', cursor: 'pointer', boxSizing: 'border-box', width: '100%',
+                        display: 'flex', alignItems: 'center', gap: 6, minHeight: 28,
+                        marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)',
+                      }}
+                    >
+                      <span className="t-mono" style={{ fontSize: 10, color: '#f59e0b' }}>
+                        ↩ W{oldest.weekNum} ยังค้าง {oldest.remaining} วัน
+                      </span>
+                      {leftovers.length > 1 && (
+                        <span className="t-mono" style={{ fontSize: 10, color: 'var(--muted)' }}>
+                          · อีก {leftovers.length - 1} สัปดาห์
+                        </span>
+                      )}
+                      <span className="t-mono" style={{ fontSize: 10, color: 'var(--accent)', marginLeft: 'auto' }}>→</span>
+                    </button>
                   )}
-                  <span className="t-mono" style={{ fontSize: 10, color: 'var(--accent)', marginLeft: 'auto' }}>→</span>
-                </button>
-              )}
-            </div>
-          </div>
-        )
-      })()}
+                </div>
+              </div>
+            )
+          })()}
 
-      {/* Shortcuts */}
-      <div style={{ padding: '0 20px', marginBottom: 28, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-        {[
-          { label: 'Programs', Ic: IconDumbbell, to: '/programs' },
-          { label: 'Exercises', Ic: IconSearch, to: '/library' },
-          { label: 'Running', Ic: IconRun, to: todayRunHref },
-          // key is the label, not `to` — the Running href changes with the day
-        ].map(({ label, Ic, to }) => (
-          <button
-            key={label}
-            className="btn btn-secondary"
-            style={{ minWidth: 0, padding: '0 6px', gap: 6, fontSize: 13 }}
-            onClick={() => navigate(to)}
-          >
-            <Ic size={17} />
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
-          </button>
-        ))}
+          {/* Shortcuts */}
+          <div style={{ padding: '0 20px', marginBottom: 28, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+            {[
+              { label: 'Programs', Ic: IconDumbbell, to: '/programs' },
+              { label: 'Exercises', Ic: IconSearch, to: '/library' },
+              { label: 'Running', Ic: IconRun, to: todayRunHref },
+              // key is the label, not `to` — the Running href changes with the day
+            ].map(({ label, Ic, to }) => (
+              <button
+                key={label}
+                className="btn btn-secondary"
+                style={{ minWidth: 0, padding: '0 6px', gap: 6, fontSize: 13 }}
+                onClick={() => navigate(to)}
+              >
+                <Ic size={17} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Notifications sheet */}

@@ -34,7 +34,7 @@ export function WeekDetailPage() {
   const phaseColor = PHASE_COLOR[week.phase] ?? 'var(--muted)'
 
   return (
-    <div className="atlas-screen screen-enter">
+    <div className="atlas-screen screen-enter screen-wide">
       {/* Header */}
       <div style={{ padding: '12px 20px 0', marginBottom: 20 }}>
         <button onClick={() => navigate(`/programs/${program.id}`)}

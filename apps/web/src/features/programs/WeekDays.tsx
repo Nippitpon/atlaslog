@@ -275,7 +275,7 @@ export function WeekDays({ program, week }: { program: StructuredProgram; week: 
 
   return (
     <>
-      <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="r-grid" style={{ padding: '0 20px', gap: 12 }}>
         {sortDaysByWeekday(week.days).map(day => {
           const exercises = resolveDayExercises(day, getDayLayout(program.id, week.id, day.id))
           const ref = buildDayRef(program.id, week.id, day.id)

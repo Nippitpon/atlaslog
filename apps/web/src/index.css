@@ -69,6 +69,21 @@
 *::-webkit-scrollbar { width: 0; height: 0; }
 * { scrollbar-width: none; }
 
+/* Mouse users get a thin scrollbar back on the main scroll area — without one
+   there is no hint that a long desktop page scrolls. Touch stays hidden. */
+@media (pointer: fine) {
+  .atlas-screen { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+  .atlas-screen::-webkit-scrollbar { width: 8px; }
+  .atlas-screen::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+}
+
+button:focus-visible,
+[role="button"]:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 body {
   margin: 0;
   font-family: var(--font-body);
@@ -119,6 +134,26 @@ body {
   .atlas-app .resume-bar {
     padding-inline: max(20px, calc((100% - var(--content-max)) / 2 + 20px));
   }
+}
+
+/* Multi-column layout helpers. Every page keeps its own 20px side padding per
+   section, so columns need no gap of their own. Mobile/tablet: plain stack in
+   source order. .screen-wide opts a page into the wider desktop column. */
+.r-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--r-gap, 8px); }
+@media (min-width: 768px) {
+  .r-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .atlas-screen.screen-wide { --content-max: 1080px; }
+  .r-cols {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+  .r-cols-aside { grid-template-columns: 380px minmax(0, 1fr); }
+  .r-cols > * { min-width: 0; }
+  .r-sticky { position: sticky; top: 16px; }
+  .r-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 .t-display {
@@ -370,6 +405,65 @@ body {
   background: transparent;
   opacity: 0;
   margin-top: 2px;
+}
+.nav-brand { display: none; }
+
+/* Desktop: the same <nav> turns into a left sidebar. .has-nav is absent on the
+   logger, so a workout gets the full width (focus mode). Absolutely positioned
+   overlays resolve against the padding box, hence the explicit 220px offsets. */
+@media (min-width: 1024px) {
+  .atlas-app { --sidebar-w: 220px; }
+  .atlas-app.has-nav { padding-left: var(--sidebar-w); }
+  .atlas-app.has-nav .atlas-screen {
+    padding-inline: max(16px, calc((100% - var(--content-max)) / 2));
+  }
+  .atlas-app.has-nav .atlas-screen { padding-bottom: 40px; }
+  .atlas-app.has-nav.has-resume-bar .atlas-screen { padding-bottom: 92px; }
+
+  .atlas-app .bottom-nav {
+    top: 0; bottom: 0; right: auto;
+    width: var(--sidebar-w);
+    height: auto;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding: max(28px, env(safe-area-inset-top, 0px)) 12px 24px;
+    border-top: none;
+    border-right: 1px solid var(--border);
+  }
+  .bottom-nav button {
+    flex: none;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    height: 46px;
+    padding: 0 14px;
+    border-radius: 12px;
+    font-size: 12px;
+    transition: color .15s ease, background .15s ease;
+  }
+  .bottom-nav button:hover { color: var(--text); background: var(--surface-2); }
+  .bottom-nav button.active {
+    background: rgba(var(--accent-rgb), 0.12);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+  .bottom-nav .nav-dot { display: none; }
+  .nav-brand {
+    display: block;
+    padding: 0 14px 28px;
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: 22px;
+    letter-spacing: -0.03em;
+    color: var(--accent);
+  }
+
+  .atlas-app.has-nav .resume-bar {
+    bottom: 0;
+    left: var(--sidebar-w);
+    padding-inline: max(20px, calc((100% - var(--sidebar-w) - var(--content-max)) / 2 + 20px));
+  }
+  .atlas-app.has-nav .fab { bottom: 32px; }
 }
 
 .bar-chart {
@@ -625,3 +719,16 @@ body {
 .list-row:active { background: var(--surface-2); }
 
 .no-select { user-select: none; -webkit-user-select: none; }
+
+/* Hover only where a real pointer can hover — on touch, :hover sticks after a tap. */
+@media (hover: hover) {
+  .list-row:hover { background: var(--surface-2); }
+  .btn-icon:hover { border-color: var(--border-strong); background: var(--surface-3); }
+  .btn-secondary:hover { border-color: var(--border-strong); }
+  .pill:not(.pill-active):hover { color: var(--text); border-color: var(--border-strong); }
+  .check-btn:not(.checked):hover { border-color: var(--border-strong); }
+}
+
+/* Grid rows stretch their cells; let a single wrapped card fill its cell so
+   neighbours in a row line up. */
+.r-grid > * > .card:only-child { height: 100%; }

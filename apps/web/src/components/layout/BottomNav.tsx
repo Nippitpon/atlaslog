@@ -19,10 +19,12 @@ export function BottomNav() {
   // through to Home. '/' is handled first since every path starts with it.
   const activeId = location.pathname === '/' ? 'home'
     : location.pathname.startsWith('/library') ? 'programs'
+    : location.pathname.startsWith('/one-rm') || location.pathname.startsWith('/body') ? 'profile'
     : NAV_ITEMS.slice(1).find(i => location.pathname.startsWith(i.path))?.id ?? 'home'
 
   return (
     <nav className="bottom-nav">
+      <div className="nav-brand">ATLASLOG</div>
       {NAV_ITEMS.map(it => {
         const active = activeId === it.id
         const badge = it.id === 'profile' && unread > 0

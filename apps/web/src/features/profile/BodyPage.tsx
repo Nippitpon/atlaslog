@@ -56,7 +56,7 @@ export function BodyPage() {
   }
 
   return (
-    <div className="atlas-screen screen-enter">
+    <div className="atlas-screen screen-enter screen-wide">
       {/* .scr-header is space-between by default — override so back + title group */}
       <div className="scr-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 12 }}>
         <button className="btn-icon" onClick={() => navigate(-1)} aria-label="Back"><IconChevronLeft size={20} /></button>
@@ -80,9 +80,9 @@ export function BodyPage() {
           </div>
         </div>
       ) : (
-        <>
+        <div className="r-cols">
           {/* Chart */}
-          <div style={{ padding: '0 20px 20px' }}>
+          <div className="r-sticky" style={{ padding: '0 20px 20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <IconScale size={14} style={{ color: 'var(--muted)' }} />
               <div className="t-eyebrow">PROGRESSION</div>
@@ -213,7 +213,7 @@ export function BodyPage() {
               ))}
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {showLog && (

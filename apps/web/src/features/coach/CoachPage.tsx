@@ -94,7 +94,7 @@ export function CoachPage() {
   }
 
   return (
-    <div className="atlas-screen screen-enter">
+    <div className="atlas-screen screen-enter screen-wide">
       <div className="scr-header">
         <div>
           <div className="sub">COACH</div>
@@ -165,7 +165,7 @@ export function CoachPage() {
             No athletes yet. Add one by email above.
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="r-grid" style={{ gap: 8 }}>
             {athletes.map(a => (
               <div key={a.id} className="card card-tight" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <button

@@ -183,7 +183,7 @@ export function AdminPage() {
   }
 
   return (
-    <div className="atlas-screen screen-enter">
+    <div className="atlas-screen screen-enter screen-wide">
       <div className="scr-header">
         <div>
           <div className="sub">ADMIN</div>
@@ -219,7 +219,7 @@ export function AdminPage() {
         <>
           <div style={{ padding: '0 20px 20px' }}>
             <div className="t-eyebrow" style={{ marginBottom: 10 }}>PENDING ({pending.length})</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="r-grid" style={{ gap: 8 }}>
               {pending.length === 0
                 ? <div className="t-mono" style={{ fontSize: 12, color: 'var(--muted)' }}>No pending users</div>
                 : pending.map(u => renderRow(u, true))}
@@ -228,7 +228,7 @@ export function AdminPage() {
 
           <div style={{ padding: '0 20px 32px' }}>
             <div className="t-eyebrow" style={{ marginBottom: 10 }}>CONFIRMED ({confirmed.length})</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="r-grid" style={{ gap: 8 }}>
               {confirmed.length === 0
                 ? <div className="t-mono" style={{ fontSize: 12, color: 'var(--muted)' }}>No confirmed users</div>
                 : confirmed.map(u => renderRow(u, false))}

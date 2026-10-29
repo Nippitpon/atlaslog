@@ -79,7 +79,7 @@ export function LibraryPage() {
   const handleQuick = () => startWorkout(QUICK_PROGRAM)
 
   return (
-    <div className="atlas-screen screen-enter">
+    <div className="atlas-screen screen-enter screen-wide">
       <div className="scr-header">
         <div>
           <div className="sub">{allEx.length} EXERCISES</div>
@@ -130,7 +130,7 @@ export function LibraryPage() {
         {filtered.length === 0 && (
           <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted)', fontSize: 13 }}>No matches.</div>
         )}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div className="r-grid r-grid-3" style={{ gap: 6 }}>
           {shown.map(ex => {
             const custom = customIds.has(ex.id)
             return (
