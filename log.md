@@ -1,8 +1,30 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-10-29 (รอบ 76 — ✅ SHIPPED: Responsive มือถือ/แท็บเล็ต/เดสก์ท็อป · รอบ 75 — PLANNED: Gamification EXP/Level/Tier)
+> อัปเดตล่าสุด: 2026-11-09 (รอบ 77 — ✅ DONE ในเครื่อง: Import Excel บันทึกเป็น Draft · รอบ 76 — ✅ SHIPPED: Responsive · รอบ 75 — PLANNED: Gamification EXP/Level/Tier)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-11-09 — รอบ 77 (✅ DONE ในเครื่อง, ยังไม่ commit/push): Import from Excel — บันทึกเป็น Draft ก่อน setup
+
+เดิม import แล้วต้องผ่านขั้น Setup (Start Date + 1RM ครบ 3 ท่า) ถึงจะ save ได้ — ปิด sheet กลางทางโปรแกรมหาย · รอบนี้เพิ่มปุ่ม Draft ให้ save โปรแกรมโดยยังไม่มี `ProgramConfig`
+
+### ทำอะไร
+- `ImportProgramSheet.tsx` · เพิ่ม `handleSaveDraft` → `addCustomProgram({ ...program, name })` อย่างเดียว (ไม่เรียก `setConfig`) → `onClose()` + `navigate('/programs/:id')` · ใช้ชื่อที่ผู้ใช้แก้ใน Setup (ว่าง = ชื่อจากไฟล์)
+- ปุ่ม "บันทึกเป็น Draft (ตั้งค่าทีหลัง)" ใต้แถว [ย้อนกลับ][เริ่มโปรแกรม] ในขั้น Setup · ปุ่ม "เริ่มโปรแกรม" เดิมไม่เปลี่ยน (ยัง validate ครบเหมือนเดิม)
+- ไม่ต้องแก้ store/หน้าอื่น: `getConfig` คืน `null` ได้อยู่แล้ว · `getProgramStatus` → `not_setup` · `ProgramOverviewPage` มีปุ่ม Configure ให้ตั้งค่าทีหลัง · import ด้วยโค้ดแชร์ (`ProgramsPage`) save แบบไม่มี config ทางเดียวกันอยู่แล้ว
+
+### ผลกระทบ (จัดการแล้ว)
+- Draft อยู่กลุ่ม `not_setup` ในหน้า Programs · ไม่ขึ้น Dashboard/History calendar จนกว่าจะมี config (`groupProgramsByStatus` / `pickHomeProgram` กรองด้วย `configs[p.id]`)
+
+### verify
+- `pnpm build` ผ่าน (146 modules)
+- ⚠️ **ยังไม่ได้ click-through e2e และยังไม่ได้รัน `pnpm test`/`pnpm lint`** — ควรเทส: import .xlsx → Setup → กด Draft → ไปหน้า Overview สถานะ not_setup · กด Configure แล้วกรอก 1RM/วันที่ → กลายเป็น active · รีเฟรชแล้ว draft ยังอยู่ · โปรแกรม `general` ด้วย
+
+### ไม่ทำรอบนี้
+- ปุ่ม Draft ในขั้น Preview (มีแค่ขั้น Setup) — ถ้าต้องการให้เพิ่ม
+- ป้าย "DRAFT" แยกบนการ์ดใน Programs (ตอนนี้ใช้ stripe สี `not_setup` เดิม)
 
 ---
 
