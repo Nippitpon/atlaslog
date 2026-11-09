@@ -20,7 +20,8 @@
 
 ### verify
 - `pnpm build` ผ่าน (146 modules) · ESLint ผ่าน · `pnpm test` **269/269 (15 ไฟล์)**
-- ⚠️ **ยังไม่ได้ click-through e2e** — ควรเทส: import .xlsx → Setup → กด Draft → ไปหน้า Overview สถานะ not_setup · กด Configure แล้วกรอก 1RM/วันที่ → กลายเป็น active · รีเฟรชแล้ว draft ยังอยู่ · โปรแกรม `general` ด้วย
+- Playwright 390px (inject auth ตาม memory `e2e-auth-gated-pages`, revert `main.tsx` แล้ว, 0 console errors): import .xlsx เล็ก ๆ → Preview ถูก → Setup ที่ยังไม่กรอก 1RM: "เริ่มโปรแกรม" disabled / "บันทึกเป็น Draft" กดได้ → กด Draft → ไป `/programs/:id`, `customPrograms` +1, **ไม่มี config** ของ id นั้น → Overview โชว์กล่อง "ยังไม่ได้ตั้งค่าโปรแกรม" + ปุ่ม SETUP → กรอก 180/120/220 → START PROGRAM → config ถูกเซ็ต, สถานะ ACTIVE, ช่วงวันที่ขึ้นครบ · ข้อมูลอยู่ใน localStorage `atlas:v1:program-progress`
+- ⚠️ **ยังไม่ได้เทส:** โปรแกรม `general` (Meta `program_type`) · reload หน้าเต็มหลัง draft (auth ปลอมถูกล้าง จึงเช็กแค่ localStorage) · 768/1280px
 
 ### ไม่ทำรอบนี้
 - ปุ่ม Draft ในขั้น Preview (มีแค่ขั้น Setup) — ถ้าต้องการให้เพิ่ม
