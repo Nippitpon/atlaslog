@@ -1,8 +1,32 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-11-09 (รอบ 77 — ✅ SHIPPED: Import Excel บันทึกเป็น Draft · รอบ 76 — ✅ SHIPPED: Responsive · รอบ 75 — PLANNED: Gamification EXP/Level/Tier)
+> อัปเดตล่าสุด: 2026-11-09 (รอบ 78 — ✅ SHIPPED: แก้ Phase ถูกเขียนทับตอน Edit โปรแกรม · รอบ 77 — ✅ SHIPPED: Import Excel บันทึกเป็น Draft · รอบ 76 — ✅ SHIPPED: Responsive · รอบ 75 — PLANNED: Gamification EXP/Level/Tier)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-11-09 — รอบ 78 (✅ SHIPPED, deploy main `cb5b4e5`): แก้ Phase ถูกเขียนทับเป็น Accumulation ตอน Edit โปรแกรม
+
+อาการ: import Excel ที่มี Phase ครบ (Accum / Intens / Peak / Taper) แต่การ์ดรายสัปดาห์ใน Overview ขึ้น Accumulation ทุกสัปดาห์ · สาเหตุไม่ใช่ parser — `CreateProgramPage.tsx` hard-code `phase: 'Accumulation'` ให้ทุก week ตอน Save จึงเขียนทับทุกครั้งที่ coach/admin กด Edit → Save changes กับโปรแกรมที่ import มา
+
+### ทำอะไร
+- `CreateProgramPage.tsx:135` · `phase: editing?.weeks[Math.min(wi, editing.weeks.length - 1)]?.phase ?? 'Accumulation'` → ตอนแก้โปรแกรมคง Phase เดิมของแต่ละสัปดาห์ · สัปดาห์ที่เพิ่มใหม่ใช้ Phase ของสัปดาห์สุดท้ายเดิม · สร้างโปรแกรมใหม่ยังเป็น Accumulation เหมือนเดิม
+- เปลี่ยนบรรทัดเดียว (+1/−1)
+
+### ผลกระทบ (จัดการแล้ว)
+- **โปรแกรมที่ถูกเขียนทับไปแล้วไม่กลับมาเอง** — Phase ถูกเก็บในโปรแกรมที่ save ไว้ (localStorage + Supabase) ต้องลบแล้ว import ไฟล์ใหม่ (ได้ program id ใหม่ ประวัติเทรนของตัวเก่าไม่ตามมา)
+
+### verify
+- ไล่หาสาเหตุ: parser (`excelImport.ts`) อ่านทั้ง `powerlifting_RPE_12weeks (Template).xlsx` และ `atlaslog-program-template -Hybrid Powerlift 12W Sumo.xlsx` ได้ `Accum×4 · Inten×4 · Peaking×3 · Taper` ถูกต้อง (รันผ่าน vitest ชั่วคราว ลบทิ้งแล้ว) · `weekPhase` อยู่ใน parser ตั้งแต่ commit แรก
+- Playwright 390px (admin inject, revert `main.tsx` แล้ว): import ไฟล์ Sumo → Phase ถูก → Edit → Save โดยไม่แก้อะไร → **หลังแก้ Phase ยังครบ** · ถอดการแก้ออกชั่วคราว (`git stash`) ทำซ้ำ → Phase กลายเป็น Accumulation ×12 (reproduce บั๊กได้จริง) · 0 console errors
+- `pnpm build` ผ่าน · ESLint ผ่าน · `pnpm test` **269/269**
+- ⚠️ **ยังไม่มีเทสอัตโนมัติ** ของ `CreateProgramPage` (ตรวจด้วย Playwright เท่านั้น)
+
+### ไม่ทำรอบนี้
+- Harden parser: forward-fill Phase ที่เว้นว่าง · เตือนค่า Phase ที่ไม่รู้จัก — `mapPhase` (`excelImport.ts:74`) ยัง fallback เป็น Accumulation เงียบ ๆ ทั้งเซลล์ว่างและคำที่ไม่รู้จัก (ไฟล์จริงไม่มีปัญหานี้ จึงไม่ทำ แต่ไฟล์ในอนาคตอาจเจอ)
+- แสดง Phase บนการ์ดโปรแกรม custom ในหน้า Programs (`renderCustom` ไม่มี Phase — แสดงเฉพาะการ์ด built-in)
+- Home card / การ์ด built-in ใช้ Phase ของสัปดาห์ที่ "ไปถึงแล้ว" (ต่ำสุด W1) จึงขึ้น Accumulation จนกว่าจะเทรนเลยสัปดาห์ 4 — พฤติกรรมตั้งใจ (รอบ 38) ไม่ได้แก้
 
 ---
 
