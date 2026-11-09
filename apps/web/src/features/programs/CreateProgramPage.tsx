@@ -132,7 +132,7 @@ export function CreateProgramPage() {
       weeks: Array.from({ length: weeksNum }, (_, wi) => ({
         id: `week-${wi + 1}`,
         weekNumber: wi + 1,
-        phase: 'Accumulation' as const,
+        phase: editing?.weeks[Math.min(wi, editing.weeks.length - 1)]?.phase ?? 'Accumulation',
         days: ordered.map((d, di) => ({
           id: dayIds[di],
           dayOfWeek: d.dayOfWeek,
