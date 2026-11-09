@@ -120,6 +120,14 @@ export function ImportProgramSheet({ onClose }: Props) {
     navigate(`/programs/${finalProgram.id}`)
   }
 
+  const handleSaveDraft = () => {
+    if (!program) return
+    const finalProgram = { ...program, name: programName.trim() || program.name }
+    addCustomProgram(finalProgram)
+    onClose()
+    navigate(`/programs/${finalProgram.id}`)
+  }
+
   return (
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
@@ -391,6 +399,10 @@ export function ImportProgramSheet({ onClose }: Props) {
                 <IconCheck size={18} stroke={3} /> เริ่มโปรแกรม
               </button>
             </div>
+            <button className="btn btn-secondary" style={{ width: '100%', marginTop: 10 }}
+              onClick={handleSaveDraft}>
+              บันทึกเป็น Draft (ตั้งค่าทีหลัง)
+            </button>
           </>
         )}
       </div>
