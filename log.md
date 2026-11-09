@@ -1,12 +1,12 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-11-09 (รอบ 77 — ✅ DONE ในเครื่อง: Import Excel บันทึกเป็น Draft · รอบ 76 — ✅ SHIPPED: Responsive · รอบ 75 — PLANNED: Gamification EXP/Level/Tier)
+> อัปเดตล่าสุด: 2026-11-09 (รอบ 77 — ✅ SHIPPED: Import Excel บันทึกเป็น Draft · รอบ 76 — ✅ SHIPPED: Responsive · รอบ 75 — PLANNED: Gamification EXP/Level/Tier)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
 
 ---
 
-## 2026-11-09 — รอบ 77 (✅ DONE ในเครื่อง, ยังไม่ commit/push): Import from Excel — บันทึกเป็น Draft ก่อน setup
+## 2026-11-09 — รอบ 77 (✅ SHIPPED, deploy main `a297008`): Import from Excel — บันทึกเป็น Draft ก่อน setup
 
 เดิม import แล้วต้องผ่านขั้น Setup (Start Date + 1RM ครบ 3 ท่า) ถึงจะ save ได้ — ปิด sheet กลางทางโปรแกรมหาย · รอบนี้เพิ่มปุ่ม Draft ให้ save โปรแกรมโดยยังไม่มี `ProgramConfig`
 
@@ -19,8 +19,8 @@
 - Draft อยู่กลุ่ม `not_setup` ในหน้า Programs · ไม่ขึ้น Dashboard/History calendar จนกว่าจะมี config (`groupProgramsByStatus` / `pickHomeProgram` กรองด้วย `configs[p.id]`)
 
 ### verify
-- `pnpm build` ผ่าน (146 modules)
-- ⚠️ **ยังไม่ได้ click-through e2e และยังไม่ได้รัน `pnpm test`/`pnpm lint`** — ควรเทส: import .xlsx → Setup → กด Draft → ไปหน้า Overview สถานะ not_setup · กด Configure แล้วกรอก 1RM/วันที่ → กลายเป็น active · รีเฟรชแล้ว draft ยังอยู่ · โปรแกรม `general` ด้วย
+- `pnpm build` ผ่าน (146 modules) · ESLint ผ่าน · `pnpm test` **269/269 (15 ไฟล์)**
+- ⚠️ **ยังไม่ได้ click-through e2e** — ควรเทส: import .xlsx → Setup → กด Draft → ไปหน้า Overview สถานะ not_setup · กด Configure แล้วกรอก 1RM/วันที่ → กลายเป็น active · รีเฟรชแล้ว draft ยังอยู่ · โปรแกรม `general` ด้วย
 
 ### ไม่ทำรอบนี้
 - ปุ่ม Draft ในขั้น Preview (มีแค่ขั้น Setup) — ถ้าต้องการให้เพิ่ม
