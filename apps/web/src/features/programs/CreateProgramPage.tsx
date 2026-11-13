@@ -8,7 +8,7 @@ import { allExercises } from '../../lib/data.js'
 import { getExercise, moveItem, muscleColor, runTarget, round2 } from '../../lib/utils.js'
 import { ReorderList } from '../../components/ReorderList.js'
 import {
-  PHASES, addExerciseToWeeks, copyWeek, draftToWeeks, emptyWeek, findEmptyDays, maxDaysPerWeek, programToDraft,
+  PHASES, addDayToWeeks, addExerciseToWeeks, copyWeek, draftToWeeks, emptyWeek, findEmptyDays, maxDaysPerWeek, programToDraft,
   removeEmptyDays, resizeWeeks,
   type DayDraft, type WeekDraft,
 } from '../../lib/programDraft.js'
@@ -55,6 +55,7 @@ export function CreateProgramPage() {
   const [runDay, setRunDay] = useState<number | null>(null)
   const [editRow, setEditRow] = useState<{ di: number; ei: number } | null>(null)
   const [copyOpen, setCopyOpen] = useState(false)
+  const [addDayAllOpen, setAddDayAllOpen] = useState(false)
   const [emptyNotice, setEmptyNotice] = useState<{ week: number; dayOfWeek: StructuredDay['dayOfWeek'] }[] | null>(null)
 
   // Weekly routine = General program with no week count → no periodization,
@@ -90,14 +91,10 @@ export function CreateProgramPage() {
   const setDayField = (i: number, patch: Partial<DayDraft>) =>
     updateDays(ds => ds.map((day, idx) => idx === i ? { ...day, ...patch } : day))
 
-  const addDay = (allWeeks: boolean) => {
+  const addDay = () => {
     const used = new Set(days.map(d => d.dayOfWeek))
     const next = WEEKDAYS.find(d => !used.has(d)) ?? 'Mon'
-    setDrafts(d => d.map((w, i) => {
-      if (i !== wk && !allWeeks) return w
-      if (w.days.some(x => x.dayOfWeek === next)) return w
-      return { ...w, days: [...w.days, { dayOfWeek: next, focus: '', exercises: [] }] }
-    }))
+    updateDays(ds => [...ds, { dayOfWeek: next, focus: '', exercises: [] }])
   }
   const removeDay = (i: number) => updateDays(ds => ds.filter((_, idx) => idx !== i))
   const removeExercise = (di: number, ei: number) =>
@@ -372,11 +369,11 @@ export function CreateProgramPage() {
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-          <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => addDay(false)}>
+          <button className="btn btn-secondary" style={{ flex: 1 }} onClick={addDay}>
             <IconPlus size={16} /> {multiWeek ? `Add Day (W${wk + 1})` : 'Add Day'}
           </button>
           {multiWeek && (
-            <button className="btn btn-secondary" style={{ flexShrink: 0, padding: '0 12px', fontSize: 12 }} onClick={() => addDay(true)}>
+            <button className="btn btn-secondary" style={{ flexShrink: 0, padding: '0 12px', fontSize: 12 }} onClick={() => setAddDayAllOpen(true)}>
               <IconPlus size={14} /> เพิ่มวันทุกสัปดาห์
             </button>
           )}
@@ -455,6 +452,14 @@ export function CreateProgramPage() {
           weekLabel={multiWeek ? `W${wk + 1} · ${days[editRow.di].dayOfWeek}` : days[editRow.di].dayOfWeek}
           onSave={ex => { replaceExercise(editRow.di, editRow.ei, ex); setEditRow(null) }}
           onClose={() => setEditRow(null)}
+        />
+      )}
+
+      {addDayAllOpen && (
+        <AddDayAllSheet
+          drafts={drafts}
+          onAdd={(dayOfWeek, dayFocus) => { setDrafts(d => addDayToWeeks(d, dayOfWeek, dayFocus)); setAddDayAllOpen(false) }}
+          onClose={() => setAddDayAllOpen(false)}
         />
       )}
 
@@ -1048,6 +1053,69 @@ function ExerciseRowSheet({ ex, weekLabel, onSave, onClose }: {
         </div>
         <button className="btn btn-primary" style={{ width: '100%', flexShrink: 0 }} onClick={save}>
           <IconCheck size={16} stroke={3} /> Save row
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Add one weekday with one name to every week at once, so it's identical across the program.
+function AddDayAllSheet({ drafts, onAdd, onClose }: {
+  drafts: WeekDraft[]
+  onAdd: (dayOfWeek: StructuredDay['dayOfWeek'], focus: string) => void
+  onClose: () => void
+}) {
+  const total = drafts.length
+  const haveCount = (d: StructuredDay['dayOfWeek']) => drafts.filter(w => w.days.some(x => x.dayOfWeek === d)).length
+  const [day, setDay] = useState<StructuredDay['dayOfWeek'] | null>(() => WEEKDAYS.find(d => haveCount(d) === 0) ?? null)
+  const [dayFocus, setDayFocus] = useState('')
+  const already = day ? haveCount(day) : 0
+  const adds = total - already
+
+  return (
+    <div className="sheet-backdrop" onClick={onClose} style={{ zIndex: 100 }}>
+      <div className="sheet" onClick={e => e.stopPropagation()}>
+        <div className="sheet-handle" />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <h3 className="t-display" style={{ margin: 0, fontSize: 20 }}>เพิ่มวันทุกสัปดาห์</h3>
+          <button className="btn-icon" onClick={onClose} aria-label="Close"><IconX size={18} /></button>
+        </div>
+        <p className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 14 }}>
+          เลือกวัน + ตั้งชื่อ แล้วจะเพิ่มวันนี้ให้ทุกสัปดาห์เหมือนกัน · จากนั้นเพิ่มท่าด้วย "ทุกสัปดาห์"
+        </p>
+
+        <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 6 }}>DAY</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6, marginBottom: 6 }}>
+          {WEEKDAYS.map(d => {
+            const full = haveCount(d) === total
+            const on = day === d
+            return (
+              <button key={d} disabled={full} onClick={() => setDay(d)} aria-pressed={on}
+                style={{
+                  height: 38, borderRadius: 8, cursor: full ? 'default' : 'pointer', opacity: full ? 0.35 : 1,
+                  border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
+                  background: on ? 'rgba(var(--accent-rgb),0.12)' : 'var(--surface-2)',
+                  color: on ? 'var(--accent)' : 'var(--text-2)',
+                  fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 12,
+                }}>
+                {d}
+              </button>
+            )
+          })}
+        </div>
+        <div className="t-mono" style={{ fontSize: 10, color: already ? 'var(--accent)' : 'var(--muted)', marginBottom: 12, minHeight: 14 }}>
+          {!day ? 'ทุกวันมีครบทุกสัปดาห์แล้ว'
+            : already ? `${day} มีอยู่แล้ว ${already} สัปดาห์ — จะเพิ่มเฉพาะ ${adds} สัปดาห์ที่ยังไม่มี (ชื่อเดิมไม่เปลี่ยน)`
+              : `จะเพิ่ม ${day} ให้ทั้ง ${total} สัปดาห์`}
+        </div>
+
+        <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>NAME / FOCUS</div>
+        <input className="input-num" type="text" value={dayFocus} placeholder="e.g. Easy Run · Accessories"
+          onChange={e => setDayFocus(e.target.value)} style={{ ...textFieldStyle, marginBottom: 16 }} />
+
+        <button className="btn btn-primary" style={{ width: '100%', opacity: day && adds > 0 ? 1 : 0.4 }}
+          disabled={!day || adds === 0} onClick={() => day && onAdd(day, dayFocus.trim())}>
+          <IconPlus size={16} /> {day ? `เพิ่ม ${day} ใน ${adds} สัปดาห์` : 'เพิ่มวัน'}
         </button>
       </div>
     </div>

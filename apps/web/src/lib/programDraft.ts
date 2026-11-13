@@ -121,6 +121,13 @@ export function addExerciseToWeeks(
   })
 }
 
+// Add the same weekday + focus to every week that doesn't have that weekday yet.
+export function addDayToWeeks(drafts: WeekDraft[], dayOfWeek: DayOfWeek, focus: string): WeekDraft[] {
+  return drafts.map(w => (w.days.some(d => d.dayOfWeek === dayOfWeek)
+    ? w
+    : { ...w, days: [...w.days, { dayOfWeek, focus, exercises: [] }] }))
+}
+
 // Training days with no rows. Saving them would put an empty "<Day> Training" day
 // in the program, so the editor blocks the save and lists them instead.
 export function findEmptyDays(drafts: WeekDraft[]): { week: number; dayOfWeek: DayOfWeek }[] {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { StructuredExercise, StructuredProgram, StructuredWeek } from '@atlaslog/shared'
-import { addExerciseToWeeks, copyWeek, draftToWeeks, programToDraft, resizeWeeks, emptyWeek, findEmptyDays, removeEmptyDays } from './programDraft.js'
+import { addDayToWeeks, addExerciseToWeeks, copyWeek, draftToWeeks, programToDraft, resizeWeeks, emptyWeek, findEmptyDays, removeEmptyDays } from './programDraft.js'
 
 const row = (id: string, exerciseId: string, label: string, sets: number, reps: number, pct: number, note?: string): StructuredExercise =>
   ({ id, exerciseId, name: exerciseId, label, type: 'main', sets, reps, pct, rpe: 8, ...(note ? { note } : {}) })
@@ -131,6 +131,17 @@ describe('findEmptyDays / removeEmptyDays', () => {
 
   it('returns nothing when every day has a row', () => {
     expect(findEmptyDays(programToDraft(sumoLike()))).toEqual([])
+  })
+})
+
+describe('addDayToWeeks', () => {
+  it('adds the named weekday to every week that lacks it and leaves the rest alone', () => {
+    const d = programToDraft(sumoLike())
+    d[1].days.push({ id: 'keep', dayOfWeek: 'Wed', focus: 'Old', exercises: [] })
+    const out = addDayToWeeks(d, 'Wed', 'Easy Run')
+    expect(out[0].days.at(-1)).toEqual({ dayOfWeek: 'Wed', focus: 'Easy Run', exercises: [] })
+    expect(out[1].days.filter(x => x.dayOfWeek === 'Wed')).toEqual([{ id: 'keep', dayOfWeek: 'Wed', focus: 'Old', exercises: [] }])
+    expect(out[0].days.slice(0, 2)).toEqual(d[0].days)
   })
 })
 
