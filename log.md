@@ -1,8 +1,35 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-11-13 (รอบ 79 — ✅ SHIPPED: หน้าแก้ไขโปรแกรมแบบรายสัปดาห์ · รอบ 78 — ✅ SHIPPED: แก้ Phase ถูกเขียนทับตอน Edit โปรแกรม · รอบ 77 — ✅ SHIPPED: Import Excel บันทึกเป็น Draft · รอบ 76 — ✅ SHIPPED: Responsive · รอบ 75 — PLANNED: Gamification EXP/Level/Tier)
+> อัปเดตล่าสุด: 2026-11-13 (รอบ 80 — ✅ SHIPPED: เพิ่มวันอาทิตย์ (Sun) · รอบ 79 — ✅ SHIPPED: หน้าแก้ไขโปรแกรมแบบรายสัปดาห์ · รอบ 78 — ✅ SHIPPED: แก้ Phase ถูกเขียนทับตอน Edit โปรแกรม · รอบ 77 — ✅ SHIPPED: Import Excel บันทึกเป็น Draft · รอบ 76 — ✅ SHIPPED: Responsive · รอบ 75 — PLANNED: Gamification EXP/Level/Tier)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-11-13 — รอบ 80 (✅ SHIPPED, deploy main `bbce03f`): เพิ่มวันอาทิตย์ (Sun) เป็นวันเทรนได้
+
+เดิมทั้งแอปออกแบบวันเทรน จันทร์–เสาร์ (`StructuredDay.dayOfWeek` ไม่มี `'Sun'`, อาทิตย์ = วันพัก) · ผู้ใช้ขอให้ "เพิ่มวันทุกสัปดาห์" มี Sun → เพิ่มทั้งชุด · **สัปดาห์นับ จันทร์ → อาทิตย์** (Sun = วันสุดท้ายของสัปดาห์ ไม่ใช่วันแรก)
+
+### ทำอะไร
+- `packages/shared/src/types.ts` · `dayOfWeek` เพิ่ม `'Sun'`
+- `lib/programStatus.ts` · แยก `DAY_INDEX` (เลข `getDay()` Sun=0 ใช้คำนวณวันที่ใน `dayDate`) ออกจาก `DAY_ORDER` ใหม่ (Mon=1…Sun=7 ใช้เรียงใน `sortDaysByWeekday`) — ถ้าใช้ตัวเดิมเรียง Sun จะขึ้นเป็นวันแรก · `dayDate` ไม่ต้องแก้ (เริ่มจันทร์ → Sun = วันที่ 7 ของ block) · `startOfTrainingWeek` ไม่ต้องแก้ (เริ่มจันทร์อยู่แล้ว) แก้แค่คอมเมนต์
+- `lib/excelImport.ts` · `VALID_DAYS` + alias `sun` / `sunday` / `อาทิตย์`
+- `CreateProgramPage.tsx` · `WEEKDAYS` มี Sun (dropdown วัน + Add Day + sheet "เพิ่มวันทุกสัปดาห์" ปรับ grid เป็น 7 ช่อง)
+- `DashboardPage.tsx` · `DAY_SHORT[0]` จาก `''` → `'Sun'` (การ์ด TODAY'S SESSION วันอาทิตย์)
+- `WeekDays.tsx` · `DAY_FULL.Sun = 'Sunday'`
+- เอกสาร: `CLAUDE.md` (Day = Mon–Sun) · `docs/excel-import-guide.md` 2 บรรทัด (ไฟล์นี้ผู้ใช้แก้ค้างอยู่ — **ไม่ได้ commit**)
+
+### ผลกระทบ (จัดการแล้ว)
+- โปรแกรมเดิมไม่มี Sun → ไม่กระทบ · Supabase ไม่มี constraint ชื่อวัน (เก็บเป็น JSON) → ไม่ต้อง migrate
+- ปฏิทินสัปดาห์ (`startOfTrainingWeek`) เริ่มจันทร์อยู่แล้ว → วันอาทิตย์อยู่ในสัปดาห์เดียวกับจันทร์ก่อนหน้า การ์ด Dashboard ไม่กระโดดเช้าวันอาทิตย์
+
+### verify
+- `pnpm build` ผ่าน · ESLint ผ่าน · `pnpm test` **285/285** (+4: Import Sun/Sunday/อาทิตย์ เรียงหลัง Sat · `dayDate` Sun = วันที่ 7 ของสัปดาห์ (start จันทร์ + start กลางสัปดาห์) · `sortDaysByWeekday` Sun ท้าย · `startOfTrainingWeek` อาทิตย์อยู่สัปดาห์เดียวกับจันทร์)
+- Playwright 390px (inject admin, seed ด้วย `setState`, revert `main.tsx` แล้ว): Import Excel จริง (แถว `อาทิตย์`) → Preview "SUN · DEADLIFT" ท้าย Sat → Draft · start 09/11/2026 (จันทร์) → หน้า Week 1 ช่วง 09/11–15/11, SUNDAY ท้ายสุด, ปุ่ม Skip ไม่ขึ้นที่ Sun (= วันที่ 15 ไม่ใช่ 8) · Date ปลอมเป็นอาทิตย์ 15/11 → Dashboard "TODAY'S SESSION Deadlift" (Week 1) · Edit Sumo → dropdown 7 วัน, sheet เพิ่มวันทุกสัปดาห์ 7 ช่องพอดีจอ 390 → Sun "Long Run" + Running 10 km ทุกสัปดาห์ → 12 สัปดาห์เรียง Mon,Tue,Thu,Fri,Sun, วันอื่นไม่เปลี่ยน · console errors 2 ตัวมาจากผมพิมพ์ URL ผิด (`/weeks/`) ไม่ใช่บั๊กแอป
+
+### ไม่ทำรอบนี้
+- โปรแกรม built-in 12 สัปดาห์ (`twelveWeekProgram.ts`) ไม่เปลี่ยน (ไม่มี Sun อยู่แล้ว)
+- ไม่ได้เทส 768/1280px รอบนี้ (sheet 7 ช่องเช็กแค่ 390px)
 
 ---
 
