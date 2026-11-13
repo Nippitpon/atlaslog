@@ -32,6 +32,11 @@
 - verify: build/lint ผ่าน · `pnpm test` **280/280** · Playwright 390px 0 errors: seed Sumo + Wed ว่าง W2–W12 → Save ถูกกัน store ไม่เปลี่ยน, แจ้ง 11 วันครบ → "ลบวันว่างทั้งหมด" → Save → ไม่เหลือ Wed, `weeks` identical กับตอน import · Add Day (W7) → Save → แจ้ง "W7 · Wed" → กดแล้วไป WEEK 7
 - ⚠️ ผู้ใช้ต้องกด Edit → Save → "ลบวันว่างทั้งหมด" → Save หนึ่งรอบ เพื่อล้างวันพุธในโปรแกรมจริง
 
+### เพิ่มเติม: Running เพิ่มทุกสัปดาห์ได้
+- อาการ: ปุ่ม Running ในหน้าแก้ไขเพิ่มได้แค่สัปดาห์ที่เลือก (`RunPicker` ส่ง `scope: 'week'` ตายตัว — ตกหล่นจากรอบ 79 ที่ใส่ scope ให้แค่ Add Exercise)
+- `CreateProgramPage.tsx` · `RunPicker` รับ `weeks`/`currentWeek` + ปุ่มเลือก "เฉพาะ Wn / ทุกสัปดาห์ (n)" แบบเดียวกับ Add Exercise · ปุ่มยืนยันเปลี่ยนเป็น "Add to n weeks" · ซ่อนตัวเลือกเมื่อโปรแกรมมีสัปดาห์เดียว
+- verify: build/lint ผ่าน · `pnpm test` 280/280 · Playwright 390px 0 errors (Sumo): Tue "Easy Zone 2" 5 km ทุกสัปดาห์ → ครบ 12 สัปดาห์ · W3 Thu 20 min เฉพาะ W3 → มีแค่ W3 · ท่าอื่นทุกสัปดาห์ไม่เปลี่ยน · id ไม่ซ้ำ
+
 ### ไม่ทำรอบนี้
 - chip สัปดาห์ที่เลือกไม่ auto-scroll เข้าจอ (W ท้าย ๆ ต้องปัดเอง)
 - ไม่มี component test ของ `CreateProgramPage` (ตรวจด้วย Playwright)
