@@ -25,6 +25,13 @@
 - รอบเทสที่ 2 (Playwright 390px, 0 console errors): **progress ไม่หลุด** — seed W1 Mon/Tue done · W5 Mon in_progress · W12 Fri done → แก้ W5 (% + ลบแถว) → Save → progress เหมือนเดิมทุกตัว, เปลี่ยนแค่ week-5 · **ลด 12→11** → confirm ขึ้น, progress W12 ถูก prune, W1/W5 อยู่ · **General ประจำสัปดาห์** — ไม่มีแถบสัปดาห์/ตัวเลือก "ทุกสัปดาห์", สร้างได้ `weekly: true` 1 สัปดาห์ (accessory + running), ไม่มี config, Edit → Save ไม่แก้ = identical
 - แก้ข้อความ confirm ตอนลดสัปดาห์ "สัปดาห์ 12–12" → "สัปดาห์ 12"
 
+### เพิ่มเติม (2026-11-13 บ่าย): กัน Save วันเทรนที่ไม่มีท่า
+- อาการจากผู้ใช้: หลัง Edit มี "Wed · Wed Training" ว่าง ๆ โผล่ใน W2–W12 (W1 ไม่มี) · Excel ไม่มีวันพุธ · ข้อความ `<Day> Training` มาจาก `draftToWeeks` ตอน Save วันที่ focus ว่างเท่านั้น → เกิดจาก Add Day (เลือกวันว่างแรก = Wed) แล้ววันว่างถูก Save ไปด้วย · เส้นทางที่ทำให้ W1 ไม่มีแต่ W อื่นมี = Add Day ในสัปดาห์อื่น (+ คัดลอกสัปดาห์ / เพิ่ม WEEKS) — ยืนยันไม่ได้ว่าทางไหนเพราะไม่เห็นข้อมูลบัญชีผู้ใช้
+- `programDraft.ts` · `findEmptyDays` + `removeEmptyDays` (+2 เทส)
+- `CreateProgramPage.tsx` · Save เจอวันไม่มีท่า → **ไม่บันทึก** + เด้ง sheet แจ้งเตือน (`role="alertdialog"`) รายการ "W7 · Wed" กดแล้วพาไปสัปดาห์นั้น · ปุ่ม "ลบวันว่างทั้งหมด" (แก้โปรแกรมผู้ใช้ได้ในคลิกเดียว) · ปุ่ม "+ ทุกสัปดาห์" ข้าง Add Day เปลี่ยนชื่อเป็น "เพิ่มวันทุกสัปดาห์" (เดิมกำกวมกับ scope "ทุกสัปดาห์" ของ Add Exercise)
+- verify: build/lint ผ่าน · `pnpm test` **280/280** · Playwright 390px 0 errors: seed Sumo + Wed ว่าง W2–W12 → Save ถูกกัน store ไม่เปลี่ยน, แจ้ง 11 วันครบ → "ลบวันว่างทั้งหมด" → Save → ไม่เหลือ Wed, `weeks` identical กับตอน import · Add Day (W7) → Save → แจ้ง "W7 · Wed" → กดแล้วไป WEEK 7
+- ⚠️ ผู้ใช้ต้องกด Edit → Save → "ลบวันว่างทั้งหมด" → Save หนึ่งรอบ เพื่อล้างวันพุธในโปรแกรมจริง
+
 ### ไม่ทำรอบนี้
 - chip สัปดาห์ที่เลือกไม่ auto-scroll เข้าจอ (W ท้าย ๆ ต้องปัดเอง)
 - ไม่มี component test ของ `CreateProgramPage` (ตรวจด้วย Playwright)
