@@ -121,6 +121,19 @@ export function addExerciseToWeeks(
   })
 }
 
+// Training days with no rows. Saving them would put an empty "<Day> Training" day
+// in the program, so the editor blocks the save and lists them instead.
+export function findEmptyDays(drafts: WeekDraft[]): { week: number; dayOfWeek: DayOfWeek }[] {
+  return drafts.flatMap((w, wi) =>
+    sortDaysByWeekday(w.days).filter(d => d.exercises.length === 0).map(d => ({ week: wi, dayOfWeek: d.dayOfWeek })))
+}
+
+export function removeEmptyDays(drafts: WeekDraft[]): WeekDraft[] {
+  return drafts.map(w => (w.days.some(d => d.exercises.length === 0)
+    ? { ...w, days: w.days.filter(d => d.exercises.length > 0) }
+    : w))
+}
+
 export function maxDaysPerWeek(drafts: WeekDraft[]): number {
   return Math.max(0, ...drafts.map(w => w.days.length))
 }

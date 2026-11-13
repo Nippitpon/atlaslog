@@ -8,7 +8,8 @@ import { allExercises } from '../../lib/data.js'
 import { getExercise, moveItem, muscleColor, runTarget, round2 } from '../../lib/utils.js'
 import { ReorderList } from '../../components/ReorderList.js'
 import {
-  PHASES, addExerciseToWeeks, copyWeek, draftToWeeks, emptyWeek, maxDaysPerWeek, programToDraft, resizeWeeks,
+  PHASES, addExerciseToWeeks, copyWeek, draftToWeeks, emptyWeek, findEmptyDays, maxDaysPerWeek, programToDraft,
+  removeEmptyDays, resizeWeeks,
   type DayDraft, type WeekDraft,
 } from '../../lib/programDraft.js'
 import { IconChevronLeft, IconPlus, IconX, IconCheck, IconSearch, IconCopy, IconRun } from '../../components/icons/index.js'
@@ -54,6 +55,7 @@ export function CreateProgramPage() {
   const [runDay, setRunDay] = useState<number | null>(null)
   const [editRow, setEditRow] = useState<{ di: number; ei: number } | null>(null)
   const [copyOpen, setCopyOpen] = useState(false)
+  const [emptyNotice, setEmptyNotice] = useState<{ week: number; dayOfWeek: StructuredDay['dayOfWeek'] }[] | null>(null)
 
   // Weekly routine = General program with no week count → no periodization,
   // no start/end date setup. Powerlifting always requires a week count + setup.
@@ -117,6 +119,11 @@ export function CreateProgramPage() {
     if (!canSave || busy) return
     const stamp = Date.now()
     const finalDrafts = resizeWeeks(drafts, isWeekly ? 1 : typedWeeks)
+    const empty = findEmptyDays(finalDrafts)
+    if (empty.length) {
+      setEmptyNotice(empty)
+      return
+    }
     const program: StructuredProgram = {
       id: editing ? editing.id : `custom-${stamp}`,
       name: name.trim(),
@@ -370,7 +377,7 @@ export function CreateProgramPage() {
           </button>
           {multiWeek && (
             <button className="btn btn-secondary" style={{ flexShrink: 0, padding: '0 12px', fontSize: 12 }} onClick={() => addDay(true)}>
-              <IconPlus size={14} /> ทุกสัปดาห์
+              <IconPlus size={14} /> เพิ่มวันทุกสัปดาห์
             </button>
           )}
         </div>
@@ -447,6 +454,39 @@ export function CreateProgramPage() {
           onSave={ex => { replaceExercise(editRow.di, editRow.ei, ex); setEditRow(null) }}
           onClose={() => setEditRow(null)}
         />
+      )}
+
+      {emptyNotice && (
+        <div className="sheet-backdrop" onClick={() => setEmptyNotice(null)} style={{ zIndex: 100 }}>
+          <div className="sheet" role="alertdialog" aria-labelledby="empty-days-title" onClick={e => e.stopPropagation()}
+            style={{ maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="sheet-handle" />
+            <h3 id="empty-days-title" className="t-display" style={{ margin: '0 0 6px', fontSize: 20, color: 'var(--danger)' }}>
+              บันทึกไม่ได้ · มีวันที่ไม่มีท่า
+            </h3>
+            <p className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
+              วันเทรนต้องมีอย่างน้อย 1 ท่า — เพิ่มท่า หรือลบวันเหล่านี้ก่อน ({emptyNotice.length} วัน)
+            </p>
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+              {emptyNotice.map(({ week: w, dayOfWeek }) => (
+                <button key={`${w}-${dayOfWeek}`} className="pill"
+                  onClick={() => { setSelWeek(w); setEmptyNotice(null) }}
+                  style={{ cursor: 'pointer', fontSize: 11, border: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+                  {multiWeek ? `W${w + 1} · ` : ''}{dayOfWeek}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setEmptyNotice(null)}>
+                กลับไปแก้
+              </button>
+              <button className="btn btn-primary" style={{ flex: 1 }}
+                onClick={() => { setDrafts(removeEmptyDays); setEmptyNotice(null) }}>
+                ลบวันว่างทั้งหมด
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {copyOpen && (
