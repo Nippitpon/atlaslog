@@ -5,7 +5,7 @@ import type { StructuredProgram, StructuredWeek, StructuredDay, StructuredExerci
 import { round2 } from './utils.js'
 import { allExercises, DB_EXERCISES } from './data.js'
 
-const VALID_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const VALID_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 export interface ImportResult {
   program: StructuredProgram | null
@@ -56,6 +56,7 @@ const DAY_ALIASES: Record<string, string> = {
   thu: 'Thu', thur: 'Thu', thurs: 'Thu', thursday: 'Thu', พฤหัส: 'Thu', พฤหัสบดี: 'Thu',
   fri: 'Fri', friday: 'Fri', ศุกร์: 'Fri',
   sat: 'Sat', saturday: 'Sat', เสาร์: 'Sat',
+  sun: 'Sun', sunday: 'Sun', อาทิตย์: 'Sun',
 }
 
 const LIFT_DICTIONARY: Record<string, { id: string; name: string }> = {

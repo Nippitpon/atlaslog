@@ -181,7 +181,7 @@ export interface StructuredExercise {
 
 export interface StructuredDay {
   id: string
-  dayOfWeek: 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat'
+  dayOfWeek: 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun'
   focus: string
   exercises: StructuredExercise[]
 }

@@ -17,7 +17,8 @@ import { IconDumbbell, IconSearch, IconCheck, IconBell, IconRun, IconUsers, Icon
 import { OneRMSparkline } from '../../components/charts/OneRMSparkline.js'
 import { buildLiftSeries } from '../../lib/oneRM.js'
 
-const DAY_SHORT = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+// Indexed by Date.getDay() (0 = Sunday)
+const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 
 // Matches the Week page's DayCard preview cap
 const PREVIEW_ROWS = 5

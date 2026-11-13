@@ -382,8 +382,8 @@ export function scheduledWeekNum(startDate: string, totalWeeks: number, now: Dat
   return Math.min(Math.max(Math.floor(days / 7) + 1, 1), Math.max(totalWeeks, 1))
 }
 
-// Training weeks run Mon–Sat (StructuredDay.dayOfWeek has no 'Sun'), so Sunday
-// belongs to the week that just ended — otherwise the card jumps on Sunday morning.
+// Training weeks run Mon → Sun (Sunday is the last training day), so Sunday
+// belongs to the week that started on Monday — the card doesn't jump on Sunday morning.
 export function startOfTrainingWeek(now: Date): Date {
   const d = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
@@ -506,12 +506,15 @@ export function resolveDayRef(
 }
 
 
+// JS Date.getDay() numbering — only for date arithmetic (dayDate).
 const DAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+// Display order: training weeks run Mon → Sun, so Sunday sorts last, not first.
+const DAY_ORDER: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 }
 
 // Calendar order for a week's days. Days are stored in the order they were added,
 // so a Wed added after Fri would otherwise list last. Stable, so same-weekday ties keep order.
 export function sortDaysByWeekday<T extends { dayOfWeek: string }>(days: T[]): T[] {
-  return [...days].sort((a, b) => (DAY_INDEX[a.dayOfWeek] ?? 7) - (DAY_INDEX[b.dayOfWeek] ?? 7))
+  return [...days].sort((a, b) => (DAY_ORDER[a.dayOfWeek] ?? 8) - (DAY_ORDER[b.dayOfWeek] ?? 8))
 }
 
 // The calendar date a program day falls on. Weeks are 7-day blocks counted from

@@ -101,7 +101,7 @@ in one parser** — full details + coach guide in `docs/excel-import-guide.md`.
 | Column | Type | Required | Notes |
 |--------|------|----------|-------|
 | `Week` | int ≥ 1 | ✅ | |
-| `Day` | Mon–Sat | ✅ | also full names + Thai (`จันทร์`) |
+| `Day` | Mon–Sun | ✅ | also full names + Thai (`จันทร์`); weeks run Mon → Sun |
 | `Lift` | string | ✅ | `Squat`/`Bench`/`Deadlift` → mapped to `squat`/`bench`/`deadlift` for 1RM calc |
 | `Sets` | int 1–50 | ✅ | |
 | `Reps` | int ≥ 1 or `AMRAP` | ✅ | |

@@ -201,6 +201,19 @@ describe('parseExcelFile — what it will accept', () => {
     expect(program!.weeks[0].days[0].exercises).toHaveLength(2)
   })
 
+  it('takes Sunday in every spelling and lists it after Saturday', async () => {
+    const { program, errors } = await parseExcelFile(template([
+      row({ Day: 'Sun' }),
+      row({ Day: 'Sat' }),
+      row({ Day: 'Sunday' }),
+      row({ Day: 'อาทิตย์' }),
+      row({ Day: 'Mon' }),
+    ]))
+    expect(errors).toEqual([])
+    expect(program!.weeks[0].days.map(d => d.dayOfWeek)).toEqual(['Mon', 'Sat', 'Sun'])
+    expect(program!.weeks[0].days[2].exercises).toHaveLength(3)
+  })
+
   // "%1RM" is the header the original coach workbook uses. normHeader strips it
   // to "1rm", which HEADER_ALIASES maps onto pct.
   it('accepts %1RM as the percentage column', async () => {

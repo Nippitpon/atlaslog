@@ -17,7 +17,7 @@ import { DayEditSheet } from './DayEditSheet.js'
 
 const DAY_FULL: Record<string, string> = {
   Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday',
-  Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday',
+  Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday',
 }
 
 function DayCard({

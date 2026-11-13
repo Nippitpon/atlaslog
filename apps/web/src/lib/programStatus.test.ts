@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type { DayStatus, ProgramProgressState, StructuredProgram } from '@atlaslog/shared'
 import {
   dayRef, resolveDayRef, doneDaysInWeek, settledDaysInWeek, remainingDays, programProgress,
-  reachedWeekNum, sortDaysByWeekday, isWeekDone, weekStatus, getProgramStatus, isProgramComplete, dayDate, isDayPast,
+  reachedWeekNum, sortDaysByWeekday, startOfTrainingWeek, isWeekDone, weekStatus, getProgramStatus, isProgramComplete, dayDate, isDayPast,
   programDateState, daysUntilStart, pickHomeProgram, groupProgramsByStatus,
 } from './programStatus.js'
 import { makeRunProgram, RUN_PROGRAM_ID, RUN_WEEK_ID, RUN_DAY_ID, MIXED_DAY_ID } from '../test/fixtures.js'
@@ -211,6 +211,13 @@ describe('dayDate / isDayPast', () => {
     expect(dayDate('2026-09-07', 1, 'Mon')?.toDateString()).toBe(new Date(2026, 8, 7).toDateString())
     expect(dayDate('2026-09-07', 1, 'Sat')?.toDateString()).toBe(new Date(2026, 8, 12).toDateString())
     expect(dayDate('2026-09-07', 3, 'Wed')?.toDateString()).toBe(new Date(2026, 8, 23).toDateString())
+  })
+
+  // Sunday is the 7th day of a Monday-start block, not the day before it
+  it('puts Sunday at the end of its week', () => {
+    expect(dayDate('2026-09-07', 1, 'Sun')?.toDateString()).toBe(new Date(2026, 8, 13).toDateString())
+    expect(dayDate('2026-09-07', 2, 'Sun')?.toDateString()).toBe(new Date(2026, 8, 20).toDateString())
+    expect(dayDate('2026-09-09', 1, 'Sun')?.toDateString()).toBe(new Date(2026, 8, 13).toDateString())
   })
 
   // A block that doesn't start on Monday still contains each weekday once
@@ -443,10 +450,25 @@ describe('groupProgramsByStatus', () => {
   })
 })
 
+describe('startOfTrainingWeek', () => {
+  // 2026-09-07 is a Monday, 2026-09-13 the Sunday that closes that week
+  it('keeps Sunday in the week that started on Monday', () => {
+    const mon = new Date(2026, 8, 7).toDateString()
+    expect(startOfTrainingWeek(new Date(2026, 8, 13, 9)).toDateString()).toBe(mon)
+    expect(startOfTrainingWeek(new Date(2026, 8, 7, 9)).toDateString()).toBe(mon)
+    expect(startOfTrainingWeek(new Date(2026, 8, 14, 9)).toDateString()).toBe(new Date(2026, 8, 14).toDateString())
+  })
+})
+
 describe('sortDaysByWeekday', () => {
   it('orders days Mon→Sat regardless of the order they were added', () => {
     const days = ['Mon', 'Tue', 'Fri', 'Wed'].map(dayOfWeek => ({ dayOfWeek }))
     expect(sortDaysByWeekday(days).map(d => d.dayOfWeek)).toEqual(['Mon', 'Tue', 'Wed', 'Fri'])
+  })
+
+  it('puts Sunday last (weeks run Mon → Sun)', () => {
+    const days = ['Sun', 'Sat', 'Mon', 'Wed'].map(dayOfWeek => ({ dayOfWeek }))
+    expect(sortDaysByWeekday(days).map(d => d.dayOfWeek)).toEqual(['Mon', 'Wed', 'Sat', 'Sun'])
   })
 
   it('does not mutate the input', () => {

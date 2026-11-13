@@ -19,7 +19,7 @@ type Visibility = 'private' | 'code' | 'public'
 // What ExercisePicker hands back: one row for the selected week, or one row per week.
 type PickResult = { scope: 'week'; row: StructuredExercise } | { scope: 'all'; rows: StructuredExercise[] }
 
-const WEEKDAYS: StructuredDay['dayOfWeek'][] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const WEEKDAYS: StructuredDay['dayOfWeek'][] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 function rowSummary(ex: StructuredExercise): string {
   if (ex.type === 'running') return runTarget(ex) || 'Run'
@@ -1085,7 +1085,7 @@ function AddDayAllSheet({ drafts, onAdd, onClose }: {
         </p>
 
         <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 6 }}>DAY</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6, marginBottom: 6 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 6 }}>
           {WEEKDAYS.map(d => {
             const full = haveCount(d) === total
             const on = day === d
