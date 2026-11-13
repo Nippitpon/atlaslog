@@ -162,6 +162,8 @@ Breakpoints: **<768** มือถือเหมือนเดิม · **768�
 
 ## 2026-10-28 — รอบ 75 (PLANNED, ยังไม่ลงมือ): Gamification — EXP / Level / Tier
 
+> **อัปเดต 2026-11-13:** ออกแบบละเอียดแล้วใน **`docs/achievements-design.md`** — Achievements 3 หมวด (Fitness Tracking / Powerlifting / Hybrid) แบบขั้น Bronze→Platinum, EXP จากการซ้อม + จากการปลดล็อก (มี cap ต่อวัน), Level 1–99 (`200 + 50×(L−1)` ต่อเลเวล), Tier Rookie → Iron → Steel → Ironforged → Titan → Legend · ข้อที่ต้องตัดสินใจก่อนลงมืออยู่ §10 ของไฟล์นั้น · Program tag อัตโนมัติจาก `programType` + มีท่า SBD (`SBD_IDS`) + มีวิ่ง (PL / PL+HYBRID / HYBRID / FITNESS) · หมวด PL/Hybrid ล็อกจนจบโปรแกรม tag นั้น 1 โปรแกรม, Fitness ไม่ล็อก (§1.1 — จดถาวรใน `programCompletions` เพราะ Restart/ลบโปรแกรมล้าง progress; skip นับ; ปลดแล้วได้ย้อนหลัง)
+
 `DESIGN.md` §6 ออกแบบระบบ Gamification ไว้ (Athlete Tier + EXP bar, 4 Core EXP Pillars, Tier Roadmap) แต่ยัง**ไม่มีในแอป** — ไม่ใช่การรีสกิน ต้องมีกฎคำนวณใหม่ จึงแยกเป็นรอบของตัวเอง ทำหลังรอบ 74 จบ
 
 ### แนวทาง (ยังไม่ตัดสินใจเรื่องตัวเลข)
