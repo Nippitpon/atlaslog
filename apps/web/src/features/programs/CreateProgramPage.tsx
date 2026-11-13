@@ -441,7 +441,9 @@ export function CreateProgramPage() {
 
       {runDay !== null && (
         <RunPicker
-          onPick={ex => { addPicked(runDay, { scope: 'week', row: ex }); setRunDay(null) }}
+          weeks={multiWeek ? drafts.length : 1}
+          currentWeek={wk}
+          onPick={res => { addPicked(runDay, res); setRunDay(null) }}
           onClose={() => setRunDay(null)}
         />
       )}
@@ -527,19 +529,27 @@ export function CreateProgramPage() {
   )
 }
 
-function RunPicker({ onPick, onClose }: { onPick: (ex: StructuredExercise) => void; onClose: () => void }) {
+function RunPicker({ weeks, currentWeek, onPick, onClose }: {
+  weeks: number
+  currentWeek: number
+  onPick: (res: PickResult) => void
+  onClose: () => void
+}) {
   const [label, setLabel] = useState('')
   const [dist, setDist] = useState('')
   const [dur, setDur] = useState('')
+  const [scope, setScope] = useState<'week' | 'all'>('week')
+  const allWeeks = scope === 'all' && weeks > 1
 
   const confirm = () => {
-    onPick({
+    const row: StructuredExercise = {
       exerciseId: 'running',
       name: label.trim() || 'Running',
       type: 'running',
       ...(Number(dist) > 0 ? { distanceKm: round2(Number(dist)) } : {}),
       ...(Number(dur) > 0 ? { durationMin: round2(Number(dur)) } : {}),
-    })
+    }
+    onPick(allWeeks ? { scope: 'all', rows: Array.from({ length: weeks }, () => ({ ...row })) } : { scope: 'week', row })
   }
 
   return (
@@ -553,6 +563,23 @@ function RunPicker({ onPick, onClose }: { onPick: (ex: StructuredExercise) => vo
         <p className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 16 }}>
           ตั้งเป้าหมายระยะ/เวลา (ไม่บังคับ) · วันนี้จะแสดงเป็น Running แล้วกดไปหน้า Running
         </p>
+
+        {weeks > 1 && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+            {([['week', `เฉพาะ W${currentWeek + 1}`], ['all', `ทุกสัปดาห์ (${weeks})`]] as const).map(([v, text]) => (
+              <button key={v} onClick={() => setScope(v)} aria-pressed={scope === v}
+                style={{
+                  flex: 1, height: 34, borderRadius: 8, cursor: 'pointer',
+                  border: `1px solid ${scope === v ? 'var(--accent)' : 'var(--border)'}`,
+                  background: scope === v ? 'rgba(var(--accent-rgb),0.12)' : 'var(--surface-2)',
+                  color: scope === v ? 'var(--accent)' : 'var(--text-2)',
+                  fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
+                }}>
+                {text}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div style={{ marginBottom: 12 }}>
           <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>LABEL (OPT)</div>
@@ -576,7 +603,7 @@ function RunPicker({ onPick, onClose }: { onPick: (ex: StructuredExercise) => vo
         </div>
 
         <button className="btn btn-primary" style={{ width: '100%' }} onClick={confirm}>
-          <IconPlus size={16} /> Add to Day
+          <IconPlus size={16} /> {allWeeks ? `Add to ${weeks} weeks` : 'Add to Day'}
         </button>
       </div>
     </div>
