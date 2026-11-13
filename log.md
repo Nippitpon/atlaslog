@@ -1,8 +1,35 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-11-09 (รอบ 78 — ✅ SHIPPED: แก้ Phase ถูกเขียนทับตอน Edit โปรแกรม · รอบ 77 — ✅ SHIPPED: Import Excel บันทึกเป็น Draft · รอบ 76 — ✅ SHIPPED: Responsive · รอบ 75 — PLANNED: Gamification EXP/Level/Tier)
+> อัปเดตล่าสุด: 2026-11-13 (รอบ 79 — ✅ เสร็จ ยังไม่ deploy: หน้าแก้ไขโปรแกรมแบบรายสัปดาห์ · รอบ 78 — ✅ SHIPPED: แก้ Phase ถูกเขียนทับตอน Edit โปรแกรม · รอบ 77 — ✅ SHIPPED: Import Excel บันทึกเป็น Draft · รอบ 76 — ✅ SHIPPED: Responsive · รอบ 75 — PLANNED: Gamification EXP/Level/Tier)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-11-13 — รอบ 79 (✅ เสร็จ — ยังไม่ commit/deploy): หน้าแก้ไขโปรแกรมแบบรายสัปดาห์ (แก้ Week 12 Sumo เพี้ยนหลัง Edit)
+
+อาการ: Hybrid Powerlifting Sumo [12W] — W12 ใน Excel เป็นวัน Attempt 1/2/3 แต่ในแอปกลายเป็นท่าเหมือนสัปดาห์อื่น · **ไฟล์ Excel + parser ถูกต้อง** (เทียบครบ 116 แถว 0 ต่าง) · สาเหตุ: `CreateProgramPage` ใช้ **W1 เป็นแม่แบบ** ทุกสัปดาห์ แล้ว map sets/reps/%/RPE ต่อสัปดาห์ **ตามลำดับแถว** → Edit → Save ทับ W8/W12: Bench Speed / Squat Volume ได้ 102%, Bench Attempt 3 หาย, label/note ทุกสัปดาห์กลายเป็นของ W1 (บั๊กตระกูลเดียวกับรอบ 78)
+
+### ทำอะไร
+- ใหม่ `apps/web/src/lib/programDraft.ts` — authoring model ที่แต่ละสัปดาห์มี days/rows ของตัวเอง: `programToDraft` · `draftToWeeks` (คง id week/day/exercise เดิม, mint id ใหม่เฉพาะของใหม่/ซ้ำ) · `resizeWeeks` (เพิ่ม = clone สัปดาห์สุดท้าย row id ใหม่) · `copyWeek` (คง day id ของปลายทางถ้าวันตรงกัน) · `addExerciseToWeeks` · `maxDaysPerWeek`
+- `CreateProgramPage.tsx` เขียนใหม่: แถบเลือกสัปดาห์ W1…Wn + Phase ต่อสัปดาห์ · ปุ่ม "คัดลอกสัปดาห์นี้ไป…" (`CopyWeekSheet`) · แตะแถว = `ExerciseRowSheet` แก้ sets/reps(AMRAP)/%/RPE/label/note หรือระยะ/เวลาวิ่ง · Add Exercise เลือก "เฉพาะ Wn / ทุกสัปดาห์" (ทุกสัปดาห์ + PL main = ตาราง per-week + Fill % เดิม) + ช่อง label แทนการต่อท้ายชื่อ "— Top set" + ช่อง %1RM สำหรับ PL main สัปดาห์เดียว · Add Day (สัปดาห์นี้ / ทุกสัปดาห์) · WEEKS resize ตอน blur/Enter + confirm ตอนลด
+- ลบ model แม่แบบเดิม (`weekly`/`originIdx`, `pctRangeLabel`/`rpeRangeLabel`)
+
+### ผลกระทบ (จัดการแล้ว)
+- progress / customAccessories (key weekId → dayId, row by id) ไม่หลุดเพราะคง id · `updateCustomProgram` prune เฉพาะ week/day ที่ถูกลบจริง (ไม่ต้องแก้ store)
+- ⚠️ **โปรแกรมที่ถูกทับไปแล้วไม่กลับมาเอง** — ลบแล้ว import Excel ใหม่ (Sumo ของผู้ใช้ต้องทำ)
+
+### verify
+- `pnpm build` ผ่าน · ESLint ผ่าน · `pnpm test` **278/278 (16 ไฟล์)** — `programDraft.test.ts` 9 เทส รวม round-trip โปรแกรมที่ W ต่างกัน
+- Playwright 390px + 1280px (inject admin ตาม memory e2e-auth-gated-pages, seed ด้วย `setState`, revert `main.tsx` แล้ว, 0 console errors): Sumo Edit → Save ไม่แก้ = 12 สัปดาห์ identical 116 แถว Phase ครบ · แก้ W12 Squat Attempt 3 → 103% เปลี่ยนแค่แถวนั้น · copy W1→W2 คง day id · 12→13 สัปดาห์ (W13 = clone W12) · Plank "ทุกสัปดาห์" ลงครบ 13 สัปดาห์ · สร้าง PL 4W + Fill % 70/+5 → 70/75/80/85% ถูกสัปดาห์
+- รอบเทสที่ 2 (Playwright 390px, 0 console errors): **progress ไม่หลุด** — seed W1 Mon/Tue done · W5 Mon in_progress · W12 Fri done → แก้ W5 (% + ลบแถว) → Save → progress เหมือนเดิมทุกตัว, เปลี่ยนแค่ week-5 · **ลด 12→11** → confirm ขึ้น, progress W12 ถูก prune, W1/W5 อยู่ · **General ประจำสัปดาห์** — ไม่มีแถบสัปดาห์/ตัวเลือก "ทุกสัปดาห์", สร้างได้ `weekly: true` 1 สัปดาห์ (accessory + running), ไม่มี config, Edit → Save ไม่แก้ = identical
+- แก้ข้อความ confirm ตอนลดสัปดาห์ "สัปดาห์ 12–12" → "สัปดาห์ 12"
+
+### ไม่ทำรอบนี้
+- chip สัปดาห์ที่เลือกไม่ auto-scroll เข้าจอ (W ท้าย ๆ ต้องปัดเอง)
+- ไม่มี component test ของ `CreateProgramPage` (ตรวจด้วย Playwright)
+- Add Day "ทุกสัปดาห์" ข้ามสัปดาห์ที่มีวันนั้นอยู่แล้ว (ไม่สร้างซ้ำ) — ตั้งใจ
+- ยังไม่ commit / deploy → ต่อด้วย `/ship`
 
 ---
 
