@@ -1,44 +1,30 @@
 import { Fragment, useState } from 'react'
 import { useNavigate, Navigate, useParams } from 'react-router-dom'
-import type { StructuredExercise, StructuredProgram, StructuredDay } from '@atlaslog/shared'
+import type { StructuredExercise, StructuredProgram, StructuredDay, ProgramPhase } from '@atlaslog/shared'
 import { useProgramStore } from '../../store/useProgramStore.js'
 import { useAuthStore } from '../../store/useAuthStore.js'
 import { createShare } from '../../lib/shareApi.js'
 import { allExercises } from '../../lib/data.js'
 import { getExercise, moveItem, muscleColor, runTarget, round2 } from '../../lib/utils.js'
 import { ReorderList } from '../../components/ReorderList.js'
-import { sortDaysByWeekday } from '../../lib/programStatus.js'
+import {
+  PHASES, addExerciseToWeeks, copyWeek, draftToWeeks, emptyWeek, maxDaysPerWeek, programToDraft, resizeWeeks,
+  type DayDraft, type WeekDraft,
+} from '../../lib/programDraft.js'
 import { IconChevronLeft, IconPlus, IconX, IconCheck, IconSearch, IconCopy, IconRun } from '../../components/icons/index.js'
 
 type Visibility = 'private' | 'code' | 'public'
 
-// Authoring-only: a powerlifting main lift carries a per-week Set/Rep/% scheme
-// (index 0 = week 1). Expanded into each week's StructuredExercise on save.
-type WeekCell = { sets?: number; reps?: number; pct?: number; rpe?: number }
-// originIdx = this row's index in the program being edited. Kept so a save can
-// look up the row's existing id in EVERY week (ids differ per week on Excel
-// imports) instead of minting a positional one — see handleCreate.
-type ExerciseDraft = StructuredExercise & { weekly?: WeekCell[]; originIdx?: number }
-type DayDraft = { id?: string; dayOfWeek: StructuredDay['dayOfWeek']; focus: string; exercises: ExerciseDraft[] }
+// What ExercisePicker hands back: one row for the selected week, or one row per week.
+type PickResult = { scope: 'week'; row: StructuredExercise } | { scope: 'all'; rows: StructuredExercise[] }
 
 const WEEKDAYS: StructuredDay['dayOfWeek'][] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-// "70→95%" range label for a draft main lift with a per-week scheme (null if no % set).
-function pctRangeLabel(ex: ExerciseDraft): string | null {
-  const vals = (ex.weekly ?? []).map(c => c.pct).filter((v): v is number => v !== undefined)
-  if (!vals.length) return null
-  const lo = Math.round(Math.min(...vals) * 100)
-  const hi = Math.round(Math.max(...vals) * 100)
-  return lo === hi ? `${lo}%` : `${lo}→${hi}%`
-}
-
-// "@7→9" RPE range label for the day-list summary (falls back to the single rpe).
-function rpeRangeLabel(ex: ExerciseDraft): string | null {
-  const vals = (ex.weekly ?? []).map(c => c.rpe).filter((v): v is number => v !== undefined)
-  if (!vals.length) return ex.rpe !== undefined ? `@${ex.rpe}` : null
-  const lo = Math.min(...vals)
-  const hi = Math.max(...vals)
-  return lo === hi ? `@${lo}` : `@${lo}→${hi}`
+function rowSummary(ex: StructuredExercise): string {
+  if (ex.type === 'running') return runTarget(ex) || 'Run'
+  const rpe = ex.rpe !== undefined ? ` @${ex.rpe}` : ''
+  const pct = ex.pct !== undefined ? ` · ${Math.round(ex.pct * 1000) / 10}%` : ''
+  return `${ex.sets}×${ex.reps}${rpe}${pct}`
 }
 
 export function CreateProgramPage() {
@@ -54,117 +40,96 @@ export function CreateProgramPage() {
 
   const [name, setName] = useState(() => editing?.name ?? '')
   const [focus, setFocus] = useState(() => editing?.focus === 'Custom' ? '' : (editing?.focus ?? ''))
-  const [weeks, setWeeks] = useState(() => editing ? (editing.weekly ? '' : String(editing.totalWeeks)) : '')
-  const [days, setDays] = useState<DayDraft[]>(() =>
-    (editing?.weeks[0]?.days ?? []).map((d, di) => ({
-      id: d.id,
-      dayOfWeek: d.dayOfWeek,
-      focus: d.focus,
-      // Reconstruct per-week Set/Rep/% for main lifts so editing doesn't flatten it.
-      exercises: d.exercises.map((ex, ei) =>
-        editing && editing.programType === 'powerlifting' && editing.weeks.length > 1 && ex.type === 'main'
-          ? {
-              ...ex,
-              originIdx: ei,
-              weekly: editing.weeks.map(w => {
-                const x = w.days[di]?.exercises[ei]
-                return { sets: x?.sets, reps: typeof x?.reps === 'number' ? x.reps : undefined, pct: x?.pct, rpe: x?.rpe }
-              }),
-            }
-          : { ...ex, originIdx: ei }
-      ),
-    }))
-  )
+  const [weeksInput, setWeeksInput] = useState(() => editing ? (editing.weekly ? '' : String(editing.weeks.length)) : '')
+  // Every week owns its own days + rows; editing one week never rewrites another.
+  const [drafts, setDrafts] = useState<WeekDraft[]>(() => editing ? programToDraft(editing) : [emptyWeek()])
+  const [selWeek, setSelWeek] = useState(0)
   const [programType, setProgramType] = useState<'general' | 'powerlifting'>(() => editing?.programType ?? 'general')
   const [visibility, setVisibility] = useState<Visibility>('private')
   const [busy, setBusy] = useState(false)
   const [publishedCode, setPublishedCode] = useState<string | null>(null)
 
-  // exercise picker target: index of day we're adding to (null = closed)
+  // exercise picker target: index of day (in the selected week) we're adding to
   const [pickerDay, setPickerDay] = useState<number | null>(null)
-  // running picker target: index of day we're adding a run to (null = closed)
   const [runDay, setRunDay] = useState<number | null>(null)
-
-  const addDay = () => {
-    const used = new Set(days.map(d => d.dayOfWeek))
-    const next = WEEKDAYS.find(d => !used.has(d)) ?? 'Mon'
-    setDays(d => [...d, { dayOfWeek: next, focus: '', exercises: [] }])
-  }
-  const removeDay = (i: number) => setDays(d => d.filter((_, idx) => idx !== i))
-  const setDayField = (i: number, patch: Partial<DayDraft>) =>
-    setDays(d => d.map((day, idx) => idx === i ? { ...day, ...patch } : day))
-  const removeExercise = (di: number, ei: number) =>
-    setDayField(di, { exercises: days[di].exercises.filter((_, idx) => idx !== ei) })
-
-  const addExerciseToDay = (di: number, ex: ExerciseDraft) =>
-    setDays(d => d.map((day, idx) => idx === di ? { ...day, exercises: [...day.exercises, ex] } : day))
-
-  const reorderExercise = (di: number, from: number, to: number) =>
-    setDays(prev => prev.map((day, i) =>
-      i === di ? { ...day, exercises: moveItem(day.exercises, from, to) } : day))
+  const [editRow, setEditRow] = useState<{ di: number; ei: number } | null>(null)
+  const [copyOpen, setCopyOpen] = useState(false)
 
   // Weekly routine = General program with no week count → no periodization,
   // no start/end date setup. Powerlifting always requires a week count + setup.
-  const isWeekly = programType === 'general' && weeks.trim() === ''
-  const weeksNum = isWeekly ? 1 : Math.max(1, Math.min(52, Number(weeks) || 1))
-  const weeksValid = isWeekly || Number(weeks) >= 1
-  const canSave = name.trim().length > 0 && days.length > 0 && weeksValid
+  const isWeekly = programType === 'general' && weeksInput.trim() === ''
+  const typedWeeks = Math.max(1, Math.min(52, Math.floor(Number(weeksInput)) || 1))
+  const weeksValid = isWeekly || Number(weeksInput) >= 1
+  const multiWeek = !isWeekly && drafts.length > 1
+  const wk = multiWeek ? Math.min(selWeek, drafts.length - 1) : 0
+  const week = drafts[wk]
+  const days = week.days
+
+  // Resize on commit (blur/Enter), not per keystroke — typing "12" passes through "1".
+  const commitWeeks = () => {
+    if (!weeksValid) return
+    const n = isWeekly ? 1 : typedWeeks
+    if (n === drafts.length) return
+    if (n < drafts.length) {
+      const lost = drafts.slice(n).some(w => w.days.length > 0)
+      const range = n + 1 === drafts.length ? `${drafts.length}` : `${n + 1}–${drafts.length}`
+      if (lost && !window.confirm(`ลดเหลือ ${n} สัปดาห์? สัปดาห์ ${range} และ progress ของสัปดาห์เหล่านั้นจะถูกลบ`)) {
+        setWeeksInput(String(drafts.length))
+        return
+      }
+    }
+    setDrafts(d => resizeWeeks(d, n))
+    setSelWeek(s => Math.min(s, n - 1))
+  }
+
+  const updateWeek = (fn: (w: WeekDraft) => WeekDraft) =>
+    setDrafts(d => d.map((w, i) => (i === wk ? fn(w) : w)))
+  const updateDays = (fn: (days: DayDraft[]) => DayDraft[]) => updateWeek(w => ({ ...w, days: fn(w.days) }))
+  const setDayField = (i: number, patch: Partial<DayDraft>) =>
+    updateDays(ds => ds.map((day, idx) => idx === i ? { ...day, ...patch } : day))
+
+  const addDay = (allWeeks: boolean) => {
+    const used = new Set(days.map(d => d.dayOfWeek))
+    const next = WEEKDAYS.find(d => !used.has(d)) ?? 'Mon'
+    setDrafts(d => d.map((w, i) => {
+      if (i !== wk && !allWeeks) return w
+      if (w.days.some(x => x.dayOfWeek === next)) return w
+      return { ...w, days: [...w.days, { dayOfWeek: next, focus: '', exercises: [] }] }
+    }))
+  }
+  const removeDay = (i: number) => updateDays(ds => ds.filter((_, idx) => idx !== i))
+  const removeExercise = (di: number, ei: number) =>
+    setDayField(di, { exercises: days[di].exercises.filter((_, idx) => idx !== ei) })
+  const reorderExercise = (di: number, from: number, to: number) =>
+    updateDays(ds => ds.map((day, i) => i === di ? { ...day, exercises: moveItem(day.exercises, from, to) } : day))
+  const replaceExercise = (di: number, ei: number, ex: StructuredExercise) =>
+    setDayField(di, { exercises: days[di].exercises.map((x, i) => i === ei ? ex : x) })
+
+  const addPicked = (di: number, res: PickResult) => {
+    const day = days[di]
+    if (res.scope === 'week') setDrafts(d => addExerciseToWeeks(d, [wk], day.dayOfWeek, res.row))
+    else setDrafts(d => addExerciseToWeeks(d, d.map((_, i) => i), day.dayOfWeek, res.rows, day.focus))
+  }
+
+  const canSave = name.trim().length > 0 && drafts.some(w => w.days.length > 0) && weeksValid
 
   const handleCreate = async () => {
     if (!canSave || busy) return
-    // Assign stable day ids ONCE: keep existing (preserves progress), new days get
-    // a fresh non-positional id so nothing collides / drifts on later edits.
     const stamp = Date.now()
-    const ordered = sortDaysByWeekday(days)
-    const dayIds = ordered.map((d, di) => d.id ?? `day-${stamp}-${di}`)
+    const finalDrafts = resizeWeeks(drafts, isWeekly ? 1 : typedWeeks)
     const program: StructuredProgram = {
       id: editing ? editing.id : `custom-${stamp}`,
       name: name.trim(),
       description: editing?.description ?? '',
-      totalWeeks: weeksNum,
-      daysPerWeek: days.length,
+      totalWeeks: finalDrafts.length,
+      daysPerWeek: maxDaysPerWeek(finalDrafts),
       focus: focus.trim() || 'Custom',
       isCustom: true,
       // Preserve source (manual/excel) when editing; new programs are manual.
       source: editing?.source === 'excel' ? 'excel' : 'manual',
       weekly: isWeekly || undefined,
       programType,
-      weeks: Array.from({ length: weeksNum }, (_, wi) => ({
-        id: `week-${wi + 1}`,
-        weekNumber: wi + 1,
-        phase: editing?.weeks[Math.min(wi, editing.weeks.length - 1)]?.phase ?? 'Accumulation',
-        days: ordered.map((d, di) => ({
-          id: dayIds[di],
-          dayOfWeek: d.dayOfWeek,
-          focus: d.focus.trim() || `${d.dayOfWeek} Training`,
-          // Expand per-week Set/Rep/% into each week + carry a per-row id (so two
-          // same-exerciseId main rows never collide in the logger's weight map).
-          exercises: d.exercises.map((ex, ei) => {
-            const { weekly, originIdx, ...base } = ex
-            // The id must follow the EXERCISE, not its position: the day layout a
-            // user drags into place (useProgramStore.customAccessories) references
-            // these ids, so re-minting them positionally would point that saved
-            // order at the wrong lifts. Look the row's id up in this very week
-            // (Excel imports carry a different id per week), then fall back to the
-            // week-1 id, then mint a fresh one for a row that was just added.
-            const srcDay = editing?.weeks[wi]?.days.find(x => x.id === d.id)
-            const id = (originIdx !== undefined ? srcDay?.exercises[originIdx]?.id : undefined)
-              ?? ex.id
-              ?? `${dayIds[di]}-n${stamp}-${ei}`
-            if (!weekly) return { ...base, id } as StructuredExercise
-            // In-range blank cells fall back to the base value; weeks past the array clamp to last.
-            const c = wi < weekly.length ? weekly[wi] : weekly[weekly.length - 1]
-            const row = { ...base, id } as StructuredExercise
-            if (c.sets !== undefined) row.sets = c.sets
-            if (c.reps !== undefined) row.reps = c.reps
-            if (c.pct !== undefined) row.pct = c.pct
-            else delete row.pct
-            if (c.rpe !== undefined) row.rpe = c.rpe
-            else delete row.rpe
-            return row
-          }),
-        })),
-      })),
+      weeks: draftToWeeks(finalDrafts, stamp),
     }
 
     if (editing) {
@@ -199,6 +164,8 @@ export function CreateProgramPage() {
   if (!canCreate) return <Navigate to="/programs" replace />
   // Edit route for a program that isn't yours/editable → bounce.
   if (programId && !isEditable) return <Navigate to="/programs" replace />
+
+  const editing_row = editRow ? days[editRow.di]?.exercises[editRow.ei] : undefined
 
   return (
     <div className="atlas-screen screen-enter">
@@ -238,9 +205,11 @@ export function CreateProgramPage() {
             </div>
             <div style={{ width: 96 }}>
               <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>WEEKS</div>
-              <input className="input-num tnum" type="number" inputMode="numeric" value={weeks}
+              <input className="input-num tnum" type="number" inputMode="numeric" value={weeksInput}
                 placeholder={programType === 'general' ? '—' : '4'}
-                onChange={e => setWeeks(e.target.value)} onFocus={e => e.target.select()}
+                onChange={e => setWeeksInput(e.target.value)} onFocus={e => e.target.select()}
+                onBlur={commitWeeks}
+                onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
                 style={{ width: '100%', textAlign: 'center' }} />
             </div>
           </div>
@@ -248,8 +217,8 @@ export function CreateProgramPage() {
             {isWeekly
               ? 'โปรแกรมประจำสัปดาห์ · ไม่ต้องตั้งวันเริ่ม/จบ'
               : programType === 'general'
-                ? `เว้นว่าง = ประจำสัปดาห์ · ใส่เลข = ทำซ้ำ ${weeksNum} สัปดาห์`
-                : `1 สัปดาห์ที่สร้างจะถูกทำซ้ำ ${weeks.trim() === '' ? 'N' : weeksNum} สัปดาห์ (Powerlifting ต้องกำหนด)`}
+                ? `เว้นว่าง = ประจำสัปดาห์ · ใส่เลข = ${drafts.length} สัปดาห์ แก้ได้ทีละสัปดาห์`
+                : `${drafts.length} สัปดาห์ · แก้ได้ทีละสัปดาห์ · เพิ่มสัปดาห์ = คัดลอกสัปดาห์สุดท้าย`}
           </div>
         </div>
       </div>
@@ -281,12 +250,53 @@ export function CreateProgramPage() {
         )}
       </div>
 
-      {/* Week template — days */}
+      {/* Week picker */}
+      {multiWeek && (
+        <div style={{ padding: '0 20px 12px' }}>
+          <div className="t-eyebrow" style={{ marginBottom: 8 }}>WEEK</div>
+          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
+            {drafts.map((w, i) => {
+              const on = i === wk
+              return (
+                <button key={i} onClick={() => setSelWeek(i)} aria-pressed={on}
+                  style={{
+                    flexShrink: 0, minWidth: 44, height: 40, borderRadius: 10, cursor: 'pointer', padding: '0 8px',
+                    border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
+                    background: on ? 'rgba(var(--accent-rgb),0.12)' : 'var(--surface-2)',
+                    color: on ? 'var(--accent)' : 'var(--text-2)',
+                    fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 12, lineHeight: 1.1,
+                  }}>
+                  W{i + 1}
+                  <div style={{ fontSize: 8, fontWeight: 500, opacity: 0.8 }}>{w.phase.slice(0, 5).toUpperCase()}</div>
+                </button>
+              )
+            })}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center' }}>
+            <select value={week.phase} aria-label="Phase"
+              onChange={e => updateWeek(w => ({ ...w, phase: e.target.value as ProgramPhase }))}
+              style={{
+                flex: 1, minWidth: 0, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8,
+                color: 'var(--text)', fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 12, padding: '8px 10px',
+              }}>
+              {PHASES.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+            <button className="btn btn-secondary" style={{ height: 36, fontSize: 12, padding: '0 12px', flexShrink: 0 }}
+              onClick={() => setCopyOpen(true)}>
+              <IconCopy size={14} /> คัดลอกสัปดาห์นี้ไป…
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Days of the selected week */}
       <div style={{ padding: '0 20px 20px' }}>
-        <div className="t-eyebrow" style={{ marginBottom: 10 }}>WEEK TEMPLATE · {days.length} DAYS</div>
+        <div className="t-eyebrow" style={{ marginBottom: 10 }}>
+          {multiWeek ? `WEEK ${wk + 1}` : 'WEEK'} · {days.length} DAYS
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {days.map((day, di) => (
-            <div key={di} className="card">
+            <div key={`${wk}-${di}`} className="card">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                 <select
                   value={day.dayOfWeek}
@@ -313,24 +323,23 @@ export function CreateProgramPage() {
                     items={day.exercises}
                     getKey={(_ex, ei) => String(ei)}
                     onReorder={(from, to) => reorderExercise(di, from, to)}
-                    groupId={`day-${di}`}
+                    groupId={`w${wk}-day-${di}`}
                     renderRow={(ex, ei, handle) => (
                       <>
                         {handle}
                         <span className="pill" style={{ fontSize: 8, flexShrink: 0 }}>
                           {ex.type === 'main' ? 'MAIN' : ex.type === 'running' ? 'RUN' : 'ACC'}
                         </span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.name}</div>
-                          {ex.type !== 'running' && getExercise(ex.exerciseId)?.group && (
-                            <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)' }}>{getExercise(ex.exerciseId).group}</div>
-                          )}
-                        </div>
-                        <span className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>
-                          {ex.type === 'running'
-                            ? (runTarget(ex) || 'Run')
-                            : `${ex.sets}×${ex.reps}${rpeRangeLabel(ex) ? ` ${rpeRangeLabel(ex)}` : ''}${pctRangeLabel(ex) ? ` · ${pctRangeLabel(ex)}` : ''}`}
-                        </span>
+                        <button onClick={() => setEditRow({ di, ei })} aria-label={`Edit ${ex.name}`}
+                          style={{ all: 'unset', cursor: 'pointer', flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.name}</div>
+                            <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {ex.label ?? (ex.type !== 'running' ? getExercise(ex.exerciseId)?.group : '')}
+                            </div>
+                          </div>
+                          <span className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>{rowSummary(ex)}</span>
+                        </button>
                         <button onClick={() => removeExercise(di, ei)} aria-label="Remove exercise"
                           style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 2, flexShrink: 0 }}>
                           <IconX size={13} />
@@ -355,9 +364,16 @@ export function CreateProgramPage() {
           ))}
         </div>
 
-        <button className="btn btn-secondary" style={{ width: '100%', marginTop: 10 }} onClick={addDay}>
-          <IconPlus size={16} /> Add Day
-        </button>
+        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+          <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => addDay(false)}>
+            <IconPlus size={16} /> {multiWeek ? `Add Day (W${wk + 1})` : 'Add Day'}
+          </button>
+          {multiWeek && (
+            <button className="btn btn-secondary" style={{ flexShrink: 0, padding: '0 12px', fontSize: 12 }} onClick={() => addDay(true)}>
+              <IconPlus size={14} /> ทุกสัปดาห์
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Visibility (create only — editing keeps existing shares untouched) */}
@@ -408,17 +424,37 @@ export function CreateProgramPage() {
 
       {pickerDay !== null && (
         <ExercisePicker
-          weeks={weeksNum}
+          weeks={multiWeek ? drafts.length : 1}
+          currentWeek={wk}
           programType={programType}
-          onPick={ex => { addExerciseToDay(pickerDay, ex); setPickerDay(null) }}
+          onPick={res => { addPicked(pickerDay, res); setPickerDay(null) }}
           onClose={() => setPickerDay(null)}
         />
       )}
 
       {runDay !== null && (
         <RunPicker
-          onPick={ex => { addExerciseToDay(runDay, ex); setRunDay(null) }}
+          onPick={ex => { addPicked(runDay, { scope: 'week', row: ex }); setRunDay(null) }}
           onClose={() => setRunDay(null)}
+        />
+      )}
+
+      {editRow && editing_row && (
+        <ExerciseRowSheet
+          key={`${wk}-${editRow.di}-${editRow.ei}`}
+          ex={editing_row}
+          weekLabel={multiWeek ? `W${wk + 1} · ${days[editRow.di].dayOfWeek}` : days[editRow.di].dayOfWeek}
+          onSave={ex => { replaceExercise(editRow.di, editRow.ei, ex); setEditRow(null) }}
+          onClose={() => setEditRow(null)}
+        />
+      )}
+
+      {copyOpen && (
+        <CopyWeekSheet
+          from={wk}
+          total={drafts.length}
+          onCopy={targets => { setDrafts(d => copyWeek(d, wk, targets)); setCopyOpen(false) }}
+          onClose={() => setCopyOpen(false)}
         />
       )}
 
@@ -515,34 +551,55 @@ function wholeOr(value: string | undefined, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? n : fallback
 }
 
-function ExercisePicker({ weeks, programType, onPick, onClose }: {
+const pctToFraction = (v: string): number | undefined => {
+  const t = v.trim()
+  if (!t) return undefined
+  const n = Number(t)
+  return Number.isFinite(n) && n > 0 ? Math.min(1.1, n / 100) : undefined
+}
+const numOrUndef = (v: string): number | undefined => {
+  const t = v.trim()
+  if (!t) return undefined
+  const n = Number(t)
+  return Number.isFinite(n) ? n : undefined
+}
+const LABEL_CHIPS = ['Top set', 'Back-off', 'Work sets'] as const
+
+const fieldStyle = { width: '100%', textAlign: 'center' } as const
+const textFieldStyle = { width: '100%', textAlign: 'left', fontFamily: 'var(--font-mono)', textTransform: 'none', fontSize: 13 } as const
+
+function ExercisePicker({ weeks, currentWeek, programType, onPick, onClose }: {
   weeks: number
+  currentWeek: number
   programType: 'general' | 'powerlifting'
-  onPick: (ex: ExerciseDraft) => void
+  onPick: (res: PickResult) => void
   onClose: () => void
 }) {
   const [search, setSearch] = useState('')
   const [groupFilter, setGroupFilter] = useState('All')
   const [pickedId, setPickedId] = useState('')
   const [type, setType] = useState<'main' | 'accessory'>('accessory')
+  const [scope, setScope] = useState<'week' | 'all'>('week')
+  const [label, setLabel] = useState('')
   const [sets, setSets] = useState('3')
   const [reps, setReps] = useState('10')
   const [rpe, setRpe] = useState('')
+  const [pct, setPct] = useState('')
   const [basePct, setBasePct] = useState('')
   const [stepPct, setStepPct] = useState('')
-  const [role, setRole] = useState<'top' | 'backoff' | 'working'>('working')
   const [wSets, setWSets] = useState<string[]>([])
   const [wReps, setWReps] = useState<string[]>([])
   const [wPct, setWPct] = useState<string[]>([])
   const [wRpe, setWRpe] = useState<string[]>([])
 
-  // Per-week Set/Rep/% table only makes sense for a powerlifting main lift.
-  const showWeekly = programType === 'powerlifting' && type === 'main'
+  const isPLMain = programType === 'powerlifting' && type === 'main'
+  // Per-week Set/Rep/% table only when adding a powerlifting main lift to every week.
+  const showWeekly = isPLMain && scope === 'all' && weeks > 1
 
   // Reset the config step to defaults (called when going back to the exercise list).
   const resetConfig = () => {
-    setType('accessory'); setRole('working')
-    setSets('3'); setReps('10'); setRpe('')
+    setType('accessory'); setScope('week'); setLabel('')
+    setSets('3'); setReps('10'); setRpe(''); setPct('')
     setBasePct(''); setStepPct('')
     setWSets([]); setWReps([]); setWPct([]); setWRpe([])
   }
@@ -552,7 +609,7 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
     if (!b) return
     const s = Number(stepPct) || 0
     setWPct(Array.from({ length: weeks }, (_, i) =>
-      String(Math.max(0, Math.min(100, Math.round((b + s * i) * 10) / 10)))
+      String(Math.max(0, Math.min(110, Math.round((b + s * i) * 10) / 10)))
     ))
   }
   const editCell = (arr: string[], setArr: (v: string[]) => void, i: number, v: string) => {
@@ -580,36 +637,50 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
   const confirm = () => {
     const ex = allExercises().find(e => e.id === pickedId)
     if (!ex) return
-    const suffix = role === 'top' ? ' — Top set' : role === 'backoff' ? ' — Back-off' : ''
-    const draft: ExerciseDraft = {
+    const base: StructuredExercise = {
       exerciseId: ex.id,
-      name: ex.name + (showWeekly ? suffix : ''),
+      name: ex.name,
+      ...(label.trim() ? { label: label.trim() } : {}),
       type,
       sets: wholeOr(sets, 3),
       reps: wholeOr(reps, 10),
-      ...(rpe ? { rpe: Number(rpe) } : {}),
     }
-    if (showWeekly) {
-      const weekly = Array.from({ length: weeks }, (_, i) => {
-        const p = wPct[i]?.trim()
-        const r = (wRpe[i] ?? '').trim() || rpe // blank per-week cell falls back to RPE (BASE)
-        return {
-          // fallback 0 → `|| undefined`, so a blank cell stays blank
-          sets: wholeOr(wSets[i] || sets, 0) || undefined,
-          reps: wholeOr(wReps[i] || reps, 0) || undefined,
-          pct: p ? Math.max(0, Math.min(1, Number(p) / 100)) : undefined,
-          rpe: r ? Number(r) : undefined,
-        }
-      })
-      draft.weekly = weekly
-      // Representative week-1 values for the day-list summary / week-1 consumers.
-      if (weekly[0]?.sets !== undefined) draft.sets = weekly[0].sets
-      if (weekly[0]?.reps !== undefined) draft.reps = weekly[0].reps
-      draft.pct = weekly.find(c => c.pct !== undefined)?.pct
-      draft.rpe = weekly.find(c => c.rpe !== undefined)?.rpe
+    const baseRpe = numOrUndef(rpe)
+    if (!showWeekly) {
+      const row = { ...base }
+      if (baseRpe !== undefined) row.rpe = baseRpe
+      const p = isPLMain ? pctToFraction(pct) : undefined
+      if (p !== undefined) row.pct = p
+      onPick(scope === 'all' && weeks > 1
+        ? { scope: 'all', rows: Array.from({ length: weeks }, () => ({ ...row })) }
+        : { scope: 'week', row })
+      return
     }
-    onPick(draft)
+    const rows = Array.from({ length: weeks }, (_, i) => {
+      const row = { ...base }
+      row.sets = wholeOr(wSets[i] || sets, base.sets ?? 3)
+      row.reps = wholeOr(wReps[i] || reps, typeof base.reps === 'number' ? base.reps : 10)
+      const p = pctToFraction(wPct[i] ?? '')
+      if (p !== undefined) row.pct = p
+      const r = numOrUndef(wRpe[i] ?? '') ?? baseRpe // blank per-week cell falls back to RPE (BASE)
+      if (r !== undefined) row.rpe = r
+      return row
+    })
+    onPick({ scope: 'all', rows })
   }
+
+  const toggle = <T extends string>(value: T, current: T, set: (v: T) => void, text: string) => (
+    <button key={value} onClick={() => set(value)}
+      style={{
+        flex: 1, height: 34, borderRadius: 8, cursor: 'pointer',
+        border: `1px solid ${current === value ? 'var(--accent)' : 'var(--border)'}`,
+        background: current === value ? 'rgba(var(--accent-rgb),0.12)' : 'var(--surface-2)',
+        color: current === value ? 'var(--accent)' : 'var(--text-2)',
+        fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
+      }}>
+      {text}
+    </button>
+  )
 
   return (
     <div className="sheet-backdrop" onClick={onClose} style={{ zIndex: 100 }}>
@@ -691,51 +762,45 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
           </h3>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', marginBottom: 12 }}>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-              {(['main', 'accessory'] as const).map(t => (
-                <button key={t} onClick={() => setType(t)}
-                  style={{
-                    flex: 1, height: 36, borderRadius: 8, cursor: 'pointer',
-                    border: `1px solid ${type === t ? 'var(--accent)' : 'var(--border)'}`,
-                    background: type === t ? 'rgba(var(--accent-rgb),0.12)' : 'var(--surface-2)',
-                    color: type === t ? 'var(--accent)' : 'var(--text-2)',
-                    fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
-                  }}>
-                  {t}
-                </button>
-              ))}
-            </div>
-
-            {showWeekly && (
+            {weeks > 1 && (
               <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-                {([['top', 'Top set'], ['backoff', 'Back-off'], ['working', 'Working']] as const).map(([r, lbl]) => (
-                  <button key={r} onClick={() => setRole(r)}
-                    style={{
-                      flex: 1, height: 32, borderRadius: 8, cursor: 'pointer',
-                      border: `1px solid ${role === r ? 'var(--accent)' : 'var(--border)'}`,
-                      background: role === r ? 'rgba(var(--accent-rgb),0.12)' : 'var(--surface-2)',
-                      color: role === r ? 'var(--accent)' : 'var(--text-2)',
-                      fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
-                    }}>
-                    {lbl}
-                  </button>
-                ))}
+                {toggle('week', scope, setScope, `เฉพาะ W${currentWeek + 1}`)}
+                {toggle('all', scope, setScope, `ทุกสัปดาห์ (${weeks})`)}
               </div>
             )}
 
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+              {toggle('main', type, setType, 'MAIN')}
+              {toggle('accessory', type, setType, 'ACCESSORY')}
+            </div>
+
+            <div style={{ marginBottom: 10 }}>
+              <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>LABEL / ชื่อเซ็ต (OPT)</div>
+              <input className="input-num" type="text" value={label} placeholder="e.g. Top set"
+                onChange={e => setLabel(e.target.value)} style={textFieldStyle} />
+              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                {LABEL_CHIPS.map(c => (
+                  <button key={c} onClick={() => setLabel(c)} className="pill"
+                    style={{ cursor: 'pointer', fontSize: 9, border: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
               {[
-                { label: showWeekly ? 'SETS (BASE)' : 'SETS', val: sets, set: setSets, ph: '3' },
-                { label: showWeekly ? 'REPS (BASE)' : 'REPS', val: reps, set: setReps, ph: '10' },
-                { label: showWeekly ? 'RPE (BASE)' : 'RPE (opt)', val: rpe, set: setRpe, ph: '—' },
-              ].map(({ label, val, set, ph }) => (
-                <div key={label} style={{ flex: 1 }}>
-                  <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>{label}</div>
-                  <input className="input-num tnum" type="number" inputMode="numeric"
-                    {...(label.startsWith('RPE') ? { step: '0.5' } : { step: '1', min: '1' })}
+                { label: showWeekly ? 'SETS (BASE)' : 'SETS', val: sets, set: setSets, ph: '3', step: '1' },
+                { label: showWeekly ? 'REPS (BASE)' : 'REPS', val: reps, set: setReps, ph: '10', step: '1' },
+                { label: showWeekly ? 'RPE (BASE)' : 'RPE (opt)', val: rpe, set: setRpe, ph: '—', step: '0.5' },
+                ...(isPLMain && !showWeekly ? [{ label: '%1RM (opt)', val: pct, set: setPct, ph: '—', step: '0.5' }] : []),
+              ].map(({ label: l, val, set, ph, step }) => (
+                <div key={l} style={{ flex: 1 }}>
+                  <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>{l}</div>
+                  <input className="input-num tnum" type="number" inputMode="decimal" step={step} {...(step === '1' ? { min: '1' } : {})}
                     value={val} placeholder={ph}
                     onChange={e => set(e.target.value)} onFocus={e => e.target.select()}
-                    style={{ width: '100%', textAlign: 'center' }} />
+                    style={fieldStyle} />
                 </div>
               ))}
             </div>
@@ -748,13 +813,13 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
                     <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>BASE %</div>
                     <input className="input-num tnum" type="number" inputMode="numeric" value={basePct} placeholder="70"
                       onChange={e => setBasePct(e.target.value)} onFocus={e => e.target.select()}
-                      style={{ width: '100%', textAlign: 'center' }} />
+                      style={fieldStyle} />
                   </div>
                   <div style={{ flex: 1 }}>
                     <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>STEP %/WK</div>
                     <input className="input-num tnum" type="number" inputMode="numeric" value={stepPct} placeholder="5"
                       onChange={e => setStepPct(e.target.value)} onFocus={e => e.target.select()}
-                      style={{ width: '100%', textAlign: 'center' }} />
+                      style={fieldStyle} />
                   </div>
                   <button className="btn btn-secondary" style={{ height: 36, padding: '0 14px', flexShrink: 0, opacity: basePct ? 1 : 0.4 }}
                     disabled={!basePct} onClick={fillPct}>Fill %</button>
@@ -771,16 +836,16 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
                         <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)', textAlign: 'center' }}>{i + 1}</div>
                         <input className="input-num tnum" type="number" inputMode="numeric" step="1" min="1" value={wSets[i] ?? ''} placeholder={sets || '—'}
                           onChange={e => editCell(wSets, setWSets, i, e.target.value)} onFocus={e => e.target.select()}
-                          style={{ width: '100%', textAlign: 'center' }} />
+                          style={fieldStyle} />
                         <input className="input-num tnum" type="number" inputMode="numeric" step="1" min="1" value={wReps[i] ?? ''} placeholder={reps || '—'}
                           onChange={e => editCell(wReps, setWReps, i, e.target.value)} onFocus={e => e.target.select()}
-                          style={{ width: '100%', textAlign: 'center' }} />
+                          style={fieldStyle} />
                         <input className="input-num tnum" type="number" inputMode="numeric" value={wPct[i] ?? ''} placeholder="—"
                           onChange={e => editCell(wPct, setWPct, i, e.target.value)} onFocus={e => e.target.select()}
-                          style={{ width: '100%', textAlign: 'center' }} />
+                          style={fieldStyle} />
                         <input className="input-num tnum" type="number" inputMode="decimal" step="0.5" value={wRpe[i] ?? ''} placeholder={rpe || '—'}
                           onChange={e => editCell(wRpe, setWRpe, i, e.target.value)} onFocus={e => e.target.select()}
-                          style={{ width: '100%', textAlign: 'center' }} />
+                          style={fieldStyle} />
                       </Fragment>
                     ))}
                   </div>
@@ -793,10 +858,192 @@ function ExercisePicker({ weeks, programType, onPick, onClose }: {
         </div>
 
         <button className="btn btn-primary" style={{ width: '100%', flexShrink: 0 }} onClick={confirm}>
-          <IconPlus size={16} /> Add to Day
+          <IconPlus size={16} /> {scope === 'all' && weeks > 1 ? `Add to ${weeks} weeks` : 'Add to Day'}
         </button>
         </>
         )}
+      </div>
+    </div>
+  )
+}
+
+// Edit one row of one week in place (sets/reps/%/RPE/label/note, or a run's target).
+function ExerciseRowSheet({ ex, weekLabel, onSave, onClose }: {
+  ex: StructuredExercise
+  weekLabel: string
+  onSave: (ex: StructuredExercise) => void
+  onClose: () => void
+}) {
+  const isRun = ex.type === 'running'
+  const [label, setLabel] = useState(ex.label ?? '')
+  const [sets, setSets] = useState(ex.sets !== undefined ? String(ex.sets) : '')
+  const [reps, setReps] = useState(ex.reps !== undefined ? String(ex.reps) : '')
+  const [pct, setPct] = useState(ex.pct !== undefined ? String(Math.round(ex.pct * 1000) / 10) : '')
+  const [rpe, setRpe] = useState(ex.rpe !== undefined ? String(ex.rpe) : '')
+  const [note, setNote] = useState(ex.note ?? '')
+  const [runName, setRunName] = useState(ex.name)
+  const [dist, setDist] = useState(ex.distanceKm !== undefined ? String(ex.distanceKm) : '')
+  const [dur, setDur] = useState(ex.durationMin !== undefined ? String(ex.durationMin) : '')
+
+  const save = () => {
+    const next: StructuredExercise = { ...ex }
+    const setOpt = <K extends keyof StructuredExercise>(k: K, v: StructuredExercise[K] | undefined) => {
+      if (v === undefined || v === '') delete next[k]
+      else next[k] = v
+    }
+    setOpt('note', note.trim() || undefined)
+    if (isRun) {
+      next.name = runName.trim() || 'Running'
+      setOpt('distanceKm', Number(dist) > 0 ? round2(Number(dist)) : undefined)
+      setOpt('durationMin', Number(dur) > 0 ? round2(Number(dur)) : undefined)
+    } else {
+      setOpt('label', label.trim() || undefined)
+      next.sets = wholeOr(sets, ex.sets ?? 3)
+      next.reps = reps.trim().toUpperCase() === 'AMRAP' ? 'AMRAP' : wholeOr(reps, typeof ex.reps === 'number' ? ex.reps : 5)
+      setOpt('pct', pctToFraction(pct))
+      setOpt('rpe', numOrUndef(rpe))
+    }
+    onSave(next)
+  }
+
+  return (
+    <div className="sheet-backdrop" onClick={onClose} style={{ zIndex: 100 }}>
+      <div className="sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+        <div className="sheet-handle" />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <h3 className="t-display" style={{ margin: 0, fontSize: 20, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.name}</h3>
+          <button className="btn-icon" onClick={onClose} aria-label="Close"><IconX size={18} /></button>
+        </div>
+        <p className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 14 }}>
+          แก้เฉพาะแถวนี้ของ {weekLabel} · สัปดาห์อื่นไม่เปลี่ยน
+        </p>
+        <div style={{ flex: 1, overflowY: 'auto', marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {isRun ? (
+            <>
+              <div>
+                <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>LABEL</div>
+                <input className="input-num" type="text" value={runName} onChange={e => setRunName(e.target.value)} style={textFieldStyle} />
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[
+                  { l: 'DISTANCE (KM)', v: dist, s: setDist },
+                  { l: 'TIME (MIN)', v: dur, s: setDur },
+                ].map(({ l, v, s }) => (
+                  <div key={l} style={{ flex: 1 }}>
+                    <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>{l}</div>
+                    <input className="input-num tnum" type="number" inputMode="decimal" value={v}
+                      onChange={e => s(e.target.value)} onFocus={e => e.target.select()} style={fieldStyle} />
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>LABEL / ชื่อเซ็ต</div>
+                <input className="input-num" type="text" value={label} placeholder="e.g. Top set"
+                  onChange={e => setLabel(e.target.value)} style={textFieldStyle} />
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>SETS</div>
+                  <input className="input-num tnum" type="number" inputMode="numeric" step="1" min="1" value={sets}
+                    onChange={e => setSets(e.target.value)} onFocus={e => e.target.select()} style={fieldStyle} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>REPS</div>
+                  <input className="input-num tnum" type="text" inputMode="numeric" value={reps} placeholder="5 / AMRAP"
+                    onChange={e => setReps(e.target.value)} onFocus={e => e.target.select()} style={fieldStyle} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>%1RM</div>
+                  <input className="input-num tnum" type="number" inputMode="decimal" step="0.5" value={pct} placeholder="—"
+                    onChange={e => setPct(e.target.value)} onFocus={e => e.target.select()} style={fieldStyle} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>RPE</div>
+                  <input className="input-num tnum" type="number" inputMode="decimal" step="0.5" value={rpe} placeholder="—"
+                    onChange={e => setRpe(e.target.value)} onFocus={e => e.target.select()} style={fieldStyle} />
+                </div>
+              </div>
+            </>
+          )}
+          <div>
+            <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>NOTE</div>
+            <textarea className="input-num" value={note} rows={2} onChange={e => setNote(e.target.value)}
+              style={{ ...textFieldStyle, height: 'auto', minHeight: 56, padding: 10, resize: 'vertical' }} />
+          </div>
+          {!isRun && (
+            <div className="t-mono" style={{ fontSize: 9, color: 'var(--muted)' }}>
+              มี % → คำนวณน้ำหนักจาก % · ไม่มี % → ใช้ RPE (เฉพาะ squat / bench / deadlift)
+            </div>
+          )}
+        </div>
+        <button className="btn btn-primary" style={{ width: '100%', flexShrink: 0 }} onClick={save}>
+          <IconCheck size={16} stroke={3} /> Save row
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Pick which weeks receive a copy of the selected week (their rows are replaced).
+function CopyWeekSheet({ from, total, onCopy, onClose }: {
+  from: number
+  total: number
+  onCopy: (targets: number[]) => void
+  onClose: () => void
+}) {
+  const [picked, setPicked] = useState<Set<number>>(() => new Set())
+  const toggleWeek = (i: number) => setPicked(p => {
+    const n = new Set(p)
+    if (n.has(i)) n.delete(i)
+    else n.add(i)
+    return n
+  })
+  const after = Array.from({ length: total }, (_, i) => i).filter(i => i > from)
+
+  return (
+    <div className="sheet-backdrop" onClick={onClose} style={{ zIndex: 100 }}>
+      <div className="sheet" onClick={e => e.stopPropagation()}>
+        <div className="sheet-handle" />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <h3 className="t-display" style={{ margin: 0, fontSize: 20 }}>คัดลอก W{from + 1} ไป…</h3>
+          <button className="btn-icon" onClick={onClose} aria-label="Close"><IconX size={18} /></button>
+        </div>
+        <p className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
+          ท่าทั้งหมดของสัปดาห์ที่เลือกจะถูกแทนที่ด้วยท่าของ W{from + 1} (Phase ไม่เปลี่ยน)
+        </p>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+          <button className="btn btn-secondary" style={{ flex: 1, height: 34, fontSize: 11 }} disabled={!after.length}
+            onClick={() => setPicked(new Set(after))}>ทุกสัปดาห์ถัดไป</button>
+          <button className="btn btn-secondary" style={{ flex: 1, height: 34, fontSize: 11 }}
+            onClick={() => setPicked(new Set())}>ล้าง</button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(56px, 1fr))', gap: 6, marginBottom: 16 }}>
+          {Array.from({ length: total }, (_, i) => {
+            const on = picked.has(i)
+            const self = i === from
+            return (
+              <button key={i} disabled={self} onClick={() => toggleWeek(i)} aria-pressed={on}
+                style={{
+                  height: 38, borderRadius: 8, cursor: self ? 'default' : 'pointer', opacity: self ? 0.35 : 1,
+                  border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
+                  background: on ? 'rgba(var(--accent-rgb),0.12)' : 'var(--surface-2)',
+                  color: on ? 'var(--accent)' : 'var(--text-2)',
+                  fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 12,
+                }}>
+                W{i + 1}
+              </button>
+            )
+          })}
+        </div>
+        <button className="btn btn-primary" style={{ width: '100%', opacity: picked.size ? 1 : 0.4 }} disabled={!picked.size}
+          onClick={() => {
+            if (window.confirm(`แทนที่ท่าใน ${picked.size} สัปดาห์ด้วย W${from + 1}?`)) onCopy([...picked].sort((a, b) => a - b))
+          }}>
+          <IconCopy size={16} /> คัดลอกไป {picked.size} สัปดาห์
+        </button>
       </div>
     </div>
   )
