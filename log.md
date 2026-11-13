@@ -1,12 +1,12 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-11-13 (รอบ 79 — ✅ เสร็จ ยังไม่ deploy: หน้าแก้ไขโปรแกรมแบบรายสัปดาห์ · รอบ 78 — ✅ SHIPPED: แก้ Phase ถูกเขียนทับตอน Edit โปรแกรม · รอบ 77 — ✅ SHIPPED: Import Excel บันทึกเป็น Draft · รอบ 76 — ✅ SHIPPED: Responsive · รอบ 75 — PLANNED: Gamification EXP/Level/Tier)
+> อัปเดตล่าสุด: 2026-11-13 (รอบ 79 — ✅ SHIPPED: หน้าแก้ไขโปรแกรมแบบรายสัปดาห์ · รอบ 78 — ✅ SHIPPED: แก้ Phase ถูกเขียนทับตอน Edit โปรแกรม · รอบ 77 — ✅ SHIPPED: Import Excel บันทึกเป็น Draft · รอบ 76 — ✅ SHIPPED: Responsive · รอบ 75 — PLANNED: Gamification EXP/Level/Tier)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
 
 ---
 
-## 2026-11-13 — รอบ 79 (✅ เสร็จ — ยังไม่ commit/deploy): หน้าแก้ไขโปรแกรมแบบรายสัปดาห์ (แก้ Week 12 Sumo เพี้ยนหลัง Edit)
+## 2026-11-13 — รอบ 79 (✅ SHIPPED, deploy main `fc1214f`): หน้าแก้ไขโปรแกรมแบบรายสัปดาห์ (แก้ Week 12 Sumo เพี้ยนหลัง Edit)
 
 อาการ: Hybrid Powerlifting Sumo [12W] — W12 ใน Excel เป็นวัน Attempt 1/2/3 แต่ในแอปกลายเป็นท่าเหมือนสัปดาห์อื่น · **ไฟล์ Excel + parser ถูกต้อง** (เทียบครบ 116 แถว 0 ต่าง) · สาเหตุ: `CreateProgramPage` ใช้ **W1 เป็นแม่แบบ** ทุกสัปดาห์ แล้ว map sets/reps/%/RPE ต่อสัปดาห์ **ตามลำดับแถว** → Edit → Save ทับ W8/W12: Bench Speed / Squat Volume ได้ 102%, Bench Attempt 3 หาย, label/note ทุกสัปดาห์กลายเป็นของ W1 (บั๊กตระกูลเดียวกับรอบ 78)
 
@@ -29,7 +29,7 @@
 - chip สัปดาห์ที่เลือกไม่ auto-scroll เข้าจอ (W ท้าย ๆ ต้องปัดเอง)
 - ไม่มี component test ของ `CreateProgramPage` (ตรวจด้วย Playwright)
 - Add Day "ทุกสัปดาห์" ข้ามสัปดาห์ที่มีวันนั้นอยู่แล้ว (ไม่สร้างซ้ำ) — ตั้งใจ
-- ยังไม่ commit / deploy → ต่อด้วย `/ship`
+- ⚠️ ผู้ใช้ต้องลบโปรแกรม Sumo เดิมแล้ว import Excel ใหม่เอง (ข้อมูลที่ถูกทับไปแล้วไม่กลับมา)
 
 ---
 
