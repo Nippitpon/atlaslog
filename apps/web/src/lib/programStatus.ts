@@ -262,13 +262,15 @@ export type HomePick =
   | { kind: 'current'; id: string }
   | { kind: 'upcoming'; id: string; startDate: string; daysUntil: number }
 
-// Pick what Home shows, dates first:
+// Pick what Home shows — status first, then dates. Paused programs are set aside
+// (pausing the old plan to start a new one must hand Home to the new one), then:
 //   1. a program whose dates cover today — the one trained/activated most recently
-//      wins when several overlap (paused ones stay in the running: pausing must not
-//      silently promote a different program, the user sees the "paused" card);
+//      wins when several overlap;
 //   2. otherwise the nearest upcoming one, as a countdown;
 //   3. otherwise a program past its endDate that was never finished, so someone
 //      running behind still finds their plan (log.md round 38).
+// Only when every open program is paused does Home fall back to the most recently
+// active paused one, so the user still gets its Resume card instead of a blank Home.
 // An upcoming program outranks an overdue one so an abandoned plan can't hold the
 // slot forever. Setting a program up stamps activatedAt, which is why activity
 // alone can't decide: it put a program starting next week ahead of the running one.
@@ -282,8 +284,9 @@ export function pickHomeProgram(
 ): HomePick | null {
   // Config-only, matching the Dashboard's existing scope — weekly routines have
   // no config and still can't drive the current-week card (see log.md round 24).
-  const open = programs.filter(p => configs[p.id] && !isProgramComplete(p, progress))
-  if (!open.length) return null
+  const allOpen = programs.filter(p => configs[p.id] && !isProgramComplete(p, progress))
+  if (!allOpen.length) return null
+  const open = allOpen.filter(p => !metas[p.id]?.paused)
 
   const inState = (state: ProgramDateState) =>
     open.filter(p => programDateState(configs[p.id]!, now) === state)
@@ -311,7 +314,8 @@ export function pickHomeProgram(
 
   const over = inState('over')
   if (over.length) return { kind: 'current', id: newest(over).id }
-  return null
+
+  return { kind: 'current', id: newest(allOpen).id }
 }
 
 export type ProgramGroupKey = 'active' | 'paused' | 'ended' | 'completed' | 'not_started'

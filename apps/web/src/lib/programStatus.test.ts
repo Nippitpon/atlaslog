@@ -415,9 +415,20 @@ describe('pickHomeProgram', () => {
       .toEqual({ kind: 'current', id: 'b' })
   })
 
-  it('keeps a paused running program rather than promoting another', () => {
+  it('skips a paused program so the new one takes Home, even before it starts', () => {
     const pausedMetas = { hybrid: { paused: true, activatedAt: 1 }, twelve: { activatedAt: 2 } }
     expect(pickHomeProgram(all, configs, pausedMetas, {}, [], day(2026, 10, 20)))
+      .toEqual({ kind: 'upcoming', id: 'twelve', startDate: '2026-10-26', daysUntil: 6 })
+    const overlap = { hybrid: configs.hybrid, twelve: cfg('2026-10-12', '2027-01-04') }
+    expect(pickHomeProgram(all, overlap, { hybrid: { paused: true, activatedAt: 9 } }, {}, [], day(2026, 10, 20)))
+      .toEqual({ kind: 'current', id: 'twelve' })
+  })
+
+  it('falls back to the most recently active paused program when every one is paused', () => {
+    const allPaused = { hybrid: { paused: true, activatedAt: 1 }, twelve: { paused: true, activatedAt: 2 } }
+    expect(pickHomeProgram(all, configs, allPaused, {}, [], day(2026, 10, 20)))
+      .toEqual({ kind: 'current', id: 'twelve' })
+    expect(pickHomeProgram([hybrid], { hybrid: configs.hybrid }, { hybrid: { paused: true } }, {}, [], day(2026, 10, 20)))
       .toEqual({ kind: 'current', id: 'hybrid' })
   })
 })

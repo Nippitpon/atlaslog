@@ -131,10 +131,9 @@ export function DashboardPage() {
   // empty card for someone who logged one squat and one bench on the same day.
   const hasOneRMTrend = liftSeries.some(s => s.manual.length >= 2)
 
-  // What Home shows is decided by the programs' dates first (see pickHomeProgram):
-  // the running one — NOT skipped when paused, pausing must never silently promote
-  // another program (the paused card below is shown instead) — else a countdown to
-  // the nearest upcoming one.
+  // What Home shows (see pickHomeProgram): paused programs are set aside first, then
+  // the running one by date, else a countdown to the nearest upcoming one. Only when
+  // every program is paused does the paused card below show (with Resume).
   const homePick = useMemo(() => {
     const allPrograms = [...STRUCTURED_PROGRAMS, ...customPrograms]
     const pick = pickHomeProgram(allPrograms, configs, programMeta, progress, history)
