@@ -93,7 +93,9 @@ export function BodyPage() {
                   squashes both lines flat — so ALL plots percent change from each
                   measure's own first reading instead, and the strip below keeps
                   the real numbers. */}
-              <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+              {/* Filters use the full names, which no longer fit one row at
+                  390px — wrap rather than scroll sideways. */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
                 {(['all', ...BODY_MEASURES.map(m => m.key)] as BodySelection[]).map(k => {
                   const active = measure === k
                   // ALL wears the accent on its border only. A drawn line never
@@ -112,7 +114,7 @@ export function BodyPage() {
                         color: active ? color : 'var(--text-2)',
                       }}
                     >
-                      {k === 'all' ? 'ALL' : measureDef(k).pill}
+                      {k === 'all' ? 'ALL' : measureDef(k).full}
                     </button>
                   )
                 })}
