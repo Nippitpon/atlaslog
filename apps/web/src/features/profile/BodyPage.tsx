@@ -5,7 +5,7 @@ import { useAppStore } from '../../store/useAppStore.js'
 import { formatDMY, formatDM, formatNum2 } from '../../lib/utils.js'
 import {
   BODY_MEASURES, measureDef, buildBodySeries, sortedByDate, measureDelta,
-  buildNormalizedSeries, totalPctChange,
+  buildNormalizedSeries, totalPctChange, fatPctFromKg,
   type BodySelection,
 } from '../../lib/bodyMetrics.js'
 import { MetricChart } from '../../components/charts/MetricChart.js'
@@ -39,13 +39,13 @@ export function BodyPage() {
   // replaces the row. A new entry mints its id HERE, at save time — minting it
   // while rendering would hand every re-render a different id.
   const saveHandler = (existing?: BodyMetricEntry) =>
-    (iso: string, weightKg: number, muscle?: number, fat?: number) => {
+    (iso: string, weightKg: number, muscle?: number, fatKg?: number) => {
       addBodyMetric({
         id: existing?.id ?? `bm${Date.now()}`,
         date: iso,
         weightKg,
         skeletalMuscleKg: muscle,
-        bodyFatPct: fat,
+        bodyFatPct: fatPctFromKg(fatKg, weightKg),
       })
     }
 
@@ -137,6 +137,11 @@ export function BodyPage() {
                         {val != null ? formatNum2(val) : '—'}
                         {val != null && <span style={{ fontSize: 9, color: 'var(--muted)', marginLeft: 1 }}>{m.unit}</span>}
                       </div>
+                      {/* % fat under the kg — the stored value, kept visible. The
+                          other columns get an empty line so the three stay aligned. */}
+                      <div className="t-mono tnum" style={{ fontSize: 9, minHeight: 11, color: 'var(--muted)' }}>
+                        {m.key === 'fat' && latest?.bodyFatPct != null && val != null ? `${formatNum2(latest.bodyFatPct)}%` : ''}
+                      </div>
                       {/* Neutral on purpose. Green-up/red-down would have the app
                           decide that losing weight is bad and losing fat is bad —
                           it cannot know whether you are cutting or bulking. The
@@ -173,10 +178,12 @@ export function BodyPage() {
             <div className="card card-tight">
               <div style={{
                 display: 'grid', gridTemplateColumns: '58px 1fr 1fr 1fr 50px', gap: 6,
-                padding: '0 0 8px', borderBottom: '1px solid var(--border)',
+                alignItems: 'end', padding: '0 0 8px', borderBottom: '1px solid var(--border)',
               }}>
-                {['DATE', 'WEIGHT', 'MUSCLE', 'FAT', ''].map((h, i) => (
-                  <div key={h || i} className="t-eyebrow" style={{ fontSize: 9, textAlign: i === 0 ? 'left' : 'center' }}>{h}</div>
+                {/* Full names here (the pills above use the SMM short form); they
+                    wrap to two lines at 390px rather than overflow the column. */}
+                {['DATE', ...BODY_MEASURES.map(m => m.full), ''].map((h, i) => (
+                  <div key={h || i} className="t-eyebrow" style={{ fontSize: 9, lineHeight: 1.3, textAlign: i === 0 ? 'left' : 'center' }}>{h}</div>
                 ))}
               </div>
 
@@ -198,6 +205,9 @@ export function BodyPage() {
                         color: val != null ? 'var(--text)' : 'var(--muted)',
                       }}>
                         {val != null ? formatNum2(val) : '—'}
+                        {m.key === 'fat' && val != null && e.bodyFatPct != null && (
+                          <div style={{ fontSize: 9, fontWeight: 400, color: 'var(--muted)' }}>{formatNum2(e.bodyFatPct)}%</div>
+                        )}
                       </div>
                     )
                   })}

@@ -9,7 +9,8 @@ import { calcEnergy, ACTIVITY, ACTIVITY_ORDER, suggestActivityFromDays } from '.
 import { IconBolt, IconUsers, IconScale, IconX, IconBell, IconTrendingUp } from '../../components/icons/index.js'
 import { DateField } from '../../components/DateField.js'
 import { MetricChart } from '../../components/charts/MetricChart.js'
-import { buildNormalizedSeries, measureDef } from '../../lib/bodyMetrics.js'
+import { buildNormalizedSeries, measureDef, fatMassKg, fatPctFromKg } from '../../lib/bodyMetrics.js'
+import { formatNum2 } from '../../lib/utils.js'
 import { validateUsername, normalizeUsername } from '../../lib/username.js'
 import { isPushSupported, isIosNeedsInstall, getPermission, isSubscribed, subscribeToPush, unsubscribeFromPush } from '../../lib/pushApi.js'
 
@@ -104,7 +105,7 @@ export function ProfilePage() {
       date: new Date().toISOString(),
       weightKg,
       skeletalMuscleKg: smm ? Number(smm) : undefined,
-      bodyFatPct: bf ? Number(bf) : undefined,
+      bodyFatPct: fatPctFromKg(bf ? Number(bf) : undefined, weightKg),
     })
     setBw(''); setSmm(''); setBf('')
     setBodySaved(true); setTimeout(() => setBodySaved(false), 1500)
@@ -293,15 +294,16 @@ export function ProfilePage() {
                 }}>
                   {[
                     { label: 'WEIGHT', val: latestBody.weightKg, unit: 'kg', color: measureDef('weight').color },
-                    { label: 'MUSCLE', val: latestBody.skeletalMuscleKg, unit: 'kg', color: measureDef('muscle').color },
-                    { label: 'FAT%', val: latestBody.bodyFatPct, unit: '%', color: measureDef('fat').color },
-                  ].map(({ label, val, unit, color }) => (
+                    { label: 'SMM', val: latestBody.skeletalMuscleKg, unit: 'kg', color: measureDef('muscle').color },
+                    { label: 'BODY FAT MASS', val: fatMassKg(latestBody), unit: 'kg', color: measureDef('fat').color, sub: latestBody.bodyFatPct != null ? `${formatNum2(latestBody.bodyFatPct)}%` : '' },
+                  ].map(({ label, val, unit, color, sub }: { label: string; val?: number; unit: string; color: string; sub?: string }) => (
                     <div key={label} style={{ textAlign: 'center', flex: 1 }}>
                       <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 3, color }}>{label}</div>
                       <div className="t-mono tnum" style={{ fontSize: 16, fontWeight: 700, color: val != null ? 'var(--text)' : 'var(--muted)' }}>
-                        {val != null ? val : '—'}
+                        {val != null ? formatNum2(val) : '—'}
                         {val != null && <span style={{ fontSize: 9, color: 'var(--muted)', marginLeft: 1 }}>{unit}</span>}
                       </div>
+                      <div className="t-mono tnum" style={{ fontSize: 9, minHeight: 11, color: 'var(--muted)' }}>{val != null ? sub : ''}</div>
                     </div>
                   ))}
                 </div>
@@ -321,8 +323,8 @@ export function ProfilePage() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
                 {[
                   { ph: 'Weight', unit: 'kg', val: bw, set: setBw, min: 0, max: 500 },
-                  { ph: 'Muscle', unit: 'kg', val: smm, set: setSmm, min: 0, max: 200 },
-                  { ph: 'Fat', unit: '%', val: bf, set: setBf, min: 0, max: 100 },
+                  { ph: 'SMM', unit: 'kg', val: smm, set: setSmm, min: 0, max: 200 },
+                  { ph: 'Body Fat Mass', unit: 'kg', val: bf, set: setBf, min: 0, max: 200 },
                 ].map(({ ph, unit, val, set, min, max }) => (
                   <div key={ph}>
                     <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 4 }}>{ph.toUpperCase()} ({unit})</div>

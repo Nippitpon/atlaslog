@@ -3,6 +3,7 @@ import type { BodyMetricEntry } from '@atlaslog/shared'
 import {
   buildBodySeries, sortedByDate, latestBodyMetric, measureDelta, measureDef,
   BODY_MEASURES, normalizePct, buildNormalizedSeries, totalPctChange,
+  fatMassKg, fatPctFromKg,
 } from './bodyMetrics.js'
 import { makeScale, FINE_STEPS, type Box } from '../components/charts/oneRMScale.js'
 
@@ -63,7 +64,10 @@ describe('buildBodySeries', () => {
   // cliff to the floor and wreck the y-axis.
   it('skips entries that never recorded the measure', () => {
     expect(buildBodySeries(entries, 'muscle').map(p => p.value)).toEqual([33.0, 33.4])
-    expect(buildBodySeries(entries, 'fat').map(p => p.value)).toEqual([19.0, 17.9])
+    // fat is shown as Body Fat Mass kg: 76 × 19% and 74.8 × 17.9%
+    const fat = buildBodySeries(entries, 'fat').map(p => p.value)
+    expect(fat[0]).toBeCloseTo(14.44, 6)
+    expect(fat[1]).toBeCloseTo(13.3892, 6)
     expect(buildBodySeries(entries, 'fat')).toHaveLength(2)
   })
 
@@ -84,7 +88,7 @@ describe('measureDelta', () => {
   // 'b' has no muscle reading, so the muscle delta spans 'a' → 'c', not 'b' → 'c'.
   it('spans the last two readings OF THAT MEASURE, skipping blanks', () => {
     expect(measureDelta(entries, 'muscle')).toBeCloseTo(0.4, 5)
-    expect(measureDelta(entries, 'fat')).toBeCloseTo(-1.1, 5)
+    expect(measureDelta(entries, 'fat')).toBeCloseTo(13.3892 - 14.44, 5)
   })
 
   it('is undefined when there is nothing to compare against', () => {
@@ -96,7 +100,7 @@ describe('measureDelta', () => {
 describe('measureDef', () => {
   it('carries unit and colour per measure', () => {
     expect(measureDef('weight').unit).toBe('kg')
-    expect(measureDef('fat').unit).toBe('%')
+    expect(measureDef('fat').unit).toBe('kg')
     expect(measureDef('muscle').color).not.toBe(measureDef('fat').color)
   })
 })
@@ -292,5 +296,30 @@ describe('makeScale on normalised %Δ data', () => {
   // wide enough to hold it.
   it('reaches far enough for a three-month cut', () => {
     expect(makeScale([{ t: 1, value: 0 }, { t: 2, value: -22 }], box, FINE_STEPS)!.vMin).toBeLessThanOrEqual(-22)
+  })
+})
+
+describe('fatMassKg / fatPctFromKg', () => {
+  // Old rows only stored the percent; the kg is exact because each row has its own weight.
+  it('derives Body Fat Mass kg from the stored percent and the same row weight', () => {
+    expect(fatMassKg(entry('x', '2026-09-01T12:00:00.000Z', 80, undefined, 20))).toBeCloseTo(16, 9)
+  })
+
+  it('is undefined when no fat was recorded', () => {
+    expect(fatMassKg(entry('x', '2026-09-01T12:00:00.000Z', 80))).toBeUndefined()
+    expect(fatMassKg(entry('x', '2026-09-01T12:00:00.000Z', 80, undefined, 0))).toBeUndefined()
+  })
+
+  it('round-trips kg → stored % → kg', () => {
+    for (const [kg, w] of [[15, 80], [13.37, 74.8], [22.05, 101.3]] as const) {
+      const pct = fatPctFromKg(kg, w)!
+      expect(fatMassKg(entry('x', '2026-09-01T12:00:00.000Z', w, undefined, pct))).toBeCloseTo(kg, 9)
+    }
+  })
+
+  it('stores nothing for a blank or non-positive input', () => {
+    expect(fatPctFromKg(undefined, 80)).toBeUndefined()
+    expect(fatPctFromKg(0, 80)).toBeUndefined()
+    expect(fatPctFromKg(15, 0)).toBeUndefined()
   })
 })

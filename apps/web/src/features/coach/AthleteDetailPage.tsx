@@ -7,7 +7,8 @@ import {
   getAthleteSessions, getAthletePrograms, getAthleteBodyMetrics, getAthleteState, assignProgram,
 } from '../../lib/coachApi.js'
 import { STRUCTURED_PROGRAMS } from '../../lib/twelveWeekProgram.js'
-import { formatDate } from '../../lib/utils.js'
+import { formatDate, formatNum2 } from '../../lib/utils.js'
+import { fatMassKg } from '../../lib/bodyMetrics.js'
 import { calcEnergy, ACTIVITY } from '../../lib/energy.js'
 import { IconChevronLeft, IconPlus, IconCheck, IconX } from '../../components/icons/index.js'
 import { MiniBars } from '../../components/charts/MiniBars.js'
@@ -204,15 +205,16 @@ export function AthleteDetailPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', background: 'var(--surface-2)', borderRadius: 10, padding: '10px 14px', marginBottom: trend.length >= 2 ? 14 : 0 }}>
                     {[
                       { label: 'WEIGHT', val: latestBody.weightKg, unit: 'kg' },
-                      { label: 'MUSCLE', val: latestBody.skeletalMuscleKg, unit: 'kg' },
-                      { label: 'FAT', val: latestBody.bodyFatPct, unit: '%' },
-                    ].map(({ label, val, unit }) => (
+                      { label: 'SMM', val: latestBody.skeletalMuscleKg, unit: 'kg' },
+                      { label: 'BODY FAT MASS', val: fatMassKg(latestBody), unit: 'kg', sub: latestBody.bodyFatPct != null ? `${formatNum2(latestBody.bodyFatPct)}%` : '' },
+                    ].map(({ label, val, unit, sub }: { label: string; val?: number; unit: string; sub?: string }) => (
                       <div key={label} style={{ textAlign: 'center', flex: 1 }}>
                         <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 3 }}>{label}</div>
                         <div className="t-mono tnum" style={{ fontSize: 16, fontWeight: 700, color: val != null ? 'var(--text)' : 'var(--muted)' }}>
-                          {val != null ? val : '—'}
+                          {val != null ? formatNum2(val) : '—'}
                           {val != null && <span style={{ fontSize: 9, color: 'var(--muted)', marginLeft: 1 }}>{unit}</span>}
                         </div>
+                        <div className="t-mono tnum" style={{ fontSize: 9, minHeight: 11, color: 'var(--muted)' }}>{val != null ? sub : ''}</div>
                       </div>
                     ))}
                   </div>

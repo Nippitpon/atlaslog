@@ -11,6 +11,7 @@ export interface MeasureDef {
   key: BodyMeasure
   label: string
   pill: string
+  full: string
   unit: string
   color: string
   get: (e: BodyMetricEntry) => number | undefined
@@ -19,10 +20,27 @@ export interface MeasureDef {
 // Three hexes already in LIFT_COLOR / PHASE_COLOR rather than a new palette.
 // Never var(--accent) — for the same reason oneRMScale gives: crimson means
 // "you / now / active" everywhere else, so a series wearing it reads as special.
+// Body fat is STORED as a percent (body_fat_pct) but shown as Body Fat Mass in
+// kg. Every row carries its own weight, so the kg value is exact for old rows
+// too — no migration. energy.ts (Katch-McArdle) keeps reading the percent.
+export function fatMassKg(e: BodyMetricEntry): number | undefined {
+  const pct = e.bodyFatPct
+  if (pct == null || !Number.isFinite(pct) || pct <= 0) return undefined
+  if (!Number.isFinite(e.weightKg) || e.weightKg <= 0) return undefined
+  return e.weightKg * pct / 100
+}
+
+// Inverse of fatMassKg, for the inputs that now take kg.
+export function fatPctFromKg(fatKg: number | undefined, weightKg: number): number | undefined {
+  if (fatKg == null || !Number.isFinite(fatKg) || fatKg <= 0) return undefined
+  if (!Number.isFinite(weightKg) || weightKg <= 0) return undefined
+  return fatKg / weightKg * 100
+}
+
 export const BODY_MEASURES: MeasureDef[] = [
-  { key: 'weight', label: 'Weight', pill: 'WEIGHT', unit: 'kg', color: '#60a5fa', get: e => e.weightKg },
-  { key: 'muscle', label: 'Muscle', pill: 'MUSCLE', unit: 'kg', color: '#4ade80', get: e => e.skeletalMuscleKg },
-  { key: 'fat',    label: 'Fat',    pill: 'FAT%',   unit: '%',  color: '#f97316', get: e => e.bodyFatPct },
+  { key: 'weight', label: 'Weight',        pill: 'WEIGHT',        full: 'WEIGHT',               unit: 'kg', color: '#60a5fa', get: e => e.weightKg },
+  { key: 'muscle', label: 'SMM',           pill: 'SMM',           full: 'SKELETAL MUSCLE MASS', unit: 'kg', color: '#4ade80', get: e => e.skeletalMuscleKg },
+  { key: 'fat',    label: 'Body Fat Mass', pill: 'BODY FAT MASS', full: 'BODY FAT MASS',        unit: 'kg', color: '#f97316', get: fatMassKg },
 ]
 
 export function measureDef(key: BodyMeasure): MeasureDef {

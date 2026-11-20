@@ -3,13 +3,15 @@ import type { BodyMetricEntry } from '@atlaslog/shared'
 import { IconX } from '../../components/icons/index.js'
 import { DateField } from '../../components/DateField.js'
 import { formatDMY, formatNum2, isoFromYMD, todayYMD, ymdOfISO } from '../../lib/utils.js'
+import { fatMassKg, fatPctFromKg } from '../../lib/bodyMetrics.js'
 
 interface Props {
   // Present = edit mode: the fields prefill and the caller keeps the entry's id,
   // so saving replaces the row instead of adding one (addBodyMetric upserts).
   entry?: BodyMetricEntry
   previous?: BodyMetricEntry
-  onSave: (iso: string, weightKg: number, muscle?: number, fat?: number) => void
+  // fatKg is Body Fat Mass in kg; the caller converts it to the stored percent.
+  onSave: (iso: string, weightKg: number, muscle?: number, fatKg?: number) => void
   onClose: () => void
 }
 
@@ -36,6 +38,11 @@ function Field({ label, unit, value, onChange, max, placeholder }: {
   )
 }
 
+function optional(v: string): number | undefined {
+  const n = Number(v)
+  return v.trim() !== '' && Number.isFinite(n) && n > 0 ? n : undefined
+}
+
 export function LogBodyMetricSheet({ entry, previous, onSave, onClose }: Props) {
   const today = todayYMD()
   const isEdit = !!entry
@@ -43,17 +50,17 @@ export function LogBodyMetricSheet({ entry, previous, onSave, onClose }: Props) 
   const [date, setDate] = useState(entry ? ymdOfISO(entry.date) : today)
   const [weight, setWeight] = useState(entry ? String(entry.weightKg) : '')
   const [muscle, setMuscle] = useState(entry?.skeletalMuscleKg != null ? String(entry.skeletalMuscleKg) : '')
-  const [fat, setFat] = useState(entry?.bodyFatPct != null ? String(entry.bodyFatPct) : '')
+  const [fat, setFat] = useState(() => {
+    const v = entry ? fatMassKg(entry) : undefined
+    return v != null ? formatNum2(v) : ''
+  })
   const [saved, setSaved] = useState(false)
 
   const kg = Number(weight)
   const canSave = kg > 0 && !!date
   const delta = previous ? kg - previous.weightKg : 0
+  const fatPct = fatPctFromKg(optional(fat), kg)
 
-  const optional = (v: string) => {
-    const n = Number(v)
-    return v.trim() !== '' && Number.isFinite(n) && n > 0 ? n : undefined
-  }
 
   const handleSave = () => {
     if (!canSave) return
@@ -89,9 +96,16 @@ export function LogBodyMetricSheet({ entry, previous, onSave, onClose }: Props) 
 
         <div style={{ display: 'flex', gap: 8 }}>
           <Field label="WEIGHT" unit="kg" value={weight} onChange={setWeight} max={500} placeholder="0" />
-          <Field label="MUSCLE" unit="kg" value={muscle} onChange={setMuscle} max={200} placeholder="—" />
-          <Field label="FAT" unit="%" value={fat} onChange={setFat} max={100} placeholder="—" />
+          <Field label="SMM" unit="kg" value={muscle} onChange={setMuscle} max={200} placeholder="—" />
+          <Field label="BODY FAT MASS" unit="kg" value={fat} onChange={setFat} max={200} placeholder="—" />
         </div>
+
+        {/* Live % so a typo in kg shows up as an absurd percent before saving. */}
+        {fatPct != null && (
+          <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 6, textAlign: 'right' }}>
+            = ไขมัน {formatNum2(fatPct)}% ของน้ำหนักตัว
+          </div>
+        )}
 
         {/* minHeight so the button never jumps as this line appears. Editing shows
             nothing: there is no "previous" to compare a correction against, and the
