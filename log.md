@@ -6,13 +6,13 @@
 
 ---
 
-## 2026-11-20 — รอบ 82 (✅ SHIPPED, deploy main `5f249b2`): Body Composition — MUSCLE → SMM, FAT% → Body Fat Mass (kg)
+## 2026-11-20 — รอบ 82 (✅ SHIPPED, deploy main `5f249b2` `ab2e9ad`): Body Composition — MUSCLE → SMM, FAT% → Body Fat Mass (kg)
 
 ผู้ใช้ขอ: เปลี่ยนชื่อ MUSCLE เป็น Skeletal Muscle Mass (ย่อ SMM ได้ แต่หัวตาราง History ใช้ชื่อเต็ม) · FAT เป็น Body Fat Mass หน่วย **kg** · ข้อมูลเก่าต้องแปลงได้ · ภายหลังขอให้ยังเห็น **% fat** ด้วย · ตัดสินใจ **ไม่ migrate DB** — ยังเก็บ `body_fat_pct` เหมือนเดิม แปลงเป็น kg เฉพาะตอนแสดง/กรอก (kg = `weightKg × pct / 100` ของแถวเดียวกัน → แถวเก่าแปลงได้ตรงเป๊ะ)
 
 ### ทำอะไร
 - `lib/bodyMetrics.ts` · เพิ่ม `fatMassKg(e)` / `fatPctFromKg(kg, weightKg)` (คืน `undefined` ถ้าค่าไม่มี/≤0) · `MeasureDef` เพิ่ม `full` · `BODY_MEASURES`: muscle → pill `SMM` / full `SKELETAL MUSCLE MASS` · fat → pill `BODY FAT MASS`, unit `kg`, `get: fatMassKg`
-- `BodyPage.tsx` · หัวตาราง History ใช้ `m.full` (ตัดบรรทัดได้ 2 บรรทัดที่ 390px) · % fat เป็นบรรทัดเล็กใต้ค่า kg ทั้งแถบค่าล่าสุดและทุกแถว History · `saveHandler` แปลง kg → pct ก่อนเก็บ
+- `BodyPage.tsx` · หัวตาราง History + ปุ่ม filter ใน PROGRESSION ใช้ `m.full` (หัวตารางตัดได้ 2 บรรทัด · ปุ่ม `flexWrap` ขึ้นแถวที่ 2 ที่ 390px) · แถบค่าล่าสุดยังใช้ `SMM` · % fat เป็นบรรทัดเล็กใต้ค่า kg ทั้งแถบค่าล่าสุดและทุกแถว History · `saveHandler` แปลง kg → pct ก่อนเก็บ
 - `LogBodyMetricSheet.tsx` · ช่อง `SMM (kg)` / `BODY FAT MASS (kg)` · edit prefill ด้วย kg ที่แปลงแล้ว (2 dp) · บอก % สดใต้ช่อง ("= ไขมัน X% ของน้ำหนักตัว") ไว้จับ kg ที่พิมพ์ผิด
 - `ProfilePage.tsx` (การ์ดค่าล่าสุด + ช่องกรอกด่วน) · `coach/AthleteDetailPage.tsx` · เปลี่ยนเป็น SMM / Body Fat Mass kg + % ใต้ค่า · ใช้ `formatNum2` แสดงค่า
 - `bodyMetrics.test.ts` · test fat เปลี่ยนเป็น kg + เพิ่มชุด `fatMassKg / fatPctFromKg` (round-trip kg → pct → kg)
