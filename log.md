@@ -1,8 +1,55 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-11-13 (รอบ 80 — ✅ SHIPPED: เพิ่มวันอาทิตย์ (Sun) · รอบ 79 — ✅ SHIPPED: หน้าแก้ไขโปรแกรมแบบรายสัปดาห์ · รอบ 78 — ✅ SHIPPED: แก้ Phase ถูกเขียนทับตอน Edit โปรแกรม · รอบ 77 — ✅ SHIPPED: Import Excel บันทึกเป็น Draft · รอบ 76 — ✅ SHIPPED: Responsive · รอบ 75 — PLANNED: Gamification EXP/Level/Tier)
+> อัปเดตล่าสุด: 2026-11-20 (รอบ 82 — ✅ SHIPPED: Body Composition ใช้ SMM / Body Fat Mass (kg) · รอบ 81 — ✅ SHIPPED: Home ข้ามโปรแกรมที่ Pause · รอบ 80 — ✅ SHIPPED: เพิ่มวันอาทิตย์ (Sun) · รอบ 79 — ✅ SHIPPED: หน้าแก้ไขโปรแกรมแบบรายสัปดาห์ · รอบ 78 — ✅ SHIPPED: แก้ Phase ถูกเขียนทับตอน Edit โปรแกรม · รอบ 77 — ✅ SHIPPED: Import Excel บันทึกเป็น Draft · รอบ 76 — ✅ SHIPPED: Responsive · รอบ 75 — PLANNED: Gamification EXP/Level/Tier)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-11-20 — รอบ 82 (✅ SHIPPED, deploy main `5f249b2`): Body Composition — MUSCLE → SMM, FAT% → Body Fat Mass (kg)
+
+ผู้ใช้ขอ: เปลี่ยนชื่อ MUSCLE เป็น Skeletal Muscle Mass (ย่อ SMM ได้ แต่หัวตาราง History ใช้ชื่อเต็ม) · FAT เป็น Body Fat Mass หน่วย **kg** · ข้อมูลเก่าต้องแปลงได้ · ภายหลังขอให้ยังเห็น **% fat** ด้วย · ตัดสินใจ **ไม่ migrate DB** — ยังเก็บ `body_fat_pct` เหมือนเดิม แปลงเป็น kg เฉพาะตอนแสดง/กรอก (kg = `weightKg × pct / 100` ของแถวเดียวกัน → แถวเก่าแปลงได้ตรงเป๊ะ)
+
+### ทำอะไร
+- `lib/bodyMetrics.ts` · เพิ่ม `fatMassKg(e)` / `fatPctFromKg(kg, weightKg)` (คืน `undefined` ถ้าค่าไม่มี/≤0) · `MeasureDef` เพิ่ม `full` · `BODY_MEASURES`: muscle → pill `SMM` / full `SKELETAL MUSCLE MASS` · fat → pill `BODY FAT MASS`, unit `kg`, `get: fatMassKg`
+- `BodyPage.tsx` · หัวตาราง History ใช้ `m.full` (ตัดบรรทัดได้ 2 บรรทัดที่ 390px) · % fat เป็นบรรทัดเล็กใต้ค่า kg ทั้งแถบค่าล่าสุดและทุกแถว History · `saveHandler` แปลง kg → pct ก่อนเก็บ
+- `LogBodyMetricSheet.tsx` · ช่อง `SMM (kg)` / `BODY FAT MASS (kg)` · edit prefill ด้วย kg ที่แปลงแล้ว (2 dp) · บอก % สดใต้ช่อง ("= ไขมัน X% ของน้ำหนักตัว") ไว้จับ kg ที่พิมพ์ผิด
+- `ProfilePage.tsx` (การ์ดค่าล่าสุด + ช่องกรอกด่วน) · `coach/AthleteDetailPage.tsx` · เปลี่ยนเป็น SMM / Body Fat Mass kg + % ใต้ค่า · ใช้ `formatNum2` แสดงค่า
+- `bodyMetrics.test.ts` · test fat เปลี่ยนเป็น kg + เพิ่มชุด `fatMassKg / fatPctFromKg` (round-trip kg → pct → kg)
+
+### ผลกระทบ (จัดการแล้ว)
+- `energy.ts` (Katch-McArdle) ยังอ่าน `bodyFatPct` → BMR เท่าเดิม · sync (`syncQueue.ts`) / hydrate (`useAuthStore`) / `coachApi` ไม่ต้องแตะ
+- กราฟ ALL: เส้นส้มเปลี่ยนจาก %Δ ของ fat% เป็น %Δ ของ fat kg — รูปเส้นต่างจากเดิม (ตั้งใจ)
+- ค่า kg ที่กรอกถูกเก็บเป็น pct → อาจคลาด float เล็กน้อย แต่แสดง 2 dp จึงไม่เห็น
+
+### verify
+- `pnpm test` ผ่าน **290 tests / 16 files** · `pnpm build` ผ่าน · ESLint ผ่าน · ผู้ใช้เปิด dev server ดูแล้ว OK
+- ยังไม่ได้ e2e อัตโนมัติที่ 390/768/1280px
+
+### ไม่ทำรอบนี้
+- คอลัมน์ `body_fat_kg` ใน Supabase (เก็บ kg ตามที่กรอกเป๊ะ ๆ) — ไม่จำเป็นตอนนี้ ถ้าต้องการค่อยเป็นรอบแยก
+
+---
+
+## 2026-11-15 — รอบ 81 (✅ SHIPPED, deploy main `5ba8aa8`): Home เลือกโปรแกรมจาก "สถานะก่อน วันที่ทีหลัง" (ข้ามโปรแกรมที่ Pause)
+
+บั๊กจากผู้ใช้: เพิ่มโปรแกรมใหม่ + ตั้ง Start Date แล้ว Pause โปรแกรมเก่า → Home ยังโชว์การ์ด "paused" ของโปรแกรมเก่า ไม่โชว์โปรแกรมใหม่ · สาเหตุ: `pickHomeProgram` ตั้งใจเก็บโปรแกรม paused ไว้ในกลุ่ม running ("pausing must not silently promote another") — ซึ่งขัดกับ use case "Pause เก่าเพื่อเริ่มใหม่" · กลับเงื่อนไขเป็น **สถานะก่อน → วันที่ทีหลัง**
+
+### ทำอะไร
+- `lib/programStatus.ts` · `pickHomeProgram`: กรอง `metas[id].paused` ออกก่อน แล้วค่อยเลือกตามวันที่เดิม running → upcoming (countdown) → over · fallback ใหม่: ถ้า **ทุก** โปรแกรมที่เปิดอยู่ถูก Pause → คืนตัวที่ `programActivity` ล่าสุดเป็น `kind: 'current'` → Dashboard โชว์การ์ด paused + Resume เหมือนเดิม (ไม่ให้ Home ว่าง)
+- `lib/programStatus.test.ts` · แทน test `keeps a paused running program rather than promoting another` (ล็อกพฤติกรรมเก่า) ด้วย 2 test: paused ถูกข้ามแม้โปรแกรมใหม่ยัง upcoming / ช่วงวันที่ทับกัน · ทุกตัว paused → fallback ตัวล่าสุด
+- `DashboardPage.tsx` · แก้คอมเมนต์เหนือ `homePick` ให้ตรง logic ใหม่ (ไม่แตะ JSX — เงื่อนไข empty state `!activeProgramInfo && !currentProgram?.paused && !upcomingProgram` ยังถูก)
+
+### ผลกระทบ (จัดการแล้ว)
+- ลำดับความสำคัญตอนนี้: โปรแกรมไม่ pause ที่ **over** (เลย endDate) ยังชนะโปรแกรมที่ pause — ตั้งใจ (สถานะมาก่อน)
+- หน้า Programs (`groupProgramsByStatus`) ไม่กระทบ — ยังจัดกลุ่ม PAUSED แยกเหมือนเดิม
+
+### verify
+- `pnpm test` ผ่าน **286 tests / 16 files** · `pnpm build` ผ่าน · ESLint ผ่าน
+- ยังไม่ได้ click-through e2e — ควรเช็ค: Pause โปรแกรมเก่า → Home โชว์ countdown ของโปรแกรมใหม่ (ถ้ายังไม่ถึง Start Date) / การ์ด current (ถ้าถึงแล้ว) · Pause ทุกตัว → การ์ด paused + Resume ยังขึ้น
+
+### ไม่ทำรอบนี้
+- SBD Total บน Dashboard (`DashboardPage.tsx:104-111`) ยังนับสัปดาห์ **อาทิตย์–เสาร์** (`getDay()` ตรง ๆ) ไม่ตรงกับรอบ 80 ที่สัปดาห์เป็น จันทร์→อาทิตย์ (`startOfTrainingWeek`) — session วันอาทิตย์ไปตกสัปดาห์ถัดไป · ยังไม่แก้ รอผู้ใช้ตัดสินใจ
 
 ---
 
