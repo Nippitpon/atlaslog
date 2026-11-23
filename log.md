@@ -1,8 +1,32 @@
 # Atlaslog — Development Log
 
-> อัปเดตล่าสุด: 2026-11-20 (รอบ 82 — ✅ SHIPPED: Body Composition ใช้ SMM / Body Fat Mass (kg) · รอบ 81 — ✅ SHIPPED: Home ข้ามโปรแกรมที่ Pause · รอบ 80 — ✅ SHIPPED: เพิ่มวันอาทิตย์ (Sun) · รอบ 79 — ✅ SHIPPED: หน้าแก้ไขโปรแกรมแบบรายสัปดาห์ · รอบ 78 — ✅ SHIPPED: แก้ Phase ถูกเขียนทับตอน Edit โปรแกรม · รอบ 77 — ✅ SHIPPED: Import Excel บันทึกเป็น Draft · รอบ 76 — ✅ SHIPPED: Responsive · รอบ 75 — PLANNED: Gamification EXP/Level/Tier)
+> อัปเดตล่าสุด: 2026-11-23 (รอบ 83 — ✅ SHIPPED: หน้า 1RM SBD Total + Baseline + Total Log/โน้ต · รอบ 82 — ✅ SHIPPED: Body Composition ใช้ SMM / Body Fat Mass (kg) · รอบ 81 — ✅ SHIPPED: Home ข้ามโปรแกรมที่ Pause · รอบ 80 — ✅ SHIPPED: เพิ่มวันอาทิตย์ (Sun) · รอบ 79 — ✅ SHIPPED: หน้าแก้ไขโปรแกรมแบบรายสัปดาห์ · รอบ 78 — ✅ SHIPPED: แก้ Phase ถูกเขียนทับตอน Edit โปรแกรม · รอบ 77 — ✅ SHIPPED: Import Excel บันทึกเป็น Draft · รอบ 76 — ✅ SHIPPED: Responsive · รอบ 75 — PLANNED: Gamification EXP/Level/Tier)
 >
 > 📘 คู่มือ Coaching: `docs/coaching-guide.md`
+
+---
+
+## 2026-11-23 — รอบ 83 (✅ SHIPPED, deploy main `98e8173`): หน้า 1RM — SBD Total + Baseline + Total Log พร้อมโน้ต
+
+ผู้ใช้ขอ: อยากเห็น total baseline ในหน้า 1RM → ชี้แจงทีหลังว่าหมายถึง **ในกราฟ PROGRESSION** · จากนั้นขอ**ช่องโน้ต**ที่ SBD TOTAL + **log ตามวันที่**ทุกครั้งที่มี Total ใหม่ · ตัดสินใจ **ไม่ migrate DB** — โน้ต Total เก็บในคอลัมน์ `note` ของ `one_rm_records` ที่ sync อยู่แล้ว
+
+### ทำอะไร
+- `lib/oneRM.ts` · `firstOneRMs(entries, fallback)` = ค่าแรกสุดของแต่ละท่า (baseline) · `buildTotalSeries(entries, fallback)` → `TotalPoint[]` (`day`/`date`/`t`/`value`/`delta`/`note`/`entryIds`) หนึ่งจุดต่อ**วัน local** (`ymdOfISO`) — ท่าที่ยังไม่เคยเทสต์ ณ วันนั้นนับที่ค่า baseline ของมัน → จุดแรก = baseline เสมอ · note ของวัน = note ล่าสุดที่ไม่ว่างในวันนั้น
+- `OneRMChart.tsx` · `LiftSelection` เพิ่ม `'total'` + pill `TOTAL` (สี `var(--text)` ไม่ใช้ accent) · เส้น total ทึบ + เส้นประแนวนอน `BASELINE xxx` · ไม่ใส่ total ในโหมด ALL (สเกล ~500 kg ทำเส้นรายท่าแบน)
+- `useAppStore.ts` · action `setOneRMNote(ids, note)` — เขียน note ลง**ทุกแถว**ของวันนั้นผ่าน `appendOneRMs` (upsert + sync) · ไม่ re-promote `personalOneRMs`
+- `OneRMPage.tsx` · การ์ด SBD TOTAL (current จาก `latestOneRMs` / BASELINE จาก `firstOneRMs` / delta) ขึ้นตอน ALL หรือ TOTAL · แถวโน้ตใต้การ์ด (โน้ตของ Total ล่าสุด) + ลิงก์ `Log →` สลับไป TOTAL · โหมด TOTAL แทน HISTORY ด้วย **TOTAL LOG** (ใหม่→เก่า, วันที่ · Total · delta, แถวเก่าสุดติด `BASELINE`, ปุ่มแก้โน้ต) · sheet `Total note` (textarea, max 500)
+
+### ผลกระทบ (จัดการแล้ว)
+- "today" entry เก็บ timestamp จริง → S/B/D ที่ log ห่างกันไม่กี่นาทีเคยเป็น 3 จุด → group ตามวัน local แล้ว
+- โน้ตเขียนทุกแถวของวัน → ลบ record ท่าใดท่าหนึ่งของวันนั้นโน้ตยังอยู่
+- ⚠️ trade-off: ถ้าวันหน้าอยากมีโน้ต**รายท่า** จะปนกับโน้ต Total (ใช้คอลัมน์เดียวกัน) → ต้องแยกตาราง/คอลัมน์ใหม่ตอนนั้น
+
+### verify
+`pnpm build` ผ่าน · ESLint ผ่าน · `pnpm test` = **295 tests / 17 files** (ไฟล์ใหม่ `lib/oneRM.test.ts` 5 เทสต์: firstOneRMs, total series step, same-day merge + note + delta) · **ยังไม่ได้ click-through e2e** — ควรเช็ค: pill TOTAL ที่ 390px (5 pill ไม่ล้น) · ป้าย BASELINE ไม่ทับจุดสุดท้าย · บันทึกโน้ต → reload/login ใหม่แล้วโน้ตยังอยู่ (ยืนยันว่าคอลัมน์ `one_rm_records.note` มีจริงบน Supabase)
+
+### ไม่ทำรอบนี้
+- เส้น baseline ในกราฟรายท่า (SQUAT/BENCH/DEAD) — ผู้ใช้ขอเฉพาะ total
+- โน้ตแยกรายท่า / ตาราง total แยก — ไม่จำเป็นตอนนี้ เลี่ยง migration
 
 ---
 
