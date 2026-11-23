@@ -1,26 +1,29 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { OneRMEntry, OneRMLift } from '@atlaslog/shared'
+import type { TotalPoint } from '../../lib/oneRM.js'
 import { useAppStore } from '../../store/useAppStore.js'
 import { formatDMY } from '../../lib/utils.js'
-import { buildLiftSeries, latestEntryFor } from '../../lib/oneRM.js'
+import { buildLiftSeries, buildTotalSeries, latestEntryFor, latestOneRMs, firstOneRMs } from '../../lib/oneRM.js'
 import { OneRMChart, type LiftSelection } from '../../components/charts/OneRMChart.js'
 import { LIFT_COLOR, LIFT_LABEL, LIFT_SHORT, LIFT_ORDER } from '../../components/charts/oneRMScale.js'
 import { LogOneRMSheet } from './LogOneRMSheet.js'
-import { IconChevronLeft, IconTrendingUp, IconTrash, IconX } from '../../components/icons/index.js'
+import { IconChevronLeft, IconTrendingUp, IconTrash, IconX, IconEdit } from '../../components/icons/index.js'
 
 const LIFTS: { key: OneRMLift; label: string; short: string }[] =
   LIFT_ORDER.map(k => ({ key: k, label: LIFT_LABEL[k], short: LIFT_SHORT[k] }))
 
 export function OneRMPage() {
   const navigate = useNavigate()
-  const { history, personalOneRMs, setPersonalOneRMs, oneRMHistory, addOneRMEntry, removeOneRMEntry } = useAppStore()
+  const { history, personalOneRMs, setPersonalOneRMs, oneRMHistory, addOneRMEntry, removeOneRMEntry, setOneRMNote } = useAppStore()
 
   const [liftSel, setLiftSel] = useState<LiftSelection>('all')
   const [showLog, setShowLog] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [draft, setDraft] = useState(personalOneRMs)
   const [saved, setSaved] = useState(false)
+  const [noteFor, setNoteFor] = useState<TotalPoint | null>(null)
+  const [noteDraft, setNoteDraft] = useState('')
 
   const liftSeries = useMemo(() => buildLiftSeries(history, oneRMHistory), [history, oneRMHistory])
 
@@ -33,8 +36,25 @@ export function OneRMPage() {
   const sbdTotal = personalOneRMs.squat + personalOneRMs.bench + personalOneRMs.deadlift
   const hasAny = oneRMHistory.length > 0 || sbdTotal > 0
 
+  const totals = useMemo(() => {
+    const sum = (r: Record<OneRMLift, number>) => Math.round((r.squat + r.bench + r.deadlift) * 10) / 10
+    return {
+      current: sum(latestOneRMs(oneRMHistory, personalOneRMs)),
+      baseline: sum(firstOneRMs(oneRMHistory, personalOneRMs)),
+    }
+  }, [oneRMHistory, personalOneRMs])
+  const totalSeries = useMemo(() => buildTotalSeries(oneRMHistory, personalOneRMs), [oneRMHistory, personalOneRMs])
+  const latestTotal = totalSeries[totalSeries.length - 1]
+  const totalLog = useMemo(() => [...totalSeries].reverse(), [totalSeries])
+  const openNote = (p: TotalPoint) => { setNoteDraft(p.note ?? ''); setNoteFor(p) }
+  const saveNote = () => {
+    if (noteFor) setOneRMNote(noteFor.entryIds, noteDraft)
+    setNoteFor(null)
+  }
+  const totalDelta = Math.round((totals.current - totals.baseline) * 10) / 10
+
   const rmRows = useMemo(() => {
-    const rows = liftSel === 'all' ? oneRMHistory : oneRMHistory.filter(e => e.lift === liftSel)
+    const rows = liftSel === 'all' || liftSel === 'total' ? oneRMHistory : oneRMHistory.filter(e => e.lift === liftSel)
     return [...rows].sort((a, b) => b.date.localeCompare(a.date))
   }, [oneRMHistory, liftSel])
 
@@ -100,7 +120,10 @@ export function OneRMPage() {
               </button>
             </div>
             <div className="card">
-              <OneRMChart series={liftSeries} selected={liftSel} onSelect={setLiftSel} />
+              <OneRMChart
+                series={liftSeries} total={totalSeries} baseline={totals.baseline}
+                selected={liftSel} onSelect={setLiftSel}
+              />
 
               {/* Latest per lift — doubles as the colour legend for the chart */}
               <div style={{
@@ -108,7 +131,7 @@ export function OneRMPage() {
                 background: 'var(--surface-2)', borderRadius: 10,
                 padding: '10px 14px', marginTop: 14,
               }}>
-                {LIFT_ORDER.filter(k => liftSel === 'all' || liftSel === k).map(k => {
+                {LIFT_ORDER.filter(k => liftSel === 'all' || liftSel === 'total' || liftSel === k).map(k => {
                   const latest = prevByLift[k]
                   const manual = liftSeries.find(s => s.lift === k)?.manual ?? []
                   const d = manual.length >= 2
@@ -137,6 +160,63 @@ export function OneRMPage() {
                 })}
               </div>
 
+              {(liftSel === 'all' || liftSel === 'total') && totals.current > 0 && (
+                <div style={{
+                  border: '1px solid var(--border)', borderRadius: 10,
+                  padding: '10px 14px', marginTop: 8,
+                }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>SBD TOTAL</div>
+                    <div className="t-mono tnum" style={{ fontSize: 18, fontWeight: 700 }}>
+                      {totals.current}<span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 2 }}>kg</span>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div className="t-eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>BASELINE</div>
+                    <div className="t-mono tnum" style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>
+                      {totals.baseline}<span style={{ fontSize: 9, color: 'var(--muted)', marginLeft: 1 }}>kg</span>
+                      <span style={{
+                        fontSize: 10, marginLeft: 6,
+                        color: totalDelta > 0 ? '#4ade80' : totalDelta < 0 ? 'var(--danger)' : 'var(--muted)',
+                      }}>
+                        {totalDelta > 0 ? '+' : ''}{totalDelta}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                {latestTotal && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    borderTop: '1px solid var(--border)', marginTop: 10, paddingTop: 8,
+                  }}>
+                    <button
+                      onClick={() => openNote(latestTotal)}
+                      style={{
+                        all: 'unset', cursor: 'pointer', flex: 1, minWidth: 0,
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        fontSize: 12, color: latestTotal.note ? 'var(--text-2)' : 'var(--muted)',
+                      }}
+                    >
+                      <IconEdit size={12} style={{ flexShrink: 0 }} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {latestTotal.note || 'เพิ่มโน้ตให้ Total นี้…'}
+                      </span>
+                    </button>
+                    {liftSel !== 'total' && (
+                      <button
+                        onClick={() => setLiftSel('total')}
+                        className="t-mono"
+                        style={{ all: 'unset', cursor: 'pointer', fontSize: 10, color: 'var(--muted)', flexShrink: 0 }}
+                      >
+                        Log →
+                      </button>
+                    )}
+                  </div>
+                )}
+                </div>
+              )}
+
               <button
                 className="btn btn-primary"
                 style={{ width: '100%', marginTop: 14, height: 44, fontSize: 13 }}
@@ -147,7 +227,42 @@ export function OneRMPage() {
             </div>
           </div>
 
-          {rmRows.length > 0 && (
+          {liftSel === 'total' && totalLog.length > 0 && (
+            <div style={{ padding: '0 20px 32px' }}>
+              <div className="t-eyebrow" style={{ marginBottom: 10 }}>TOTAL LOG</div>
+              {totalLog.map((p, i) => {
+                const isFirst = i === totalLog.length - 1
+                const deltaColor = isFirst || p.delta === 0 ? 'var(--muted)' : p.delta > 0 ? '#4ade80' : 'var(--danger)'
+                return (
+                  <div key={p.day} className="card card-tight" style={{ marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="t-mono tnum" style={{ fontSize: 15, fontWeight: 700 }}>
+                          {p.value}<span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 1 }}>kg</span>
+                          <span style={{ fontSize: 10, marginLeft: 8, fontWeight: 600, color: deltaColor }}>
+                            {isFirst ? 'BASELINE' : `${p.delta > 0 ? '+' : ''}${p.delta}`}
+                          </span>
+                        </div>
+                        <div className="t-mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                          {formatDMY(p.date)}
+                        </div>
+                      </div>
+                      <button className="btn-icon" onClick={() => openNote(p)} aria-label="Edit total note">
+                        <IconEdit size={16} style={{ color: 'var(--muted)' }} />
+                      </button>
+                    </div>
+                    {p.note && (
+                      <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 8, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                        {p.note}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {liftSel !== 'total' && rmRows.length > 0 && (
             <div style={{ padding: '0 20px 32px' }}>
               <div className="t-eyebrow" style={{ marginBottom: 10 }}>
                 HISTORY{liftSel !== 'all' ? ` · ${LIFT_LABEL[liftSel].toUpperCase()}` : ''}
@@ -183,9 +298,45 @@ export function OneRMPage() {
         </div>
       )}
 
+      {noteFor && (
+        <div className="sheet-backdrop" onClick={() => setNoteFor(null)} style={{ zIndex: 100 }}>
+          <div className="sheet" onClick={e => e.stopPropagation()}>
+            <div className="sheet-handle" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <h3 className="t-display" style={{ margin: 0, fontSize: 20 }}>Total note</h3>
+              <button className="btn-icon" onClick={() => setNoteFor(null)}><IconX size={18} /></button>
+            </div>
+            <p className="t-mono" style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
+              SBD {noteFor.value} kg · {formatDMY(noteFor.date)}
+            </p>
+            <textarea
+              className="input-num"
+              autoFocus
+              rows={4}
+              maxLength={500}
+              value={noteDraft}
+              placeholder="เช่น แข่งรายการ… / น้ำหนักตัว… / รู้สึกยังไง"
+              onChange={e => setNoteDraft(e.target.value)}
+              style={{
+                width: '100%', height: 'auto', minHeight: 96, padding: 10, resize: 'vertical',
+                textAlign: 'left', fontFamily: 'var(--font-mono)', textTransform: 'none', fontSize: 13,
+                boxSizing: 'border-box',
+              }}
+            />
+            <button
+              className="btn btn-primary"
+              style={{ width: '100%', marginTop: 14, height: 44, fontSize: 13 }}
+              onClick={saveNote}
+            >
+              Save note
+            </button>
+          </div>
+        </div>
+      )}
+
       {showLog && (
         <LogOneRMSheet
-          defaultLift={liftSel === 'all' ? 'squat' : liftSel}
+          defaultLift={liftSel === 'all' || liftSel === 'total' ? 'squat' : liftSel}
           previous={prevByLift}
           onSave={(lift, iso, weightKg) => addOneRMEntry({
             id: `rm${Date.now()}-${lift}`,

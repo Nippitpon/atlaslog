@@ -49,6 +49,7 @@ interface AppStore {
   addOneRMEntry: (entry: OneRMEntry) => void
   addOneRMEntries: (entries: OneRMEntry[]) => void
   removeOneRMEntry: (id: string) => void
+  setOneRMNote: (ids: string[], note: string) => void
   setOneRMHistory: (entries: OneRMEntry[]) => void
   addCustomExercise: (ex: Exercise) => void
   removeCustomExercise: (id: string) => void
@@ -273,6 +274,16 @@ export const useAppStore = create<AppStore>()(
         // tidying the chart should not silently change every prescribed weight.
         set(state => ({ oneRMHistory: state.oneRMHistory.filter(e => e.id !== id) }))
         void syncOneRMDelete(id)
+      },
+      // A total's note is written onto every row of its test day, so it survives
+      // deleting any one of them. Same rows, same values — never re-promotes.
+      setOneRMNote: (ids, note) => {
+        const want = new Set(ids)
+        const trimmed = note.trim() || undefined
+        const touched = get().oneRMHistory
+          .filter(e => want.has(e.id) && e.note !== trimmed)
+          .map(e => ({ ...e, note: trimmed }))
+        appendOneRMs(touched)
       },
       setOneRMHistory: (oneRMHistory) => set({ oneRMHistory }),
 

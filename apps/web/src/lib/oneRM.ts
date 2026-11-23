@@ -1,5 +1,6 @@
 import type { Session, WorkoutSet, ProgramOneRMs, OneRMEntry, OneRMLift } from '@atlaslog/shared'
 import { getRpePct, SBD_IDS } from './rpeTable.js'
+import { ymdOfISO } from './utils.js'
 
 export const LIFT_ORDER: OneRMLift[] = ['squat', 'bench', 'deadlift']
 
@@ -146,6 +147,59 @@ export function latestEntryFor(entries: OneRMEntry[], lift: OneRMLift): OneRMEnt
     if (!latest || e.date.localeCompare(latest.date) > 0) latest = e
   }
   return latest
+}
+
+// Oldest logged value per lift — the baseline the current total is measured against.
+export function firstOneRMs(entries: OneRMEntry[], fallback: ProgramOneRMs): ProgramOneRMs {
+  const out = { ...fallback }
+  const seen = new Set<OneRMLift>()
+  for (const e of [...entries].sort((a, b) => a.date.localeCompare(b.date))) {
+    if (seen.has(e.lift)) continue
+    seen.add(e.lift)
+    out[e.lift] = e.weightKg
+  }
+  return out
+}
+
+export interface TotalPoint {
+  day: string        // local YYYY-MM-DD — one point per test day
+  date: string       // ISO of the newest entry that day
+  t: number
+  value: number
+  delta: number      // vs the previous point; 0 on the first
+  note?: string
+  entryIds: string[] // the rows logged that day — where the day's note lives
+}
+
+// SBD total as it stood on each day a 1RM was logged. A lift not yet tested by
+// that day counts at its baseline, so the first point always equals the
+// firstOneRMs() total and the line only moves when a lift actually changes.
+// Grouped by local day, not raw timestamp: "today" entries carry the real
+// instant, so S/B/D logged minutes apart would otherwise be three points.
+export function buildTotalSeries(entries: OneRMEntry[], fallback: ProgramOneRMs): TotalPoint[] {
+  const current = firstOneRMs(entries, fallback)
+  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date))
+  const out: TotalPoint[] = []
+  let i = 0
+  while (i < sorted.length) {
+    const day = ymdOfISO(sorted[i]!.date)
+    const group: OneRMEntry[] = []
+    while (i < sorted.length && ymdOfISO(sorted[i]!.date) === day) group.push(sorted[i++]!)
+    for (const e of group) current[e.lift] = e.weightKg
+    const value = Math.round((current.squat + current.bench + current.deadlift) * 10) / 10
+    const prev = out[out.length - 1]
+    const last = group[group.length - 1]!
+    out.push({
+      day,
+      date: last.date,
+      t: new Date(last.date).getTime(),
+      value,
+      delta: prev ? Math.round((value - prev.value) * 10) / 10 : 0,
+      note: [...group].reverse().find(e => e.note?.trim())?.note,
+      entryIds: group.map(e => e.id),
+    })
+  }
+  return out
 }
 
 // Newest logged value per lift, falling back per-lift when history has none for it.

@@ -1,12 +1,17 @@
 import type { OneRMLift } from '@atlaslog/shared'
-import type { LiftSeries, OneRMPoint } from '../../lib/oneRM.js'
+import type { LiftSeries, TotalPoint } from '../../lib/oneRM.js'
 import { formatDM } from '../../lib/utils.js'
-import { LIFT_ORDER, LIFT_COLOR, LIFT_PILL, makeScale, polyPoints, type Box } from './oneRMScale.js'
+import { LIFT_ORDER, LIFT_COLOR, LIFT_PILL, makeScale, polyPoints, type Box, type ChartPoint } from './oneRMScale.js'
 
-export type LiftSelection = OneRMLift | 'all'
+export type LiftSelection = OneRMLift | 'all' | 'total'
+
+// Neutral, not --accent: the total is a sum of the three lift colours, not one of them.
+const TOTAL_COLOR = 'var(--text)'
 
 interface OneRMChartProps {
   series: LiftSeries[]
+  total: TotalPoint[]
+  baseline: number
   selected: LiftSelection
   onSelect: (k: LiftSelection) => void
   height?: number
@@ -18,16 +23,17 @@ const PAD_R = 6
 const PAD_T = 10
 const PAD_B = 20
 
-export function OneRMChart({ series, selected, onSelect, height = 168 }: OneRMChartProps) {
+export function OneRMChart({ series, total, baseline, selected, onSelect, height = 168 }: OneRMChartProps) {
   const box: Box = { w: VB_W, h: height, padL: PAD_L, padR: PAD_R, padT: PAD_T, padB: PAD_B }
 
   // ALL shows manual only. Three lifts x two series is six polylines across a
   // 284px plot — unreadable, and solid-vs-dashed is a weak channel at 1.5px.
   // Manual entries are sparse enough that three solid lines stay legible.
-  const shown = selected === 'all' ? series : series.filter(s => s.lift === selected)
-  const withEstimates = selected !== 'all'
+  const isTotal = selected === 'total'
+  const shown = isTotal ? [] : selected === 'all' ? series : series.filter(s => s.lift === selected)
+  const withEstimates = selected !== 'all' && !isTotal
 
-  const visible: OneRMPoint[] = shown.flatMap(s =>
+  const visible: ChartPoint[] = isTotal ? total : shown.flatMap(s =>
     withEstimates ? [...s.manual, ...s.estimated] : s.manual
   )
   const scale = makeScale(visible, box)
@@ -40,9 +46,9 @@ export function OneRMChart({ series, selected, onSelect, height = 168 }: OneRMCh
     <div>
       {/* Lift selector */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-        {(['all', ...LIFT_ORDER] as LiftSelection[]).map(k => {
+        {(['all', ...LIFT_ORDER, 'total'] as LiftSelection[]).map(k => {
           const active = selected === k
-          const color = k === 'all' ? 'var(--accent)' : LIFT_COLOR[k]
+          const color = k === 'all' ? 'var(--accent)' : k === 'total' ? TOTAL_COLOR : LIFT_COLOR[k]
           return (
             <button
               key={k}
@@ -55,7 +61,7 @@ export function OneRMChart({ series, selected, onSelect, height = 168 }: OneRMCh
                 color: active ? color : 'var(--text-2)',
               }}
             >
-              {k === 'all' ? 'ALL' : LIFT_PILL[k]}
+              {k === 'all' ? 'ALL' : k === 'total' ? 'TOTAL' : LIFT_PILL[k]}
             </button>
           )
         })}
@@ -84,6 +90,37 @@ export function OneRMChart({ series, selected, onSelect, height = 168 }: OneRMCh
                 </text>
               </g>
             ))}
+
+            {isTotal && (
+              <g>
+                <line
+                  x1={PAD_L} x2={VB_W - PAD_R}
+                  y1={scale.y(baseline)} y2={scale.y(baseline)}
+                  stroke="var(--muted)" strokeWidth={1} strokeDasharray="4 3"
+                />
+                <text
+                  x={VB_W - PAD_R} y={scale.y(baseline) + 10}
+                  textAnchor="end" fontSize={8}
+                  fill="var(--muted)" fontFamily="var(--font-mono)"
+                >
+                  BASELINE {baseline}
+                </text>
+                <polyline
+                  fill="none" stroke={TOTAL_COLOR} strokeWidth={2}
+                  strokeLinecap="round" strokeLinejoin="round"
+                  points={polyPoints(total, scale)}
+                />
+                {total.map((p, i) => (
+                  <circle
+                    key={p.date}
+                    cx={scale.x(p.t)} cy={scale.y(p.value)}
+                    r={i === total.length - 1 ? 4 : 3}
+                    fill={TOTAL_COLOR}
+                    stroke="var(--surface-1)" strokeWidth={1.5}
+                  />
+                ))}
+              </g>
+            )}
 
             {shown.map(s => (
               <g key={s.lift} style={{ transition: 'opacity .2s ease' }}>
